@@ -2,6 +2,3 @@ node_modules/
 .env
 /src/generated/prisma
 mintty.2026-07-06_14-08-13.png
-SHMS_AUDIT_REPORT.md
-DEPLOYMENT_PROGRESS.md
-test-password.js
