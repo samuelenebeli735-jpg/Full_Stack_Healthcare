@@ -20,9 +20,11 @@ const app = express();
 |--------------------------------------------------------------------------
 */
 
+const defaultOrigins = [env.FRONTEND_URL, "http://localhost:5500", "http://127.0.0.1:5500"].filter(Boolean);
+
 const allowedOrigins = env.CORS_ORIGINS
   ? env.CORS_ORIGINS.split(",").map((o) => o.trim())
-  : ["http://localhost:5500", "http://127.0.0.1:5500"];
+  : defaultOrigins;
 
 app.use(cors({
   origin: allowedOrigins,

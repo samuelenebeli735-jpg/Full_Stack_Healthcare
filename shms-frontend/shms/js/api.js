@@ -8,7 +8,7 @@
 |--------------------------------------------------------------------------
 */
 const API = (() => {
-  const BASE_URL = (window.SHMS_API_BASE || 'http://localhost:5000/api/v1').replace(/\/$/, '');
+  const BASE_URL = (window.SHMS_API_BASE || (window.location && window.location.origin ? `${window.location.origin}/api/v1` : '/api/v1')).replace(/\/$/, '');
   const TOKEN_KEY = 'shms_token';
   const USER_KEY = 'shms_user';
 

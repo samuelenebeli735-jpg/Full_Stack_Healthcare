@@ -8,5 +8,12 @@
     window.SHMS_BASE = path.substring(0, path.lastIndexOf('/') + 1);
   }
 
-  window.SHMS_API_BASE = window.SHMS_API_BASE || 'http://localhost:5000/api/v1';
+  var configuredBase = window.SHMS_API_BASE;
+  var fallbackBase = window.location && window.location.origin
+    ? window.location.origin + '/api/v1'
+    : '/api/v1';
+
+  window.SHMS_API_BASE = configuredBase && String(configuredBase).trim()
+    ? String(configuredBase).trim()
+    : fallbackBase;
 })();
