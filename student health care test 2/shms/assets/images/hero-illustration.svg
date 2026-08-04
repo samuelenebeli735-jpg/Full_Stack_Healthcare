@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 400" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#eef2ff"/>
+      <stop offset="100%" stop-color="#e0f2fe"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="100%" stop-color="#f8fafc"/>
+    </linearGradient>
+  </defs>
+  <!-- Background -->
+  <rect width="500" height="400" rx="24" fill="url(#bg)"/>
+  <!-- Decorative circles -->
+  <circle cx="80" cy="60" r="40" fill="#2563eb" opacity="0.06"/>
+  <circle cx="420" cy="340" r="60" fill="#2563eb" opacity="0.05"/>
+  <circle cx="400" cy="80" r="30" fill="#06b6d4" opacity="0.08"/>
+  <!-- Medical cross - large background -->
+  <g opacity="0.04">
+    <path d="M250 80v240M130 200h240" stroke="#2563eb" stroke-width="60" stroke-linecap="round"/>
+  </g>
+  <!-- Doctor figure -->
+  <g transform="translate(100, 120)">
+    <!-- Body (coat) -->
+    <rect x="25" y="45" width="50" height="70" rx="8" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+    <!-- Collar -->
+    <path d="M40 45l10 15 10-15" fill="#2563eb" opacity="0.15"/>
+    <!-- Head -->
+    <circle cx="50" cy="25" r="20" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+    <!-- Hair -->
+    <path d="M35 20c0-10 30-10 30 0" fill="#1e293b" opacity="0.8"/>
+    <!-- Eyes -->
+    <circle cx="43" cy="23" r="2" fill="#1e293b"/>
+    <circle cx="57" cy="23" r="2" fill="#1e293b"/>
+    <!-- Smile -->
+    <path d="M43 30c4 4 10 4 14 0" stroke="#1e293b" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    <!-- Stethoscope -->
+    <path d="M50 45l-5 15-3 5c-2 3-6 2-6-1" stroke="#64748b" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <circle cx="36" cy="66" r="5" stroke="#64748b" stroke-width="2" fill="none"/>
+    <!-- Clipboard -->
+    <rect x="70" y="50" width="20" height="26" rx="3" fill="#fff" stroke="#2563eb" stroke-width="1.5"/>
+    <line x1="74" y1="58" x2="86" y2="58" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="74" y1="64" x2="86" y2="64" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/>
+    <line x1="74" y1="70" x2="80" y2="70" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+  <!-- Patient figure (sitting) -->
+  <g transform="translate(280, 160)">
+    <!-- Body -->
+    <rect x="20" y="30" width="45" height="55" rx="8" fill="#e0f2fe" stroke="#7dd3fc" stroke-width="1.5"/>
+    <!-- Head -->
+    <circle cx="42" cy="15" r="18" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+    <!-- Hair -->
+    <path d="M28 12c0-8 28-8 28 0" fill="#1e293b" opacity="0.7"/>
+    <path d="M28 12v-2c0-4 28-4 28 2" fill="#1e293b" opacity="0.5"/>
+    <!-- Eyes -->
+    <circle cx="36" cy="13" r="1.8" fill="#1e293b"/>
+    <circle cx="48" cy="13" r="1.8" fill="#1e293b"/>
+    <!-- Smile -->
+    <path d="M36 19c3 3 9 3 12 0" stroke="#1e293b" stroke-width="1.2" stroke-linecap="round" fill="none"/>
+    <!-- Arm reaching out -->
+    <path d="M20 50l-20 10" stroke="#fcd34d" stroke-width="6" stroke-linecap="round" fill="none"/>
+    <circle cx="0" cy="60" r="5" fill="#fef3c7" stroke="#fcd34d" stroke-width="1"/>
+  </g>
+  <!-- Heartbeat line -->
+  <polyline points="60,350 120,350 140,320 160,380 180,340 200,360 220,300 240,350 300,350 320,320 340,380 360,340 380,360 400,300 420,350 460,350" stroke="#ef4444" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6">
+    <animate attributeName="opacity" values="0.3;0.8;0.3" dur="3s" repeatCount="indefinite"/>
+  </polyline>
+  <!-- Pills decoration -->
+  <g transform="translate(420, 100)" opacity="0.5">
+    <rect x="0" y="0" width="8" height="16" rx="4" fill="#3b82f6" transform="rotate(-20)"/>
+    <rect x="12" y="4" width="8" height="16" rx="4" fill="#ef4444" transform="rotate(15)"/>
+  </g>
+  <!-- Clipboard with checkmark -->
+  <g transform="translate(50, 300)" opacity="0.4">
+    <rect x="0" y="0" width="16" height="20" rx="3" fill="#fff" stroke="#2563eb" stroke-width="1.5"/>
+    <polyline points="3,10 7,14 13,6" stroke="#2563eb" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </g>
+</svg>

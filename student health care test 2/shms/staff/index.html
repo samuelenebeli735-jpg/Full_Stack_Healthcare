@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Staff Dashboard - SHMS</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--font-family);background:#f4f6f8;color:var(--text-primary)}
+
+    .staff-tabs{display:none}
+
+    .staff-content-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:20px;margin-bottom:20px}
+    @media(max-width:1024px){.staff-content-grid{grid-template-columns:1fr}}
+
+    .sf-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    @media(max-width:1024px){.sf-stat-row{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:480px){.sf-stat-row{grid-template-columns:1fr}}
+
+    .sf-stat{background:#fff;border-radius:14px;padding:20px 22px;display:flex;align-items:center;gap:16px;border:1px solid #e8ecf0;transition:all 0.3s}
+    .sf-stat:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.07)}
+    .sf-stat-icon{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .sf-stat-icon svg{width:24px;height:24px}
+    .sf-stat-icon.blue{background:#eff6ff;color:#2563eb}
+    .sf-stat-icon.green{background:#f0fdf4;color:#16a34a}
+    .sf-stat-icon.amber{background:#fffbeb;color:#d97706}
+    .sf-stat-icon.purple{background:#f5f3ff;color:#7c3aed}
+    .sf-stat-value{font-size:26px;font-weight:800;color:#111827;line-height:1.1}
+    .sf-stat-label{font-size:13px;color:#6b7280;margin-top:2px}
+    .sf-stat-link{font-size:12px;color:#10b981;font-weight:600;margin-top:4px;cursor:pointer;text-decoration:none}
+    .sf-stat-link:hover{text-decoration:underline}
+
+    .sf-card{background:#fff;border-radius:14px;border:1px solid #e8ecf0;overflow:hidden;transition:all 0.3s}
+    .sf-card:hover{box-shadow:0 6px 20px rgba(0,0,0,0.06)}
+    .sf-card-header{padding:18px 22px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;justify-content:space-between}
+    .sf-card-header h3{font-size:15px;font-weight:700;color:#111827}
+    .sf-card-header .view-link{font-size:13px;color:#10b981;font-weight:600;cursor:pointer;text-decoration:none}
+    .sf-card-header .view-link:hover{text-decoration:underline}
+    .sf-card-body{padding:0}
+
+    .sf-appt-row{display:flex;align-items:center;gap:14px;padding:14px 22px;border-bottom:1px solid #f5f6f8;transition:background 0.2s}
+    .sf-appt-row:last-child{border-bottom:none}
+    .sf-appt-row:hover{background:#f9fafb}
+    .sf-appt-time{font-size:13px;font-weight:600;color:#6b7280;min-width:72px}
+    .sf-appt-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+    .sf-appt-avatar.green{background:#10b981}
+    .sf-appt-avatar.blue{background:#3b82f6}
+    .sf-appt-avatar.purple{background:#8b5cf6}
+    .sf-appt-avatar.amber{background:#f59e0b}
+    .sf-appt-avatar.rose{background:#f43f5e}
+    .sf-appt-avatar.teal{background:#14b8a6}
+    .sf-appt-info{flex:1;min-width:0}
+    .sf-appt-name{font-size:14px;font-weight:600;color:#111827}
+    .sf-appt-meta{font-size:12px;color:#9ca3af;margin-top:1px}
+    .sf-appt-badge{font-size:11px;font-weight:600;padding:4px 12px;border-radius:20px;white-space:nowrap}
+    .sf-appt-badge.completed{background:#dcfce7;color:#166534}
+    .sf-appt-badge.in-progress{background:#dbeafe;color:#1e40af}
+    .sf-appt-badge.scheduled{background:#f0fdf4;color:#059669;border:1.5px solid #a7f3d0}
+
+    .sf-pc-actions{display:none;gap:4px;margin-left:8px}
+    .sf-appt-row:hover .sf-pc-actions{display:flex}
+
+    .sf-donut-wrap{display:flex;align-items:center;gap:28px;padding:24px 22px}
+    .sf-donut{position:relative;width:130px;height:130px;flex-shrink:0}
+    .sf-donut svg{width:130px;height:130px;transform:rotate(-90deg)}
+    .sf-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .sf-donut-center .num{font-size:24px;font-weight:800;color:#111827}
+    .sf-donut-center .lbl{font-size:11px;color:#9ca3af}
+    .sf-legend{flex:1;display:flex;flex-direction:column;gap:10px}
+    .sf-legend-item{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+    .sf-legend-item .left{display:flex;align-items:center;gap:8px}
+    .sf-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+    .sf-legend-item .name{color:#374151;font-weight:500}
+    .sf-legend-item .count{font-weight:700;color:#111827}
+    .sf-legend-item .pct{color:#9ca3af;margin-left:4px;font-size:12px}
+
+    .sf-chart-area{padding:20px 22px}
+    .sf-chart-svg{width:100%;height:140px}
+    .sf-chart-labels{display:flex;justify-content:space-between;padding:8px 0 0;font-size:11px;color:#9ca3af}
+
+    .sf-record-row{display:flex;align-items:center;gap:12px;padding:12px 22px;border-bottom:1px solid #f5f6f8;transition:background 0.2s}
+    .sf-record-row:last-child{border-bottom:none}
+    .sf-record-row:hover{background:#f9fafb}
+    .sf-record-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+    .sf-record-info{flex:1;min-width:0}
+    .sf-record-name{font-size:14px;font-weight:600;color:#111827}
+    .sf-record-meta{font-size:12px;color:#9ca3af;margin-top:1px}
+    .sf-record-date{font-size:12px;color:#9ca3af;white-space:nowrap}
+
+    .sf-banner{background:linear-gradient(135deg,#059669 0%,#10b981 60%,#34d399 100%);border-radius:16px;padding:32px;color:#fff;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:space-between;min-height:160px}
+    .sf-banner::after{content:'';position:absolute;right:-20px;bottom:-30px;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.06)}
+    .sf-banner-content{position:relative;z-index:1;max-width:320px}
+    .sf-banner-content h3{font-size:22px;font-weight:800;line-height:1.25;margin-bottom:8px}
+    .sf-banner-content p{font-size:13px;opacity:0.85;line-height:1.5;margin-bottom:16px}
+    .sf-banner-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 20px;background:#fff;color:#059669;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:all 0.3s}
+    .sf-banner-btn:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.15)}
+    .sf-banner-icon{position:relative;z-index:1;font-size:80px;opacity:0.2}
+
+    .sf-alerts{display:flex;flex-direction:column;gap:12px}
+    .sf-alert{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.5;transition:all 0.3s}
+    .sf-alert:hover{transform:translateX(2px)}
+    .sf-alert.yellow{background:#fef9c3;border:1px solid #fde68a}
+    .sf-alert-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+    .sf-alert-text{flex:1}
+    .sf-alert-text strong{font-weight:700;color:#111827}
+    .sf-alert-text p{color:#6b7280;margin-top:2px;font-size:12px}
+    .sf-alert-link{font-size:12px;font-weight:700;color:#10b981;cursor:pointer;text-decoration:none;white-space:nowrap;align-self:center}
+    .sf-alert-link:hover{text-decoration:underline}
+
+    .sf-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:20px}
+    @media(max-width:1024px){.sf-bottom-grid{grid-template-columns:1fr}}
+
+    .sf-section-label{font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;padding:14px 22px 0}
+
+    .sf-patient-card{display:flex;align-items:center;gap:12px;padding:12px 22px;border-bottom:1px solid #f5f6f8;transition:all 0.2s}
+    .sf-patient-card:last-child{border-bottom:none}
+    .sf-patient-card:hover{background:#f9fafb}
+    .sf-patient-card.in-consultation{border-left:3px solid #10b981;background:#f0fdf4}
+    .sf-pc-ticket{font-size:13px;font-weight:700;color:#10b981;min-width:48px}
+    .sf-pc-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;background:#10b981}
+    .sf-pc-info{flex:1;min-width:0}
+    .sf-pc-info h4{font-size:14px;font-weight:600;color:#111827}
+    .sf-pc-info p{font-size:12px;color:#9ca3af;margin-top:1px}
+    .sf-pc-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
+    .sf-pc-actions{display:none;gap:4px;margin-left:8px}
+    .sf-patient-card:hover .sf-pc-actions{display:flex}
+
+    .queue-actions-section{margin-top:20px}
+    .queue-actions-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+    @media(max-width:768px){.queue-actions-grid{grid-template-columns:repeat(2,1fr)}}
+
+    .staff-lookup-grid{display:grid;grid-template-columns:1fr;gap:20px}
+    .staff-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .sf-stat,.sf-card,.sf-banner{animation:fadeInUp 0.5s ease both}
+    .sf-stat:nth-child(2){animation-delay:0.05s}
+    .sf-stat:nth-child(3){animation-delay:0.1s}
+    .sf-stat:nth-child(4){animation-delay:0.15s}
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+
+        <div class="page-header">
+          <h1>Staff Dashboard <span class="role-badge role-staff-badge">Healthcare Staff</span></h1>
+          <p>Here's what's happening in the health center today.</p>
+        </div>
+
+        <!-- STAT CARDS -->
+        <div class="sf-stat-row" id="staffStatsRow">
+          <div class="sf-stat">
+            <div class="sf-stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div><div class="sf-stat-value" id="sTotal">0</div><div class="sf-stat-label">Total Students</div><a class="sf-stat-link" href="javascript:void(0)">View all</a></div>
+          </div>
+          <div class="sf-stat">
+            <div class="sf-stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div><div class="sf-stat-value" id="sChecked">0</div><div class="sf-stat-label">Appointments Today</div><a class="sf-stat-link" href="javascript:void(0)">View schedule</a></div>
+          </div>
+          <div class="sf-stat">
+            <div class="sf-stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+            <div><div class="sf-stat-value" id="sWaiting">0</div><div class="sf-stat-label">Health Alerts</div><a class="sf-stat-link" href="javascript:void(0)">View alerts</a></div>
+          </div>
+          <div class="sf-stat">
+            <div class="sf-stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>
+            <div><div class="sf-stat-value" id="sConsult">0</div><div class="sf-stat-label">Immunization Rate</div><a class="sf-stat-link" href="javascript:void(0)">View report</a></div>
+          </div>
+        </div>
+
+        <!-- TABS (hidden but JS-functional) -->
+        <div class="staff-tabs">
+          <button class="staff-tab active" data-staff-tab="queue">Queue Management</button>
+          <button class="staff-tab" data-staff-tab="patients">Patient Lookup</button>
+        </div>
+
+        <!-- ==================== QUEUE PANEL ==================== -->
+        <div class="staff-panel active" id="staff-panel-queue">
+
+          <!-- Row 1: Appointments + Health Overview -->
+          <div class="staff-content-grid">
+            <div class="sf-card">
+              <div class="sf-card-header">
+                <h3>Today's Appointments</h3>
+                <span class="badge badge-primary" id="queueCount">0 waiting</span>
+              </div>
+              <div class="sf-card-body p-0" id="patientList">
+                <div class="empty-state"><div class="empty-state-icon">&#128101;</div><h3>No patients in queue</h3><p>Waiting for patients to check in.</p></div>
+              </div>
+            </div>
+            <div class="sf-card">
+              <div class="sf-card-header">
+                <h3>Health Overview</h3>
+                <a class="view-link" href="javascript:void(0)">This Month &#9662;</a>
+              </div>
+              <div class="sf-card-body">
+                <div class="sf-donut-wrap">
+                  <div class="sf-donut">
+                    <svg viewBox="0 0 120 120">
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="14"/>
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#3b82f6" stroke-width="14" stroke-dasharray="110 204" stroke-dashoffset="0" stroke-linecap="round"/>
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#f59e0b" stroke-width="14" stroke-dasharray="78.5 235.5" stroke-dashoffset="-110" stroke-linecap="round"/>
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" stroke-width="14" stroke-dasharray="50.3 263.7" stroke-dashoffset="-188.5" stroke-linecap="round"/>
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="14" stroke-dasharray="44 270" stroke-dashoffset="-238.8" stroke-linecap="round"/>
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="14" stroke-dasharray="31.4 282.6" stroke-dashoffset="-282.8" stroke-linecap="round"/>
+                    </svg>
+                    <div class="sf-donut-center"><span class="num">128</span><span class="lbl">Total Cases</span></div>
+                  </div>
+                  <div class="sf-legend">
+                    <div class="sf-legend-item"><div class="left"><span class="sf-legend-dot" style="background:#3b82f6"></span><span class="name">Cold &amp; Cough</span></div><div><span class="count">45</span><span class="pct">(35%)</span></div></div>
+                    <div class="sf-legend-item"><div class="left"><span class="sf-legend-dot" style="background:#f59e0b"></span><span class="name">Fever</span></div><div><span class="count">32</span><span class="pct">(25%)</span></div></div>
+                    <div class="sf-legend-item"><div class="left"><span class="sf-legend-dot" style="background:#8b5cf6"></span><span class="name">Headache</span></div><div><span class="count">20</span><span class="pct">(16%)</span></div></div>
+                    <div class="sf-legend-item"><div class="left"><span class="sf-legend-dot" style="background:#10b981"></span><span class="name">Stomach Pain</span></div><div><span class="count">18</span><span class="pct">(14%)</span></div></div>
+                    <div class="sf-legend-item"><div class="left"><span class="sf-legend-dot" style="background:#ef4444"></span><span class="name">Allergies</span></div><div><span class="count">13</span><span class="pct">(10%)</span></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 2: Monthly Trend + Recent Records -->
+          <div class="sf-bottom-grid">
+            <div class="sf-card">
+              <div class="sf-card-header"><h3>Monthly Trend</h3></div>
+              <div class="sf-card-body">
+                <div class="sf-chart-area">
+                  <svg class="sf-chart-svg" viewBox="0 0 500 140" preserveAspectRatio="none">
+                    <defs>
+                      <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/>
+                        <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+                      </linearGradient>
+                    </defs>
+                    <path d="M0,120 L50,105 L100,110 L150,95 L200,85 L250,90 L300,70 L350,55 L400,60 L450,40 L500,35 L500,140 L0,140Z" fill="url(#trendFill)"/>
+                    <polyline points="0,120 50,105 100,110 150,95 200,85 250,90 300,70 350,55 400,60 450,40 500,35" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="500" cy="35" r="5" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                  </svg>
+                  <div class="sf-chart-labels">
+                    <span>May 1</span><span>May 7</span><span>May 14</span><span>May 21</span><span>May 28</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="sf-card">
+              <div class="sf-card-header">
+                <h3>Recent Health Records</h3>
+                <a class="view-link" href="javascript:void(0)">View all</a>
+              </div>
+              <div class="sf-card-body p-0">
+                <div class="sf-record-row">
+                  <div class="sf-record-avatar" style="background:#fef2f2;color:#dc2626">&#9829;</div>
+                  <div class="sf-record-info"><div class="sf-record-name">Rahul Das</div><div class="sf-record-meta">Grade 8-B &middot; Fever</div></div>
+                  <span class="sf-record-date">27 May</span>
+                </div>
+                <div class="sf-record-row">
+                  <div class="sf-record-avatar" style="background:#fefce8;color:#ca8a04">&#9888;</div>
+                  <div class="sf-record-info"><div class="sf-record-name">Ananya Gupta</div><div class="sf-record-meta">Allergy &middot; 10-A</div></div>
+                  <span class="sf-record-date">27 May</span>
+                </div>
+                <div class="sf-record-row">
+                  <div class="sf-record-avatar" style="background:#f0fdf4;color:#16a34a">&#10003;</div>
+                  <div class="sf-record-info"><div class="sf-record-name">Dev Joshi</div><div class="sf-record-meta">Grade 9-B &middot; Cold &amp; Cough</div></div>
+                  <span class="sf-record-date">26 May</span>
+                </div>
+                <div class="sf-record-row">
+                  <div class="sf-record-avatar" style="background:#f5f3ff;color:#7c3aed">&#10004;</div>
+                  <div class="sf-record-info"><div class="sf-record-name">Ishita Roy</div><div class="sf-record-meta">Grade 8-A &middot; Sprain</div></div>
+                  <span class="sf-record-date">26 May</span>
+                </div>
+                <div class="sf-record-row">
+                  <div class="sf-record-avatar" style="background:#ecfdf5;color:#059669">&#9829;</div>
+                  <div class="sf-record-info"><div class="sf-record-name">Neha Kumari</div><div class="sf-record-meta">Grade 7-A</div></div>
+                  <span class="sf-record-date">25 May</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Row 3: Banner + Alerts -->
+          <div class="staff-content-grid" style="margin-top:20px">
+            <div class="sf-banner">
+              <div class="sf-banner-content">
+                <h3>Keep Your Students Healthy &amp; Safe</h3>
+                <p>Ensure timely checkups, vaccinations, and follow-ups for a healthier tomorrow.</p>
+                <button class="sf-banner-btn">View Health Tips</button>
+              </div>
+              <div class="sf-banner-icon">
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
+              </div>
+            </div>
+            <div class="sf-alerts">
+              <div class="sf-alert yellow">
+                <span class="sf-alert-icon">&#9888;</span>
+                <div class="sf-alert-text"><strong>2 students' immunizations are due.</strong><p>Check and update records.</p></div>
+                <a class="sf-alert-link" href="javascript:void(0)">View</a>
+              </div>
+              <div class="sf-alert yellow">
+                <span class="sf-alert-icon">&#9888;</span>
+                <div class="sf-alert-text"><strong>5 students with fever reported today.</strong><p>Monitor and follow up.</p></div>
+                <a class="sf-alert-link" href="javascript:void(0)">View</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Queue Actions (accessible via JS) -->
+          <div class="queue-actions-section">
+            <div class="sf-card" style="margin-top:20px">
+              <div class="sf-card-header"><h3>Queue Actions</h3></div>
+              <div class="sf-card-body">
+                <div class="queue-actions-grid">
+                  <button class="btn btn-primary" id="callNext">Call Next Patient</button>
+                  <button class="btn btn-secondary" id="skipPatient">Skip Patient</button>
+                  <button class="btn btn-success" id="completePatient">Mark Complete</button>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid #f0f2f5">
+                  <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Currently Serving</div><div style="font-size:18px;font-weight:700;color:#111827" id="currentServingStaff">--</div></div>
+                  <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avg Wait Time</div><div style="font-size:18px;font-weight:700;color:#111827" id="avgWait">12 min</div></div>
+                  <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Longest Wait</div><div style="font-size:18px;font-weight:700;color:#111827" id="longWait">25 min</div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ==================== PATIENT LOOKUP PANEL ==================== -->
+        <div class="staff-panel" id="staff-panel-patients">
+          <div class="sf-card">
+            <div class="sf-card-header"><h3>Patient Search</h3></div>
+            <div class="sf-card-body">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+                <div class="form-group" style="margin-bottom:0">
+                  <label class="form-label">Search by name, matric or email</label>
+                  <input type="text" class="form-input" id="patientSearchInput" placeholder="Type to search...">
+                </div>
+                <div class="form-group" style="margin-bottom:0">
+                  <label class="form-label">Quick Lookup (Matric Number)</label>
+                  <div style="display:flex;gap:8px">
+                    <input type="text" class="form-input" id="matricLookup" placeholder="e.g. STU001" style="flex:1">
+                    <button class="btn btn-primary" id="lookupBtn">Find</button>
+                  </div>
+                </div>
+              </div>
+              <div id="patientsResults"></div>
+            </div>
+          </div>
+          <div class="sf-card" style="margin-top:20px;display:none" id="patientDetailCard">
+            <div class="sf-card-header"><h3>Patient Details</h3><button class="btn btn-sm btn-secondary" onclick="document.getElementById('patientDetailCard').style.display='none'">Close</button></div>
+            <div class="sf-card-body" id="patientDetailBody"></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    let queueData = [];
+    let queueStats = {};
+    let staffDoctors = [];
+    function switchStaffTab(tab) {
+      document.querySelectorAll('.staff-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.staff-panel').forEach(p => p.classList.remove('active'));
+      document.querySelector(`.staff-tab[data-staff-tab="${tab}"]`).classList.add('active');
+      document.getElementById(`staff-panel-${tab}`).classList.add('active');
+    }
+    document.querySelectorAll('.staff-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchStaffTab(tab.dataset.staffTab));
+    });
+
+    async function loadStaffDashboard() {
+      try {
+        const res = await API.getStaffDashboard();
+        if (res.success) {
+          const d = res.data;
+          document.getElementById('sTotal').textContent = d.total_appointments;
+          document.getElementById('sChecked').textContent = d.checked_in;
+          document.getElementById('sWaiting').textContent = d.waiting;
+          document.getElementById('sConsult').textContent = d.in_consultation;
+          document.getElementById('queueCount').textContent = d.queue_list.length + ' waiting';
+          queueData = d.queue_list;
+          renderQueue();
+          const waits = queueData.filter((p) => p.estimated_wait_minutes > 0).map((p) => p.estimated_wait_minutes);
+          if (waits.length) {
+            const avg = Math.round(waits.reduce((a, b) => a + b, 0) / waits.length);
+            const max = Math.max(...waits);
+            document.getElementById('avgWait').textContent = avg + ' min';
+            document.getElementById('longWait').textContent = max + ' min';
+          }
+        }
+      } catch(e) {}
+      try {
+        const queueRes = await API.getQueue();
+        if (queueRes.success) {
+          document.getElementById('currentServingStaff').textContent = queueRes.data.current_serving || '--';
+        }
+      } catch(e) {}
+    }
+
+    function renderQueue() {
+      const list = document.getElementById('patientList');
+      list.innerHTML = '';
+      if (queueData.length === 0) {
+        list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128101;</div><h3>No patients in queue</h3><p>Waiting for patients to check in.</p></div>';
+        return;
+      }
+      const statusOrder = { 'in_consultation': 0, 'checked_in': 1, 'waiting': 2, 'confirmed': 3 };
+      const sorted = [...queueData].sort((a, b) => (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99));
+      let hasCheckedIn = false;
+      const avatarColors = ['green','blue','purple','amber','rose','teal'];
+      sorted.forEach((p, i) => {
+        const isConsult = p.status === 'in_consultation';
+        const isCheckedIn = p.status === 'checked_in';
+        if (isCheckedIn) hasCheckedIn = true;
+        const color = avatarColors[i % avatarColors.length];
+        const initials = p.patient ? p.patient.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase() : '??';
+        const div = document.createElement('div');
+        div.className = 'sf-patient-card' + (isConsult ? ' in-consultation' : '');
+        div.innerHTML = `
+          <div class="sf-pc-ticket">${p.ticket}</div>
+          <div class="sf-pc-avatar" style="background:var(--${color === 'green' ? 'success' : color === 'blue' ? 'info' : color === 'purple' ? 'primary' : color === 'amber' ? 'warning' : color === 'rose' ? 'danger' : 'primary'})">${initials}</div>
+          <div class="sf-pc-info">
+            <h4>${p.patient}</h4>
+            <p>${p.service || 'General'} ${p.doctor ? '&middot; ' + p.doctor : ''}</p>
+          </div>
+          <span class="sf-pc-badge ${isConsult ? 'in-progress' : isCheckedIn ? 'completed' : 'scheduled'}">${isConsult ? 'In Progress' : isCheckedIn ? 'Completed' : 'Scheduled'}</span>
+          <div class="sf-pc-actions">
+            ${isConsult ? `<button class="btn btn-sm btn-success" onclick="markComplete('${p.ticket}')">Complete</button>` : ''}
+            ${isCheckedIn ? `<button class="btn btn-sm btn-primary" onclick="callPatient('${p.ticket}')">Call</button>` : ''}
+            ${!isConsult ? `<button class="btn btn-sm btn-secondary" onclick="skipPatient('${p.ticket}')">Skip</button>` : ''}
+          </div>
+        `;
+        list.appendChild(div);
+      });
+      if (!hasCheckedIn) {
+        document.getElementById('callNext').disabled = true;
+      } else {
+        document.getElementById('callNext').disabled = false;
+      }
+    }
+
+    async function callPatient(ticket) {
+      try {
+        await API.updateQueue(ticket, 'call');
+        Utils.showToast('Calling ' + ticket, 'success');
+        await loadStaffDashboard();
+      } catch(e) { Utils.showToast(e.message, 'error'); }
+    }
+
+    async function skipPatient(ticket) {
+      if (!confirm('Skip ticket ' + ticket + '?')) return;
+      try {
+        await API.updateQueue(ticket, 'skip');
+        Utils.showToast('Patient skipped', 'warning');
+        await loadStaffDashboard();
+      } catch(e) { Utils.showToast(e.message, 'error'); }
+    }
+
+    async function markComplete(ticket) {
+      if (!confirm('Mark consultation for ' + ticket + ' as complete?')) return;
+      try {
+        await API.updateQueue(ticket, 'complete');
+        Utils.showToast('Consultation completed', 'success');
+        await loadStaffDashboard();
+      } catch(e) { Utils.showToast(e.message, 'error'); }
+    }
+
+    document.getElementById('callNext')?.addEventListener('click', async () => {
+      const nextCheckedIn = queueData.find(p => p.status === 'checked_in');
+      if (nextCheckedIn) {
+        await callPatient(nextCheckedIn.ticket);
+      } else {
+        Utils.showToast('No checked-in patients to call', 'info');
+      }
+    });
+
+    document.getElementById('skipPatient')?.addEventListener('click', async () => {
+      const nextWaiting = queueData.find(p => p.status === 'waiting' || p.status === 'checked_in');
+      if (nextWaiting) {
+        await skipPatient(nextWaiting.ticket);
+      } else {
+        Utils.showToast('No patients to skip', 'info');
+      }
+    });
+
+    document.getElementById('completePatient')?.addEventListener('click', async () => {
+      const inConsult = queueData.find(p => p.status === 'in_consultation');
+      if (inConsult) {
+        await markComplete(inConsult.ticket);
+      } else {
+        Utils.showToast('No patients in consultation', 'info');
+      }
+    });
+
+    const doPatientSearch = Utils.debounce(async (query) => {
+      if (!query || query.length < 2) {
+        document.getElementById('patientsResults').innerHTML = '<p style="color:var(--text-secondary);font-size:14px;padding:16px">Type at least 2 characters to search.</p>';
+        return;
+      }
+      try {
+        const res = await API.searchPatients(query);
+        if (res.success) {
+          const results = res.data;
+          const container = document.getElementById('patientsResults');
+          container.innerHTML = '';
+          if (results.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128269;</div><h3>No Results</h3><p>No patients match your search.</p></div>';
+            return;
+          }
+          results.forEach(p => {
+            container.innerHTML += `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;transition:all 0.2s">
+              <span class="avatar avatar-sm">${Utils.getInitials(p.full_name)}</span>
+              <div style="flex:1"><strong>${p.full_name}</strong><br><span style="font-size:13px;color:var(--text-secondary)">${p.matric || 'N/A'} &middot; ${p.email}</span></div>
+              <span class="badge badge-neutral">${p.faculty || ''} L${p.level || ''}</span>
+              <button class="btn btn-sm btn-primary" onclick="showPatientDetail(${p.id})">View</button>
+            </div>`;
+          });
+        }
+      } catch(e) {}
+    }, 400);
+
+    document.getElementById('patientSearchInput')?.addEventListener('input', (e) => {
+      doPatientSearch(e.target.value.trim());
+    });
+
+    document.getElementById('lookupBtn')?.addEventListener('click', async () => {
+      const matric = document.getElementById('matricLookup').value.trim();
+      if (!matric) { Utils.showToast('Enter a matric number', 'warning'); return; }
+      try {
+        const res = await API.lookupPatient(matric);
+        if (res.success) {
+          showPatientDetail(res.data.id, res.data);
+        } else {
+          Utils.showToast('Patient not found', 'error');
+        }
+      } catch(e) { Utils.showToast(e.message, 'error'); }
+    });
+
+    document.getElementById('matricLookup')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') document.getElementById('lookupBtn').click();
+    });
+
+    async function showPatientDetail(id, data) {
+      const card = document.getElementById('patientDetailCard');
+      const body = document.getElementById('patientDetailBody');
+      try {
+        if (!data) {
+          const res = await API.getStudent(id);
+          if (res.success) data = res.data;
+        }
+        if (!data) { Utils.showToast('Could not load patient details', 'error'); return; }
+        body.innerHTML = `
+          <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+            <span class="avatar avatar-lg">${Utils.getInitials(data.full_name)}</span>
+            <div>
+              <h3 style="font-size:18px;font-weight:600">${data.full_name}</h3>
+              <p style="color:var(--text-secondary)">${data.matric || 'N/A'} &middot; ${data.email}</p>
+            </div>
+          </div>
+          <div class="staff-detail-grid">
+            <div class="profile-meta-item"><span class="label">Phone</span><span class="value">${data.phone || '-'}</span></div>
+            <div class="profile-meta-item"><span class="label">Faculty</span><span class="value">${data.faculty || '-'}</span></div>
+            <div class="profile-meta-item"><span class="label">Department</span><span class="value">${data.department || '-'}</span></div>
+            <div class="profile-meta-item"><span class="label">Level</span><span class="value">${data.level || '-'}</span></div>
+          </div>
+        `;
+        card.style.display = 'block';
+      } catch(e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Staff Dashboard');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
+      }, 100);
+      try {
+        const docRes = await API.getDoctors();
+        if (docRes.success) staffDoctors = docRes.data;
+      } catch(e) {}
+      await loadStaffDashboard();
+      setInterval(loadStaffDashboard, 15000);
+    });
+  </script>
+</body>
+</html>

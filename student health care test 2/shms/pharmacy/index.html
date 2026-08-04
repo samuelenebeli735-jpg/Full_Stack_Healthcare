@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pharmacy - SHMS</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>Pharmacy</h1>
+          <p>View your prescriptions and medication history.</p>
+        </div>
+        <div class="grid grid-3 mb-lg">
+          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Prescriptions</span></div><div class="stat-card-value" id="totalRx">0</div></div>
+          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Dispensed</span></div><div class="stat-card-value" id="dispensedRx">0</div></div>
+          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Pending</span></div><div class="stat-card-value" id="pendingRx">0</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>My Prescriptions</h3></div>
+          <div class="card-body p-0" id="rxList">
+            <div class="empty-state"><div class="empty-state-icon">💊</div><h3>No Prescriptions</h3><p>Prescribed medications will appear here.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    async function loadPrescriptions() {
+      try {
+        const res = await API.getPrescriptions();
+        if (res.success) {
+          const data = res.data;
+          document.getElementById('totalRx').textContent = data.length;
+          document.getElementById('dispensedRx').textContent = data.filter(d => d.status === 'dispensed').length;
+          document.getElementById('pendingRx').textContent = data.filter(d => d.status === 'pending').length;
+          const container = document.getElementById('rxList');
+          container.innerHTML = '';
+          data.forEach(item => {
+            const statusColor = item.status === 'dispensed' ? 'success' : 'warning';
+            container.innerHTML += `
+              <div class="appointment-card" style="margin:0;border-radius:0;border-left:none;border-right:none">
+                <div class="apt-icon" style="background:#fce7f3;color:#be185d">💊</div>
+                <div class="apt-info">
+                  <h4>${item.medication}</h4>
+                  <p>${item.dosage} &bull; Prescribed by ${item.prescribed_by}</p>
+                  <p style="font-size:12px;color:var(--text-light)">${Utils.formatDate(item.date)}</p>
+                </div>
+                <span class="badge badge-${statusColor}">${Utils.capitalize(item.status)}</span>
+              </div>
+            `;
+          });
+        }
+      } catch (e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('pharmacy');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Pharmacy');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
+      }, 100);
+      loadPrescriptions();
+      setInterval(loadPrescriptions, 30000);
+    });
+  </script>
+</body>
+</html>

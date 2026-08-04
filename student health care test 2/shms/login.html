@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In - SHMS</title>
+  <meta name="description" content="Sign in to the Student Health Management System">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--font-family);background:#fff;overflow-x:hidden}
+
+    .login-split{display:flex;min-height:100vh}
+
+    .login-left{
+      width:48%;background:linear-gradient(160deg,#0a2e1f 0%,#0f3d2a 40%,#124a31 100%);
+      display:flex;flex-direction:column;justify-content:space-between;padding:48px 56px;
+      position:relative;overflow:hidden;
+    }
+    .login-left::before{
+      content:'';position:absolute;top:-20%;right:-20%;width:500px;height:500px;
+      border-radius:50%;background:rgba(16,185,129,0.08);pointer-events:none;
+    }
+    .login-left::after{
+      content:'';position:absolute;bottom:-10%;left:-10%;width:400px;height:400px;
+      border-radius:50%;background:rgba(16,185,129,0.05);pointer-events:none;
+    }
+
+    .ll-brand{display:flex;align-items:center;gap:10px;z-index:1}
+    .ll-brand svg{width:32px;height:32px;color:#10b981}
+    .ll-brand span{font-size:18px;font-weight:700;color:#fff}
+    .ll-brand .portal{color:#10b981}
+
+    .ll-content{z-index:1}
+    .ll-content h1{font-size:40px;font-weight:800;color:#fff;line-height:1.15;margin-bottom:16px}
+    .ll-content h1 .green{color:#10b981}
+    .ll-content p{font-size:16px;color:rgba(255,255,255,0.7);line-height:1.7;margin-bottom:40px;max-width:420px}
+
+    .ll-features{display:flex;flex-direction:column;gap:12px;z-index:1}
+    .ll-feature{
+      display:flex;align-items:center;gap:14px;padding:16px 20px;
+      background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.08);
+      border-radius:12px;backdrop-filter:blur(8px);transition:all 0.3s;
+    }
+    .ll-feature:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.12)}
+    .ll-feature-icon{
+      width:40px;height:40px;border-radius:10px;background:rgba(16,185,129,0.15);
+      display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    }
+    .ll-feature-icon svg{width:18px;height:18px;color:#10b981}
+    .ll-feature-text .title{font-size:14px;font-weight:600;color:#fff}
+    .ll-feature-text .sub{font-size:12px;color:rgba(255,255,255,0.5);margin-top:2px}
+
+    .ll-footer{z-index:1;display:flex;align-items:center;gap:12px}
+    .ll-avatars{display:flex}
+    .ll-avatars .av{
+      width:30px;height:30px;border-radius:50%;border:2px solid #0a2e1f;
+      display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;
+      margin-left:-6px;
+    }
+    .ll-avatars .av:first-child{margin-left:0}
+    .ll-avatars .av.a1{background:#10b981}
+    .ll-avatars .av.a2{background:#f59e0b}
+    .ll-avatars .av.a3{background:#8b5cf6}
+    .ll-trust-text{font-size:13px;color:rgba(255,255,255,0.6)}
+    .ll-trust-text strong{color:#fff;font-weight:600}
+
+    .login-right{
+      flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      padding:48px;background:#fff;position:relative;
+    }
+
+    .lr-form{width:100%;max-width:420px}
+    .lr-badge{
+      display:inline-flex;align-items:center;gap:6px;padding:6px 14px;
+      border:1.5px solid #d1fae5;border-radius:20px;font-size:13px;font-weight:500;
+      color:#059669;margin-bottom:20px;background:#f0fdf4;
+    }
+    .lr-badge svg{width:14px;height:14px}
+    .lr-form h2{font-size:28px;font-weight:700;color:var(--text-primary);margin-bottom:6px}
+    .lr-form .subtitle{font-size:14px;color:var(--text-secondary);margin-bottom:32px}
+    .lr-form .subtitle a{color:#10b981;font-weight:600;text-decoration:none}
+    .lr-form .subtitle a:hover{text-decoration:underline}
+
+    .lr-field{margin-bottom:20px}
+    .lr-field label{display:block;font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:6px}
+    .lr-input-wrap{position:relative}
+    .lr-input-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--text-light);pointer-events:none}
+    .lr-input-wrap input{
+      width:100%;padding:12px 14px 12px 42px;border:1.5px solid var(--border);
+      border-radius:var(--radius);font-size:14px;background:var(--bg-primary);
+      transition:all 0.2s;color:var(--text-primary);
+    }
+    .lr-input-wrap input:focus{border-color:#10b981;outline:none;box-shadow:0 0 0 3px rgba(16,185,129,0.1)}
+    .lr-input-wrap input::placeholder{color:var(--text-light)}
+    .lr-input-wrap .toggle-pw{
+      position:absolute;right:12px;top:50%;transform:translateY(-50%);
+      background:none;border:none;cursor:pointer;color:var(--text-light);
+      padding:4px;display:flex;
+    }
+    .lr-input-wrap .toggle-pw:hover{color:var(--text-primary)}
+
+    .lr-options{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+    .lr-remember{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);cursor:pointer}
+    .lr-remember input[type=checkbox]{width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);accent-color:#10b981}
+    .lr-forgot{font-size:13px;font-weight:600;color:#10b981;text-decoration:none}
+    .lr-forgot:hover{text-decoration:underline}
+
+    .lr-submit{
+      width:100%;padding:14px;border:none;border-radius:var(--radius);
+      background:#10b981;color:#fff;font-size:15px;font-weight:600;
+      cursor:pointer;transition:all 0.3s;display:flex;align-items:center;justify-content:center;gap:8px;
+    }
+    .lr-submit:hover{background:#059669;transform:translateY(-1px);box-shadow:0 6px 20px rgba(16,185,129,0.3)}
+    .lr-submit svg{width:16px;height:16px}
+
+    .lr-divider{display:flex;align-items:center;gap:16px;margin:24px 0}
+    .lr-divider::before,.lr-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+    .lr-divider span{font-size:12px;color:var(--text-light);white-space:nowrap}
+
+    .lr-social{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+    .lr-social-btn{
+      display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;
+      border:1.5px solid var(--border);border-radius:var(--radius);background:#fff;
+      font-size:14px;font-weight:500;color:var(--text-primary);cursor:pointer;transition:all 0.2s;
+    }
+    .lr-social-btn:hover{border-color:var(--text-secondary);background:var(--bg-secondary)}
+    .lr-social-btn svg{width:18px;height:18px}
+
+    .lr-help{text-align:center;font-size:13px;color:var(--text-secondary)}
+    .lr-help a{color:#10b981;font-weight:600;text-decoration:none}
+    .lr-help a:hover{text-decoration:underline}
+
+    .lr-footer-links{
+      position:absolute;bottom:24px;left:0;right:0;text-align:center;
+      font-size:12px;color:var(--text-light);
+    }
+    .lr-footer-links a{color:var(--text-secondary);text-decoration:none;margin:0 6px}
+    .lr-footer-links a:hover{color:var(--text-primary)}
+    .lr-footer-links .sep{margin:0 2px}
+
+    .role-tabs{display:flex;gap:6px;margin-bottom:20px}
+    .role-tab{
+      flex:1;padding:10px 12px;font-size:12px;font-weight:600;cursor:pointer;
+      border:1.5px solid var(--border);border-radius:8px;background:var(--bg-primary);
+      color:var(--text-secondary);transition:all 0.3s;text-align:center;
+      display:flex;align-items:center;justify-content:center;gap:6px;
+    }
+    .role-tab:hover{border-color:#10b981;color:#10b981}
+    .role-tab.active{border-color:#10b981;background:#f0fdf4;color:#10b981}
+    .role-tab svg{width:16px;height:16px;flex-shrink:0}
+
+    .login-tabs{display:flex;gap:0;margin-bottom:20px;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
+    .login-tab{
+      flex:1;padding:10px 16px;font-size:13px;font-weight:500;cursor:pointer;
+      border:none;background:var(--bg-primary);color:var(--text-secondary);transition:all 0.2s;
+    }
+    .login-tab.active{background:#10b981;color:#fff}
+    .login-tab:not(.active):hover{background:var(--bg-tertiary)}
+
+    @keyframes fadeIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .lr-form>*{animation:fadeIn 0.5s ease both}
+    .lr-form>*:nth-child(2){animation-delay:0.05s}
+    .lr-form>*:nth-child(3){animation-delay:0.1s}
+    .lr-form>*:nth-child(4){animation-delay:0.15s}
+    .lr-form>*:nth-child(5){animation-delay:0.2s}
+    .lr-form>*:nth-child(6){animation-delay:0.25s}
+    .lr-form>*:nth-child(7){animation-delay:0.3s}
+    .lr-form>*:nth-child(8){animation-delay:0.35s}
+    .lr-form>*:nth-child(9){animation-delay:0.4s}
+    .lr-form>*:nth-child(10){animation-delay:0.45s}
+
+    @media(max-width:1024px){
+      .login-left{display:none}
+      .login-right{padding:32px 24px}
+    }
+    @media(max-width:480px){
+      .lr-form{max-width:100%}
+      .lr-social{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+  <div class="login-split">
+    <div class="login-left">
+      <div class="ll-brand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>SHMS <span class="portal">Portal</span></span>
+      </div>
+      <div class="ll-content">
+        <h1>Your health record,<br><span class="green">always in your pocket.</span></h1>
+        <p>Track appointments, vaccinations, and health history — all in one secure student portal.</p>
+        <div class="ll-features">
+          <div class="ll-feature">
+            <div class="ll-feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div class="ll-feature-text"><div class="title">Book & track appointments</div><div class="sub">Never miss a checkup or booster dose</div></div>
+          </div>
+          <div class="ll-feature">
+            <div class="ll-feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 2v7.31l-6 9.2A2 2 0 0 0 5.64 22h12.72a2 2 0 0 0 1.64-3.49l-6-9.2V2"/><line x1="10" y1="2" x2="14" y2="2"/></svg></div>
+            <div class="ll-feature-text"><div class="title">Vaccination records</div><div class="sub">Digital, verified, always accessible</div></div>
+          </div>
+          <div class="ll-feature">
+            <div class="ll-feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <div class="ll-feature-text"><div class="title">Message the school nurse</div><div class="sub">Direct line for questions and updates</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="ll-footer">
+        <div class="ll-avatars">
+          <span class="av a1">AC</span><span class="av a2">TQ</span><span class="av a3">KJ</span>
+        </div>
+        <div class="ll-trust-text">Trusted by <strong>2,400+ students</strong> across 18 schools</div>
+      </div>
+    </div>
+    <div class="login-right">
+      <div class="lr-form">
+        <div class="lr-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Secure student login</div>
+        <h2 id="authTitle">Welcome back</h2>
+        <div class="subtitle" id="authSubtitle">New here? <a href="register.html">Ask your school to set up access</a></div>
+
+        <div class="role-tabs" id="roleTabs">
+          <button class="role-tab active" data-role="student"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Student</button>
+          <button class="role-tab" data-role="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Staff</button>
+          <button class="role-tab" data-role="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Admin</button>
+        </div>
+
+        <div class="login-tabs" id="loginModeTabs">
+          <button class="login-tab active" data-mode="email">Email</button>
+          <button class="login-tab" data-mode="id">Matric / ID</button>
+        </div>
+
+        <form class="auth-form" id="loginForm" novalidate>
+          <div class="lr-field" id="emailField">
+            <label for="email">Student ID or email</label>
+            <div class="lr-input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" id="email" placeholder="STU-04821 or amara@school.edu" autocomplete="email">
+            </div>
+          </div>
+          <div class="lr-field" id="idField" style="display:none">
+            <label id="idLabel">Matric Number</label>
+            <div class="lr-input-wrap">
+              <svg id="idIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              <input type="text" id="idInput" placeholder="e.g. STU001">
+            </div>
+          </div>
+          <div class="lr-field">
+            <label for="password">Password</label>
+            <div class="lr-input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
+              <button type="button" class="toggle-password toggle-pw" aria-label="Toggle password visibility">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="lr-options">
+            <label class="lr-remember"><input type="checkbox" id="remember"> Remember me</label>
+            <a href="forgot-password.html" class="lr-forgot">Forgot password?</a>
+          </div>
+          <button type="submit" class="lr-submit" id="loginSubmit">
+            Sign in to portal <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </form>
+
+        <div class="lr-divider"><span>or continue with</span></div>
+        <div class="lr-social">
+          <button class="lr-social-btn"><svg viewBox="0 0 24 24" width="18" height="18"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg> Google</button>
+          <button class="lr-social-btn"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.98-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.32 2.32-2.12 4.51-3.74 4.25z"/></svg> Apple ID</button>
+        </div>
+
+        <div class="lr-help">Trouble signing in? <a href="forgot-password.html">Reset your password</a></div>
+      </div>
+      <div class="lr-footer-links">
+        <a href="#">Privacy</a> <span class="sep">·</span> <a href="#">Terms</a> <span class="sep">·</span> <a href="#">Help</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    const roleConfig = {
+      student: {
+        title: 'Student Portal', sub: 'Sign in to access your health services', badge: 'Student',
+        icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+        cls: '',
+        idLabel: 'Matric Number', idPlaceholder: 'e.g. STU001', idMode: 'Login with Matric No.',
+        idApiField: 'matric',
+        idIcon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'
+      },
+      staff: {
+        title: 'Staff Portal', sub: 'Sign in to manage patients and queues', badge: 'Staff',
+        icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/><circle cx="12" cy="12" r="3"/>',
+        cls: 'theme-staff',
+        idLabel: 'Staff ID', idPlaceholder: 'e.g. SFT042', idMode: 'Login with Staff ID',
+        idApiField: 'staff_id',
+        idIcon: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
+      },
+      admin: {
+        title: 'Admin Dashboard', sub: 'Sign in to manage the health center', badge: 'Administrator',
+        icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+        cls: 'theme-admin',
+        idLabel: 'Admin ID', idPlaceholder: 'e.g. ADM001', idMode: 'Login with Admin ID',
+        idApiField: 'admin_id',
+        idIcon: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
+      },
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      Auth.redirectIfAuthenticated();
+      Auth.initLoginForm('loginForm');
+
+      document.querySelectorAll('.role-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          const role = tab.dataset.role;
+          const cfg = roleConfig[role] || roleConfig.student;
+          document.querySelector('.auth-page')?.classList.add(cfg.cls);
+          document.getElementById('authTitle').textContent = cfg.title;
+          document.getElementById('authSubtitle').innerHTML = role === 'student'
+            ? 'New here? <a href="register.html">Ask your school to set up access</a>'
+            : cfg.sub;
+          const badge = document.querySelector('.lr-badge');
+          if (badge) badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Secure ' + cfg.badge.toLowerCase() + ' login';
+          document.getElementById('idLabel').textContent = cfg.idLabel;
+          document.getElementById('idInput').placeholder = cfg.idPlaceholder;
+          document.getElementById('loginModeTabs').children[1].textContent = cfg.idMode;
+          document.getElementById('idIcon').innerHTML = cfg.idIcon.toLowerCase();
+          const mode = document.querySelector('.login-tab.active')?.dataset.mode;
+          document.getElementById('emailField').style.display = mode === 'email' ? 'block' : 'none';
+          document.getElementById('idField').style.display = mode === 'id' ? 'block' : 'none';
+        });
+      });
+
+      document.querySelectorAll('.login-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          const mode = tab.dataset.mode;
+          document.getElementById('emailField').style.display = mode === 'email' ? 'block' : 'none';
+          document.getElementById('idField').style.display = mode === 'id' ? 'block' : 'none';
+        });
+      });
+    });
+  </script>
+</body>
+</html>

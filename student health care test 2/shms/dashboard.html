@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - SHMS</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div id="dashboardContent">
+          <div class="page-header">
+            <h1>Dashboard</h1>
+            <p>Welcome back! Here's your health center overview.</p>
+          </div>
+          <div class="welcome-card" id="welcomeCard">
+            <div class="welcome-medical-deco">
+              <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg" style="position:absolute;right:-10px;bottom:-20px;opacity:0.08">
+                <circle cx="60" cy="60" r="50" stroke="white" stroke-width="0.5"/>
+                <circle cx="60" cy="60" r="35" stroke="white" stroke-width="0.5"/>
+                <path d="M30 60h60M60 30v60" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M20 60 L35 60 L45 50 L55 70 L65 45 L75 60 L100 60" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
+              </svg>
+            </div>
+            <h2 id="welcomeText">Good morning, John</h2>
+            <p>Your health is our priority. Manage your appointments and queue from here.</p>
+            <div class="welcome-time" id="currentTime"></div>
+          </div>
+          <div class="quick-actions">
+            <a href="appointments.html" class="quick-action-btn">
+              <div class="qa-icon blue">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+              </div>
+              <span>Book Appointment</span>
+            </a>
+            <a href="queue.html" class="quick-action-btn">
+              <div class="qa-icon green">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+              </div>
+              <span>View Queue</span>
+            </a>
+            <a href="checkin.html" class="quick-action-btn">
+              <div class="qa-icon yellow">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+              </div>
+              <span>Check In</span>
+            </a>
+            <a href="history.html" class="quick-action-btn">
+              <div class="qa-icon purple">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              </div>
+              <span>History</span>
+            </a>
+          </div>
+          <div class="dashboard-grid">
+            <div class="dashboard-main">
+              <div class="upcoming-appointment-card" id="upcomingAppointmentCard">
+                <div class="upcoming-appointment-header">
+                  <h3>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    Upcoming Appointment
+                  </h3>
+                  <span class="badge badge-primary" id="apptStatusBadge">Confirmed</span>
+                </div>
+                <div id="upcomingApptBody">
+                  <div class="upcoming-appointment-body">
+                    <div class="appointment-icon">
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </div>
+                    <div class="appointment-info">
+                      <h4 id="apptDoctor">Dr. Olawale Adebayo</h4>
+                      <p id="apptService">General Consultation</p>
+                      <p id="apptDept">General Medicine</p>
+                    </div>
+                    <div class="appointment-time">
+                      <div class="time" id="apptTime">10:00 AM</div>
+                      <div class="date" id="apptDate">Jul 2, 2026</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="grid grid-2" style="margin-bottom:24px">
+                <div class="stat-card green">
+                  <div class="stat-card-header">
+                    <span class="stat-card-label">Total Appointments</span>
+                    <div class="stat-card-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
+                    </div>
+                  </div>
+                  <div class="stat-card-value" id="totalAppts">12</div>
+                  <div class="stat-card-change positive">+2 this month</div>
+                </div>
+                <div class="stat-card blue">
+                  <div class="stat-card-header">
+                    <span class="stat-card-label">Completed</span>
+                    <div class="stat-card-icon">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    </div>
+                  </div>
+                  <div class="stat-card-value" id="completedAppts">10</div>
+                  <div class="stat-card-change positive">83% completion rate</div>
+                </div>
+              </div>
+              <div class="card">
+                <div class="card-header">
+                  <h3>Recent Activity</h3>
+                  <a href="history.html" style="font-size:13px;font-weight:500">View All</a>
+                </div>
+                <div class="card-body p-0" id="activityList">
+                  <div class="empty-state" style="padding:24px;text-align:center">
+                    <div class="empty-state-icon">📋</div>
+                    <p>No recent activity yet.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="dashboard-sidebar">
+              <div class="queue-status-card" id="queueCard">
+                <div class="queue-number" id="queueNumber">--</div>
+                <div class="queue-label">Your Queue Number</div>
+                <div class="queue-info">
+                  <div class="queue-info-item">
+                    <div class="value" id="currentServing">--</div>
+                    <div class="label">Serving</div>
+                  </div>
+                  <div class="queue-info-item">
+                    <div class="value" id="patientsAhead">--</div>
+                    <div class="label">Ahead</div>
+                  </div>
+                  <div class="queue-info-item">
+                    <div class="value" id="estWait">--</div>
+                    <div class="label">Est. Wait</div>
+                  </div>
+                </div>
+                <div class="progress-bar" style="margin-bottom:16px">
+                  <div class="progress-bar-fill" id="queueProgress" style="width:0%"></div>
+                </div>
+                <a href="queue.html" class="btn btn-primary btn-sm" style="width:100%">View Queue Details</a>
+              </div>
+              <div class="notification-preview">
+                <div class="notification-preview-header">
+                  <h3>Recent Notifications</h3>
+                  <a href="notifications.html" style="font-size:13px;font-weight:500">View All</a>
+                </div>
+                <div id="notificationPreviewList">
+                  <div class="notification-item">
+                    <div class="notification-content">
+                      <div class="notification-text">No notifications yet.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    function renderActivity(appts) {
+      const list = document.getElementById('activityList');
+      const icons = {
+        checked_in: ['blue', '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'],
+        in_progress: ['yellow', '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>'],
+        completed: ['green', '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>'],
+        cancelled: ['red', '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'],
+      };
+      if (!appts.length) return;
+      const rows = appts.slice(0, 4).map((a) => {
+        const cfg = icons[a.status] || icons.completed;
+        const actionText = a.status === 'cancelled'
+          ? 'Appointment cancelled'
+          : a.status === 'completed'
+            ? 'Appointment completed'
+            : a.status === 'checked_in' || a.status === 'in_progress'
+              ? 'Checked in for appointment'
+              : 'Appointment ' + a.status.replace('_', ' ');
+        return '<div class="activity-item">' +
+          '<div class="activity-icon ' + cfg[0] + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + cfg[1] + '</svg></div>' +
+          '<div class="activity-content">' +
+          '<div class="activity-text">' + Utils.sanitize(actionText) + ' - ' + Utils.sanitize(a.service) + '</div>' +
+          '<div class="activity-time">' + Utils.timeAgo(a.appointmentDate || a.date) + '</div>' +
+          '</div></div>';
+      }).join('');
+      list.innerHTML = rows;
+    }
+
+    function renderNotificationPreview(notifs) {
+      const list = document.getElementById('notificationPreviewList');
+      if (!notifs.length) {
+        list.innerHTML = '<div class="notification-item"><div class="notification-content"><div class="notification-text">No notifications yet.</div></div></div>';
+        return;
+      }
+      list.innerHTML = notifs.slice(0, 3).map((n) =>
+        '<div class="notification-item' + (n.read ? '' : ' unread') + '">' +
+        '<div class="notification-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg></div>' +
+        '<div class="notification-content">' +
+        '<div class="notification-title">' + Utils.sanitize(n.title || 'Notification') + '</div>' +
+        '<div class="notification-text">' + Utils.sanitize(n.message || '') + '</div>' +
+        '<div class="notification-time">' + Utils.timeAgo(n.created_at) + '</div>' +
+        '</div></div>'
+      ).join('');
+    }
+
+    async function loadDashboard() {
+      try {
+        const notifRes = await API.getNotifications();
+        if (notifRes.success) {
+          const count = notifRes.unread_count || 0;
+          document.getElementById('notifCount').textContent = count;
+          const sidebarCount = document.getElementById('sidebarNotifCount');
+          if (sidebarCount) sidebarCount.textContent = count;
+          renderNotificationPreview(notifRes.data || []);
+        }
+      } catch (e) {}
+      try {
+        const apptRes = await API.getAppointments();
+        if (apptRes.success) {
+          renderActivity(apptRes.data || []);
+          document.getElementById('totalAppts').textContent = (apptRes.data || []).length;
+          if (apptRes.data.length > 0) {
+            const appt = apptRes.data[0];
+            document.getElementById('apptDoctor').textContent = appt.doctor_name;
+            document.getElementById('apptService').textContent = appt.service;
+            document.getElementById('apptDept').textContent = appt.department;
+            document.getElementById('apptTime').textContent = Utils.formatTime(appt.time);
+            document.getElementById('apptDate').textContent = Utils.formatDate(appt.date);
+            const badge = document.getElementById('apptStatusBadge');
+            badge.textContent = Utils.capitalize(appt.status.replace('_', ' '));
+            badge.className = 'badge badge-' + Utils.getStatusColor(appt.status);
+          } else {
+            document.getElementById('upcomingApptBody').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No Upcoming Appointments</h3><p>Book your first appointment to get started.</p><a href="appointments.html" class="btn btn-primary mt-md">Book Now</a></div>';
+          }
+        }
+      } catch (e) {}
+      try {
+        const histRes = await API.getAppointmentHistory();
+        if (histRes.success) {
+          const completed = histRes.data.filter((a) => a.status === 'completed').length;
+          document.getElementById('completedAppts').textContent = completed;
+          const totalEl = document.getElementById('totalAppts');
+          const total = parseInt(totalEl.textContent) || completed;
+          const rateEl = document.querySelector('#completedAppts').closest('.stat-card').querySelector('.stat-card-change');
+          if (rateEl) {
+            const pct = total ? Math.round((completed / total) * 100) : 0;
+            rateEl.textContent = pct + '% completion rate';
+          }
+        }
+      } catch (e) {}
+      try {
+        const queueRes = await API.getQueue();
+        if (queueRes.success) {
+          const q = queueRes.data;
+          document.getElementById('queueNumber').textContent = q.ticket_number;
+          document.getElementById('currentServing').textContent = q.current_serving;
+          document.getElementById('patientsAhead').textContent = q.patients_ahead;
+          document.getElementById('estWait').textContent = q.estimated_wait_minutes + 'm';
+          const progress = Math.max(10, Math.min(95, (1 - q.patients_ahead / 20) * 100));
+          document.getElementById('queueProgress').style.width = progress + '%';
+        } else {
+          document.getElementById('queueCard').querySelector('.queue-number').textContent = '--';
+        }
+      } catch (e) {}
+    }
+
+    function updateGreeting() {
+      const hour = new Date().getHours();
+      let greeting = 'Good evening';
+      if (hour < 12) greeting = 'Good morning';
+      else if (hour < 17) greeting = 'Good afternoon';
+      const user = Auth.getUser();
+      const name = user ? user.full_name?.split(' ')[0] : 'Student';
+      document.getElementById('welcomeText').textContent = `${greeting}, ${name}`;
+      const now = new Date();
+      document.getElementById('currentTime').textContent = now.toLocaleString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    }
+
+    function loadComponents() {
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('dashboard');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Dashboard');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.toggle('open');
+          document.getElementById('sidebarOverlay')?.classList.toggle('active');
+        });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.remove('open');
+          document.getElementById('sidebarOverlay')?.classList.remove('active');
+        });
+        document.getElementById('userMenuBtn')?.addEventListener('click', () => {
+          document.getElementById('userMenu')?.classList.toggle('active');
+        });
+        document.addEventListener('click', (e) => {
+          if (!e.target.closest('.dropdown')) {
+            document.querySelectorAll('.dropdown-menu.active').forEach(m => m.classList.remove('active'));
+          }
+        });
+      }, 100);
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      updateGreeting();
+      loadComponents();
+      loadDashboard();
+      setInterval(loadDashboard, 30000);
+    });
+  </script>
+</body>
+</html>

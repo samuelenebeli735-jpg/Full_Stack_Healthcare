@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Telemedicine - SHMS</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>Telemedicine</h1>
+          <p>Consult with doctors remotely via video calls.</p>
+        </div>
+        <div class="grid grid-2 mb-lg">
+          <div class="card">
+            <div class="card-body" style="text-align:center;padding:40px">
+              <div style="font-size:64px;margin-bottom:20px">
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </div>
+              <h3 style="font-size:20px;font-weight:700;margin-bottom:8px">Start a Consultation</h3>
+              <p style="color:var(--text-secondary);margin-bottom:24px">Connect with a doctor via video call from anywhere.</p>
+              <button class="btn btn-primary btn-lg" id="startConsult">Start New Consultation</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Upcoming Consultations</h3></div>
+            <div class="card-body" id="telecomList">
+              <div class="empty-state"><div class="empty-state-icon">📹</div><h3>No Consultations</h3><p>Schedule a telemedicine appointment.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    async function loadTelecom() {
+      try {
+        const res = await API.getTelecomConsultations();
+        const container = document.getElementById('telecomList');
+        if (!res.success || res.data.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📹</div><h3>No Consultations</h3><p>Your telemedicine appointments will appear here.</p></div>';
+          return;
+        }
+        container.innerHTML = '';
+        res.data.forEach(c => {
+          container.innerHTML += `
+            <div class="appointment-card" style="margin:0;border-radius:0;border-left:none;border-right:none">
+              <div class="apt-icon" style="background:#e0f2fe;color:#075985">📹</div>
+              <div class="apt-info">
+                <h4>${c.doctor}</h4>
+                <p>${Utils.formatDate(c.date)} at ${Utils.formatTime(c.time)}</p>
+              </div>
+              <span class="badge badge-${c.status === 'scheduled' ? 'primary' : 'success'}">${Utils.capitalize(c.status)}</span>
+            </div>
+          `;
+        });
+      } catch(e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('telecom');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Telemedicine');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
+      }, 100);
+      loadTelecom();
+      setInterval(loadTelecom, 30000);
+      document.getElementById('startConsult')?.addEventListener('click', () => Utils.showToast('Telemedicine consultation scheduling coming soon', 'info'));
+    });
+  </script>
+</body>
+</html>

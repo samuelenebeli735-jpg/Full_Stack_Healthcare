@@ -1,0 +1,505 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url= env("DATABASE_URL")
+  // The datasource connection URL has been moved out of the schema file.
+  // Configure the database URL in prisma.config.ts and pass the
+  // appropriate adapter/accelerateUrl to the PrismaClient constructor.
+  // See https://pris.ly/d/config-datasource and https://pris.ly/d/prisma7-client-config
+}
+
+model Organization {
+  id      String  @id @default(cuid())
+  name    String
+  slug    String  @unique
+  email   String? @unique
+  phone   String?
+  address String?
+  logoUrl String?
+
+  isActive Boolean @default(true)
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  users        User[]
+  departments  Department[]
+  positions    Position[]
+  services     Service[]
+  appointments Appointment[]
+  queues       Queue[]
+  schedules    Schedule[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+}
+
+model User {
+  id String @id @default(cuid())
+
+  organizationId String
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+  profile      Profile?
+  staff        Staff?
+
+  email String? @unique
+
+  password String
+
+  role Role
+
+  isActive Boolean @default(true)
+
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  notificationPref   NotificationPreference?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Profile {
+  id String @id @default(cuid())
+
+  userId String @unique
+
+  user User @relation(fields: [userId], references: [id])
+
+  firstName  String
+  middleName String?
+  lastName   String
+
+  matricNumber String @unique
+
+  faculty    String
+  department String
+  level      String
+
+  gender      String
+  dateOfBirth DateTime
+
+  phone String
+
+  emergencyContactName  String
+  emergencyContactPhone String
+
+  bloodGroup String?
+  genotype   String?
+  allergies  String?
+
+  profilePhotoUrl String?
+
+  medicalRecord MedicalRecord?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model MedicalRecord {
+  id String @id @default(cuid())
+
+  profileId String @unique
+
+  profile Profile @relation(fields: [profileId], references: [id])
+
+  recordNumber String @unique
+
+  recordYear Int
+
+  appointments Appointment[]
+
+  status MedicalRecordStatus @default(active)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+model Staff {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  departmentId String
+  positionId   String
+
+  department Department @relation(fields: [departmentId], references: [id])
+  position   Position   @relation(fields: [positionId], references: [id])
+
+  appointments Appointment[]
+
+  schedules Schedule[]
+
+  staffNumber String @unique
+
+  firstName  String
+  middleName String?
+  lastName   String
+
+  gender      String
+  dateOfBirth DateTime
+
+  phone String
+
+  employmentDate DateTime
+
+  qualification String?
+
+  licenseNumber String?
+
+  profilePhotoUrl String?
+
+  employmentStatus EmploymentStatus @default(active)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Schedule {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id])
+
+  dayOfWeek DayOfWeek
+
+  startTime DateTime
+  endTime   DateTime
+
+  breakStart DateTime?
+  breakEnd   DateTime?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([staffId, dayOfWeek])
+  @@index([organizationId])
+  @@index([staffId])
+  @@index([dayOfWeek])
+}
+
+model Department {
+  id String @id @default(cuid())
+
+  organizationId String
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  name String
+
+  code String
+
+  description String?
+
+  location String?
+
+  phone String?
+
+  email String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff Staff[]
+
+  @@unique([organizationId, code])
+}
+
+model Position {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  staff Staff[]
+
+  name String
+  code String
+
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code])
+}
+
+model Service {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  appointments Appointment[]
+
+  name String
+  code String
+
+  description String?
+
+  estimatedDuration Int @default(15)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, code])
+}
+
+model Appointment {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  medicalRecordId String
+  medicalRecord   MedicalRecord @relation(fields: [medicalRecordId], references: [id])
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  staffId String?
+  staff   Staff?  @relation(fields: [staffId], references: [id])
+
+  appointmentDate DateTime
+
+  reason String?
+
+  queue Queue?
+
+  status AppointmentStatus @default(scheduled)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Queue {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  appointmentId String      @unique
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  consultation Consultation?
+
+  queueNumber Int
+
+  queueDate String
+
+  status QueueStatus @default(waiting)
+
+  checkedInAt DateTime @default(now())
+
+  calledAt DateTime?
+
+  startedAt DateTime?
+
+  completedAt DateTime?
+
+  estimatedWaitMinutes Int?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, queueDate, queueNumber])
+}
+
+model Consultation {
+  id String @id @default(cuid())
+
+  queueId String @unique
+  queue   Queue  @relation(fields: [queueId], references: [id])
+
+  chiefComplaint String?
+
+  symptoms String?
+
+  diagnosis String?
+
+  treatmentPlan String?
+
+  notes String?
+
+  consultationDate DateTime @default(now())
+
+  prescription Prescription?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+}
+
+model Prescription {
+  id String @id @default(cuid())
+
+  consultationId String @unique
+
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  items PrescriptionItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PrescriptionItem {
+  id String @id @default(cuid())
+
+  prescriptionId String
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+
+  medicationName String
+
+  dosage String
+
+  frequency String
+
+  duration String
+
+  quantity Int
+
+  instructions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id])
+
+  action String
+
+  entity String
+
+  entityId String?
+
+  description String?
+
+  ipAddress String?
+
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([entity])
+  @@index([action])
+  @@index([createdAt])
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  title   String
+  message String
+  type    String    @default("general")
+  read    Boolean   @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, read])
+  @@index([organizationId])
+}
+
+model NotificationPreference {
+  id String @id @default(cuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  emailEnabled   Boolean @default(true)
+  whatsappEnabled Boolean @default(false)
+  telegramEnabled Boolean @default(false)
+
+  phone String?
+
+  remindBeforeHours Int @default(24)
+
+  remindForAppointment Boolean @default(true)
+  remindForQueue       Boolean @default(true)
+  remindForResults     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  student
+  staff
+  admin
+  super_admin
+}
+
+enum MedicalRecordStatus {
+  active
+  archived
+}
+
+enum EmploymentStatus {
+  active
+  suspended
+  resigned
+  retired
+}
+
+enum AppointmentStatus {
+  scheduled
+  confirmed
+  checked_in
+  in_progress
+  completed
+  cancelled
+  no_show
+}
+
+enum QueueStatus {
+  waiting
+  called
+  in_progress
+  completed
+  cancelled
+}
+
+enum DayOfWeek {
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+  sunday
+}

@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Notifications - SHMS</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    .notif-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:24px; }
+    .notif-tab { padding:10px 20px; font-size:14px; font-weight:500; color:var(--text-secondary); border-bottom:2px solid transparent; cursor:pointer; transition:var(--transition); }
+    .notif-tab:hover { color:var(--primary); }
+    .notif-tab.active { color:var(--primary); border-bottom-color:var(--primary); }
+    .notif-panel { display:none; animation:fadeIn 0.3s ease; }
+    .notif-panel.active { display:block; }
+    .notifications-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:24px; flex-wrap:wrap; gap:12px; padding-bottom:16px; }
+    .notifications-filters { display:flex; gap:8px; flex-wrap:wrap; }
+    .notif-card {
+      display:flex; gap:14px; padding:16px 20px;
+      border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:10px;
+      cursor:pointer; transition:var(--transition); position:relative;
+    }
+    .notif-card:hover { border-color:var(--accent-light); box-shadow:var(--shadow-sm); }
+    .notif-card.unread { background:var(--primary-light); border-color:rgba(var(--theme-rgb),0.3); }
+    .notif-card .notif-dot { width:8px; height:8px; border-radius:var(--radius-full); background:var(--primary); position:absolute; top:20px; left:8px; display:none; }
+    .notif-card.unread .notif-dot { display:block; }
+    .notif-card .notif-icon { width:40px; height:40px; border-radius:var(--radius); display:flex; align-items:center; justify-content:center; font-size:18px; flex-shrink:0; }
+    .notif-card .notif-body { flex:1; }
+    .notif-card .notif-body h4 { font-size:14px; font-weight:600; color:var(--text-primary); margin-bottom:4px; }
+    .notif-card .notif-body p { font-size:13px; color:var(--text-secondary); line-height:1.5; }
+    .notif-card .notif-body .notif-time { font-size:12px; color:var(--text-light); margin-top:6px; }
+    .notif-card .notif-body .notif-type { font-size:11px; text-transform:uppercase; letter-spacing:0.05em; font-weight:600; }
+    .pref-section { margin-bottom:32px; }
+    .pref-section-title { font-size:15px; font-weight:600; margin-bottom:16px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+    .channel-toggle { display:flex; align-items:center; gap:16px; padding:14px 16px; border:1px solid var(--border); border-radius:var(--radius-md); margin-bottom:10px; transition:var(--transition); }
+    .channel-toggle:hover { border-color:var(--accent-light); }
+    .channel-toggle .channel-icon { width:44px; height:44px; border-radius:var(--radius); display:flex; align-items:center; justify-content:center; font-size:20px; flex-shrink:0; }
+    .channel-toggle .channel-info { flex:1; }
+    .channel-toggle .channel-info h4 { font-size:14px; font-weight:600; }
+    .channel-toggle .channel-info p { font-size:12px; color:var(--text-secondary); }
+    .channel-toggle .toggle-switch { position:relative; width:44px; height:24px; flex-shrink:0; cursor:pointer; }
+    .channel-toggle .toggle-switch input { opacity:0; width:0; height:0; }
+    .channel-toggle .toggle-slider { position:absolute; top:0; left:0; right:0; bottom:0; background:var(--bg-tertiary); border-radius:12px; transition:var(--transition); }
+    .channel-toggle .toggle-slider::before { content:''; position:absolute; height:18px; width:18px; left:3px; bottom:3px; background:white; border-radius:var(--radius-full); transition:var(--transition); box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+    .channel-toggle .toggle-switch input:checked + .toggle-slider { background:var(--success); }
+    .channel-toggle .toggle-switch input:checked + .toggle-slider::before { transform:translateX(20px); }
+    .sent-item { display:flex; align-items:center; gap:12px; padding:12px 16px; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:8px; }
+    .sent-item .sent-icon { width:32px; height:32px; border-radius:var(--radius-full); display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .sent-item .sent-info { flex:1; }
+    .sent-item .sent-info h4 { font-size:13px; font-weight:600; }
+    .sent-item .sent-info p { font-size:12px; color:var(--text-secondary); }
+    .sent-item .sent-time { font-size:11px; color:var(--text-light); }
+    @media (max-width:480px) {
+      .notifications-header { flex-direction:column; align-items:stretch; }
+      .notifications-filters { justify-content:center; }
+      .channel-toggle { flex-direction:column; text-align:center; }
+      .pref-form .form-row { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="notifications-header">
+          <div>
+            <h1>Notifications</h1>
+            <p style="color:var(--text-secondary);font-size:14px">Stay updated with appointments, queue, and reminders.</p>
+          </div>
+        </div>
+        <div class="notif-tabs">
+          <button class="notif-tab active" data-notif-tab="inbox">Inbox</button>
+          <button class="notif-tab" data-notif-tab="preferences">Reminder Settings</button>
+          <button class="notif-tab" data-notif-tab="sent">Sent History</button>
+        </div>
+        <!-- INBOX PANEL -->
+        <div class="notif-panel active" id="notif-panel-inbox">
+          <div class="flex-between mb-md" style="flex-wrap:wrap;gap:12px">
+            <div class="notifications-filters">
+              <button class="btn btn-sm btn-primary filter-btn active" data-filter="all">All</button>
+              <button class="btn btn-sm btn-secondary filter-btn" data-filter="unread">Unread</button>
+              <button class="btn btn-sm btn-secondary filter-btn" data-filter="appointment">Appointments</button>
+              <button class="btn btn-sm btn-secondary filter-btn" data-filter="queue">Queue</button>
+              <button class="btn btn-sm btn-secondary filter-btn" data-filter="reminder">Reminders</button>
+            </div>
+            <button class="btn btn-sm btn-secondary" id="markAllRead">Mark All as Read</button>
+          </div>
+          <div id="notificationsList"></div>
+        </div>
+        <!-- PREFERENCES PANEL -->
+        <div class="notif-panel" id="notif-panel-preferences">
+          <div class="card">
+            <div class="card-header"><h3>Notification Channels</h3></div>
+            <div class="card-body">
+              <div class="pref-section">
+                <div class="channel-toggle">
+                  <div class="channel-icon" style="background:var(--primary-light);color:var(--primary)">📧</div>
+                  <div class="channel-info"><h4>Email Notifications</h4><p>Receive reminders via email at john@university.edu</p></div>
+                  <label class="toggle-switch"><input type="checkbox" id="emailToggle"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="channel-toggle">
+                  <div class="channel-icon" style="background:#dcfce7;color:#166534">💬</div>
+                  <div class="channel-info"><h4>WhatsApp Notifications</h4><p>Receive reminders via WhatsApp message</p></div>
+                  <label class="toggle-switch"><input type="checkbox" id="whatsappToggle"><span class="toggle-slider"></span></label>
+                </div>
+                <div class="channel-toggle">
+                  <div class="channel-icon" style="background:#e0f2fe;color:#075985">✈️</div>
+                  <div class="channel-info"><h4>Telegram Notifications</h4><p>Receive reminders via Telegram bot</p></div>
+                  <label class="toggle-switch"><input type="checkbox" id="telegramToggle"><span class="toggle-slider"></span></label>
+                </div>
+              </div>
+               <div class="pref-section">
+                 <div class="pref-section-title">Contact Details</div>
+                 <div class="form-row">
+                   <div class="form-group" style="grid-column:1/-1">
+                     <label class="form-label">Phone Number (WhatsApp)</label>
+                     <input type="tel" class="form-input" id="prefPhone" placeholder="+2348012345678">
+                   </div>
+                 </div>
+               </div>
+              <div class="pref-section">
+                <div class="pref-section-title">Reminder Timing</div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Remind Before Appointment</label>
+                    <select class="form-select" id="prefRemindHours">
+                      <option value="1">1 hour before</option>
+                      <option value="2">2 hours before</option>
+                      <option value="6">6 hours before</option>
+                      <option value="12">12 hours before</option>
+                      <option value="24" selected>24 hours before</option>
+                      <option value="48">48 hours before</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Remind For</label>
+                    <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+                      <label class="form-checkbox"><input type="checkbox" id="remindAppt" checked> <span>Appointments</span></label>
+                      <label class="form-checkbox"><input type="checkbox" id="remindQueue" checked> <span>Queue updates</span></label>
+                      <label class="form-checkbox"><input type="checkbox" id="remindResults" checked> <span>Lab results</span></label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <button class="btn btn-primary" id="savePrefs">Save Preferences</button>
+                <button class="btn btn-secondary" id="testNotification">Send Test Notification</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- SENT HISTORY PANEL -->
+        <div class="notif-panel" id="notif-panel-sent">
+          <div class="card">
+            <div class="card-header"><h3>Recently Sent Reminders</h3><span class="badge badge-info" id="sentCount">0 sent</span></div>
+            <div class="card-body" id="sentHistoryList">
+              <div class="empty-state"><div class="empty-state-icon">📤</div><h3>No Sent Notifications</h3><p>Your sent reminders will appear here.</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let allNotifications = [];
+    let notificationPrefs = {};
+
+    function switchNotifTab(tab) {
+      document.querySelectorAll('.notif-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.notif-panel').forEach(p => p.classList.remove('active'));
+      document.querySelector(`.notif-tab[data-notif-tab="${tab}"]`).classList.add('active');
+      document.getElementById(`notif-panel-${tab}`).classList.add('active');
+      if (tab === 'preferences') loadPreferences();
+      if (tab === 'sent') loadSentHistory();
+    }
+    document.querySelectorAll('.notif-tab').forEach(tab => {
+      tab.addEventListener('click', () => switchNotifTab(tab.dataset.notif-tab));
+    });
+
+    function getNotifIcon(type) {
+      const icons = { appointment: '📅', reminder: '⏰', queue: '🔢', checkin: '✅', lab: '🔬', pharmacy: '💊', system: '⚙️' };
+      return icons[type] || '📣';
+    }
+
+    function getNotifBg(type) {
+      const bgs = { appointment: '--primary-light', reminder: '#fef3c7', queue: '#e0f2fe', checkin: '#dcfce7', lab: '#f3e8ff', pharmacy: '#fce7f3', system: '#f1f5f9' };
+      return `var(${bgs[type] || '--bg-tertiary'})`;
+    }
+
+    function getNotifColor(type) {
+      const colors = { appointment: 'var(--primary)', reminder: '#92400e', queue: '#075985', checkin: '#166534', lab: '#6d28d9', pharmacy: '#be185d', system: 'var(--text-secondary)' };
+      return colors[type] || 'var(--text-secondary)';
+    }
+
+    function renderNotifications(filter = 'all') {
+      const container = document.getElementById('notificationsList');
+      let filtered = allNotifications;
+      if (filter === 'unread') filtered = allNotifications.filter(n => !n.read);
+      else if (filter !== 'all') filtered = allNotifications.filter(n => n.type === filter);
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔔</div><h3>No Notifications</h3><p>You\'re all caught up!</p></div>';
+        return;
+      }
+      container.innerHTML = '';
+      filtered.forEach(n => {
+        const div = document.createElement('div');
+        div.className = 'notif-card' + (n.read ? '' : ' unread');
+        div.innerHTML = `
+          <div class="notif-dot"></div>
+          <div class="notif-icon" style="background:${getNotifBg(n.type)};color:${getNotifColor(n.type)}">${getNotifIcon(n.type)}</div>
+          <div class="notif-body">
+            <h4>${n.title}</h4>
+            <p>${n.message}</p>
+            <div class="flex-between" style="margin-top:6px">
+              <span class="notif-time">${Utils.timeAgo(n.created_at)}</span>
+              <span class="notif-type" style="color:${getNotifColor(n.type)}">${Utils.capitalize(n.type)}</span>
+            </div>
+          </div>
+        `;
+        div.addEventListener('click', async () => {
+          if (!n.read) {
+            n.read = true;
+            div.classList.remove('unread');
+            try { await API.markNotificationRead(n.id); } catch (e) {}
+            updateCounts();
+          }
+        });
+        container.appendChild(div);
+      });
+    }
+
+    function updateCounts() {
+      const unread = allNotifications.filter(n => !n.read).length;
+      const el = document.getElementById('notifCount');
+      if (el) el.textContent = unread;
+      const sideEl = document.getElementById('sidebarNotifCount');
+      if (sideEl) sideEl.textContent = unread;
+    }
+
+    async function loadNotifications() {
+      try {
+        const res = await API.getNotifications();
+        if (res.success) {
+          allNotifications = res.data;
+          renderNotifications('all');
+          updateCounts();
+        }
+      } catch (e) {}
+    }
+
+    // ==================== PREFERENCES ====================
+    async function loadPreferences() {
+      try {
+        const res = await API.getNotificationPrefs();
+        if (res.success) {
+          notificationPrefs = res.data;
+          document.getElementById('emailToggle').checked = notificationPrefs.email_enabled;
+          document.getElementById('whatsappToggle').checked = notificationPrefs.whatsapp_enabled;
+          document.getElementById('telegramToggle').checked = notificationPrefs.telegram_enabled;
+           document.getElementById('prefPhone').value = notificationPrefs.phone || '';
+           document.getElementById('prefRemindHours').value = notificationPrefs.remind_before_hours || 24;
+          document.getElementById('remindAppt').checked = notificationPrefs.remind_for_appointment !== false;
+          document.getElementById('remindQueue').checked = notificationPrefs.remind_for_queue !== false;
+          document.getElementById('remindResults').checked = notificationPrefs.remind_for_results !== false;
+        }
+      } catch(e) {}
+    }
+
+    document.getElementById('savePrefs')?.addEventListener('click', async () => {
+      const data = {
+        email_enabled: document.getElementById('emailToggle').checked,
+        whatsapp_enabled: document.getElementById('whatsappToggle').checked,
+        telegram_enabled: document.getElementById('telegramToggle').checked,
+        phone: document.getElementById('prefPhone').value.trim(),
+        remind_before_hours: parseInt(document.getElementById('prefRemindHours').value),
+        remind_for_appointment: document.getElementById('remindAppt').checked,
+        remind_for_queue: document.getElementById('remindQueue').checked,
+        remind_for_results: document.getElementById('remindResults').checked,
+      };
+      try {
+        const res = await API.updateNotificationPrefs(data);
+        if (res.success) {
+          notificationPrefs = res.data;
+          Utils.showToast('Notification preferences saved', 'success');
+        } else {
+          Utils.showToast(res.message || 'Save failed', 'error');
+        }
+      } catch(e) {
+        Utils.showToast(e.message, 'error');
+      }
+    });
+
+    document.getElementById('testNotification')?.addEventListener('click', async () => {
+      try {
+        const res = await API.sendTestNotification();
+        if (res.success) {
+          Utils.showToast(res.message || 'Test notification sent!', 'success');
+        } else {
+          Utils.showToast(res.message || 'Test failed', 'error');
+        }
+      } catch(e) {
+        Utils.showToast(e.message, 'error');
+      }
+    });
+
+    // ==================== SENT HISTORY ====================
+    async function loadSentHistory() {
+      try {
+        const res = await API.getSentNotifications();
+        if (res.success) {
+          const sent = res.data;
+          const container = document.getElementById('sentHistoryList');
+          document.getElementById('sentCount').textContent = sent.length + ' sent';
+          container.innerHTML = '';
+          if (sent.length === 0) {
+            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📤</div><h3>No Sent Notifications</h3><p>Your sent reminders will appear here.</p></div>';
+            return;
+          }
+          sent.forEach(s => {
+            const channelColors = { 'Email': { bg: 'var(--primary-light)', color: 'var(--primary)' }, 'WhatsApp': { bg: '#dcfce7', color: '#166534' }, 'Telegram': { bg: '#e0f2fe', color: '#075985' } };
+            const cc = channelColors[s.channel] || { bg: 'var(--bg-tertiary)', color: 'var(--text-secondary)' };
+            const iconMap = { 'Email': '📧', 'WhatsApp': '💬', 'Telegram': '✈️' };
+            container.innerHTML += `<div class="sent-item">
+              <div class="sent-icon" style="background:${cc.bg};color:${cc.color}">${iconMap[s.channel] || '📤'}</div>
+              <div class="sent-info">
+                <h4>${s.title}</h4>
+                <p>To: ${s.recipient} &middot; via ${s.channel}</p>
+              </div>
+              <span class="badge badge-success">${s.status}</span>
+              <span class="sent-time">${Utils.timeAgo(s.sent_at)}</span>
+            </div>`;
+          });
+        }
+      } catch(e) {}
+    }
+
+    // ==================== INIT ====================
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('notifications');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Notifications');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.toggle('open');
+          document.getElementById('sidebarOverlay')?.classList.toggle('active');
+        });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.remove('open');
+          document.getElementById('sidebarOverlay')?.classList.remove('active');
+        });
+      }, 100);
+      await loadNotifications();
+      setInterval(loadNotifications, 30000);
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-btn').forEach(b => {
+            b.className = b.className.replace('btn-primary', 'btn-secondary');
+          });
+          btn.className = btn.className.replace('btn-secondary', 'btn-primary');
+          renderNotifications(btn.dataset.filter);
+        });
+      });
+      document.getElementById('markAllRead').addEventListener('click', async () => {
+        try { await API.markAllNotificationsRead(); } catch (e) {}
+        allNotifications.forEach(n => n.read = true);
+        renderNotifications('all');
+        updateCounts();
+        Utils.showToast('All notifications marked as read', 'success');
+      });
+    });
+  </script>
+</body>
+</html>

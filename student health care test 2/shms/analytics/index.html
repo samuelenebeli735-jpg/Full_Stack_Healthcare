@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analytics - SHMS</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+  <style>
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:var(--font-family);background:#f4f6f8;color:var(--text-primary)}
+
+    .ax-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+    .ax-header h1{font-size:24px;font-weight:800;color:#111827}
+    .ax-header p{font-size:14px;color:#6b7280;margin-top:2px}
+    .ax-header-actions{display:flex;gap:10px;align-items:center}
+    .ax-btn{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #e5e7eb;background:#fff;color:#374151;transition:all 0.2s;display:inline-flex;align-items:center;gap:6px}
+    .ax-btn:hover{border-color:#d1d5db;background:#f9fafb}
+    .ax-btn svg{width:16px;height:16px}
+    .ax-btn.primary{background:#10b981;color:#fff;border-color:#10b981}
+    .ax-btn.primary:hover{background:#059669}
+
+    .ax-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+    @media(max-width:1024px){.ax-stat-row{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:480px){.ax-stat-row{grid-template-columns:1fr}}
+
+    .ax-stat{background:#fff;border-radius:14px;padding:20px 22px;display:flex;align-items:center;gap:16px;border:1px solid #e8ecf0;transition:all 0.3s}
+    .ax-stat:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.07)}
+    .ax-stat-icon{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .ax-stat-icon svg{width:24px;height:24px}
+    .ax-stat-icon.green{background:#f0fdf4;color:#16a34a}
+    .ax-stat-icon.blue{background:#eff6ff;color:#2563eb}
+    .ax-stat-icon.teal{background:#f0fdfa;color:#0d9488}
+    .ax-stat-icon.amber{background:#fffbeb;color:#d97706}
+    .ax-stat-value{font-size:26px;font-weight:800;color:#111827;line-height:1.1}
+    .ax-stat-label{font-size:13px;color:#6b7280;margin-top:2px}
+    .ax-stat-change{font-size:12px;font-weight:600;margin-top:4px;display:inline-flex;align-items:center;gap:3px}
+    .ax-stat-change.up{color:#16a34a}
+    .ax-stat-change.down{color:#dc2626}
+
+    .ax-grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:20px;margin-bottom:20px}
+    .ax-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:20px}
+    @media(max-width:1024px){.ax-grid-2,.ax-grid-3{grid-template-columns:1fr}}
+
+    .ax-card{background:#fff;border-radius:14px;border:1px solid #e8ecf0;overflow:hidden;transition:all 0.3s}
+    .ax-card:hover{box-shadow:0 6px 20px rgba(0,0,0,0.06)}
+    .ax-card-header{padding:18px 22px;border-bottom:1px solid #f0f2f5;display:flex;align-items:center;justify-content:space-between}
+    .ax-card-header h3{font-size:15px;font-weight:700;color:#111827}
+    .ax-card-header .filter-link{font-size:13px;color:#10b981;font-weight:600;cursor:pointer}
+    .ax-card-body{padding:22px}
+
+    .ax-chart-area{position:relative}
+    .ax-line-chart{width:100%;height:180px}
+    .ax-chart-labels{display:flex;justify-content:space-between;padding:8px 0 0;font-size:11px;color:#9ca3af}
+    .ax-chart-tooltip{position:absolute;top:10px;right:60px;background:#111827;color:#fff;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;pointer-events:none}
+    .ax-chart-tooltip::after{content:'';position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);border-left:5px solid transparent;border-right:5px solid transparent;border-top:5px solid #111827}
+
+    .ax-donut-wrap{display:flex;align-items:center;gap:28px}
+    .ax-donut{position:relative;width:130px;height:130px;flex-shrink:0}
+    .ax-donut svg{width:130px;height:130px;transform:rotate(-90deg)}
+    .ax-donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .ax-donut-center .num{font-size:24px;font-weight:800;color:#111827}
+    .ax-donut-center .lbl{font-size:11px;color:#9ca3af}
+    .ax-legend{flex:1;display:flex;flex-direction:column;gap:10px}
+    .ax-legend-item{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+    .ax-legend-item .left{display:flex;align-items:center;gap:8px}
+    .ax-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+    .ax-legend-item .name{color:#374151;font-weight:500}
+    .ax-legend-item .count{font-weight:700;color:#111827}
+    .ax-legend-item .pct{color:#9ca3af;margin-left:4px;font-size:12px}
+
+    .ax-bar-chart{display:flex;flex-direction:column;gap:14px}
+    .ax-bar-row{display:flex;align-items:center;gap:12px}
+    .ax-bar-label{font-size:13px;color:#6b7280;min-width:56px;text-align:right}
+    .ax-bar-track{flex:1;height:28px;background:#f3f4f6;border-radius:6px;overflow:hidden;position:relative}
+    .ax-bar-fill{height:100%;border-radius:6px;transition:width 0.8s cubic-bezier(0.34,1.56,0.64,1);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:12px;font-weight:700;color:#fff}
+    .ax-bar-fill.green{background:#10b981}
+    .ax-bar-fill.red{background:#ef4444}
+    .ax-bar-fill.amber{background:#f59e0b}
+    .ax-bar-fill.blue{background:#3b82f6}
+    .ax-bar-count{font-size:13px;font-weight:700;color:#111827;min-width:28px}
+
+    .ax-completion{display:flex;align-items:center;gap:28px}
+    .ax-completion-donut{position:relative;width:110px;height:110px;flex-shrink:0}
+    .ax-completion-donut svg{width:110px;height:110px;transform:rotate(-90deg)}
+    .ax-completion-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    .ax-completion-center .pct{font-size:20px;font-weight:800;color:#111827}
+    .ax-completion-center .lbl{font-size:10px;color:#9ca3af}
+    .ax-completion-stats{flex:1;display:flex;flex-direction:column;gap:8px}
+    .ax-cs-row{display:flex;align-items:center;justify-content:space-between;font-size:13px}
+    .ax-cs-row .label{color:#6b7280}
+    .ax-cs-row .value{font-weight:700;color:#111827}
+    .ax-cs-row .value.green{color:#16a34a}
+    .ax-cs-row .value.amber{color:#d97706}
+    .ax-cs-row .value.red{color:#dc2626}
+
+    .ax-kpi-list{display:flex;flex-direction:column;gap:16px}
+    .ax-kpi-item{display:flex;flex-direction:column;gap:6px}
+    .ax-kpi-top{display:flex;align-items:center;justify-content:space-between}
+    .ax-kpi-name{font-size:13px;color:#374151;font-weight:500}
+    .ax-kpi-val{font-size:13px;font-weight:700}
+    .ax-kpi-val.green{color:#16a34a}
+    .ax-kpi-val.blue{color:#2563eb}
+    .ax-kpi-val.purple{color:#7c3aed}
+    .ax-kpi-val.amber{color:#d97706}
+    .ax-kpi-val.red{color:#dc2626}
+    .ax-kpi-track{width:100%;height:6px;background:#f3f4f6;border-radius:3px;overflow:hidden}
+    .ax-kpi-fill{height:100%;border-radius:3px;transition:width 0.8s cubic-bezier(0.34,1.56,0.64,1)}
+    .ax-kpi-fill.green{background:#10b981}
+    .ax-kpi-fill.blue{background:#3b82f6}
+    .ax-kpi-fill.purple{background:#8b5cf6}
+    .ax-kpi-fill.amber{background:#f59e0b}
+    .ax-kpi-fill.red{background:#ef4444}
+
+    @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+    .ax-stat,.ax-card{animation:fadeInUp 0.5s ease both}
+    .ax-stat:nth-child(2){animation-delay:0.05s}
+    .ax-stat:nth-child(3){animation-delay:0.1s}
+    .ax-stat:nth-child(4){animation-delay:0.15s}
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+
+        <div class="ax-header">
+          <div>
+            <h1>Analytics Dashboard</h1>
+            <p>Insights across health, clinical, and operational performance.</p>
+          </div>
+          <div class="ax-header-actions">
+            <button class="ax-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Last 30 days</button>
+            <button class="ax-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export</button>
+          </div>
+        </div>
+
+        <!-- STAT CARDS -->
+        <div class="ax-stat-row" id="kpiGrid">
+          <div class="ax-stat">
+            <div class="ax-stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div><div class="ax-stat-value" id="kpiTotal">0</div><div class="ax-stat-label">Total students enrolled</div><div class="ax-stat-change up">&#8593; 14 new this month</div></div>
+          </div>
+          <div class="ax-stat">
+            <div class="ax-stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
+            <div><div class="ax-stat-value" id="kpiCompleted">0</div><div class="ax-stat-label">Appointments this month</div><div class="ax-stat-change up">&#8593; 12% vs last month</div></div>
+          </div>
+          <div class="ax-stat">
+            <div class="ax-stat-icon teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>
+            <div><div class="ax-stat-value" id="kpiWait">0%</div><div class="ax-stat-label">Immunization coverage</div><div class="ax-stat-change up">&#8593; 3% since last term</div></div>
+          </div>
+          <div class="ax-stat">
+            <div class="ax-stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+            <div><div class="ax-stat-value" id="kpiSatisfaction">0m</div><div class="ax-stat-label">Avg. consultation time</div><div class="ax-stat-change down">&#8595; 2 min this week</div></div>
+          </div>
+        </div>
+
+        <!-- Row 1: Line Chart + Donut -->
+        <div class="ax-grid-2">
+          <div class="ax-card">
+            <div class="ax-card-header"><h3>Monthly health visits</h3><span class="filter-link">Last 6 months</span></div>
+            <div class="ax-card-body">
+              <div class="ax-chart-area">
+                <div class="ax-chart-tooltip" id="chartTooltip" style="display:none">128 visits</div>
+                <svg class="ax-line-chart" viewBox="0 0 500 180" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="axFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/>
+                      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <line x1="0" y1="45" x2="500" y2="45" stroke="#f3f4f6" stroke-width="1"/>
+                  <line x1="0" y1="90" x2="500" y2="90" stroke="#f3f4f6" stroke-width="1"/>
+                  <line x1="0" y1="135" x2="500" y2="135" stroke="#f3f4f6" stroke-width="1"/>
+                  <text x="0" y="42" font-size="10" fill="#9ca3af">150</text>
+                  <text x="0" y="87" font-size="10" fill="#9ca3af">100</text>
+                  <text x="0" y="132" font-size="10" fill="#9ca3af">50</text>
+                  <text x="0" y="175" font-size="10" fill="#9ca3af">0</text>
+                  <path d="M60,140 L155,120 L250,95 L345,75 L440,55 L500,50 L500,180 L60,180Z" fill="url(#axFill)"/>
+                  <polyline points="60,140 155,120 250,95 345,75 440,55 500,50" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="60" cy="140" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                  <circle cx="155" cy="120" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                  <circle cx="250" cy="95" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                  <circle cx="345" cy="75" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                  <circle cx="440" cy="55" r="5" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                  <circle cx="500" cy="50" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
+                </svg>
+                <div class="ax-chart-labels">
+                  <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ax-card">
+            <div class="ax-card-header"><h3>Health condition breakdown</h3><span class="filter-link">This month</span></div>
+            <div class="ax-card-body">
+              <div class="ax-donut-wrap">
+                <div class="ax-donut">
+                  <svg viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="14"/>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#3b82f6" stroke-width="14" stroke-dasharray="115.5 198.5" stroke-dashoffset="0" stroke-linecap="round"/>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="14" stroke-dasharray="78.5 235.5" stroke-dashoffset="-115.5" stroke-linecap="round"/>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" stroke-width="14" stroke-dasharray="47.1 266.9" stroke-dashoffset="-194" stroke-linecap="round"/>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#f59e0b" stroke-width="14" stroke-dasharray="37 277" stroke-dashoffset="-241.1" stroke-linecap="round"/>
+                    <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="14" stroke-dasharray="42.5 271.5" stroke-dashoffset="-278.1" stroke-linecap="round"/>
+                  </svg>
+                  <div class="ax-donut-center"><span class="num">377</span><span class="lbl">Total cases</span></div>
+                </div>
+                <div class="ax-legend">
+                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#3b82f6"></span><span class="name">Cold &amp; Cough</span></div><div><span class="count">132</span><span class="pct">(35%)</span></div></div>
+                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#ef4444"></span><span class="name">Fever</span></div><div><span class="count">94</span><span class="pct">(25%)</span></div></div>
+                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#8b5cf6"></span><span class="name">Migraine</span></div><div><span class="count">56</span><span class="pct">(15%)</span></div></div>
+                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#f59e0b"></span><span class="name">Allergy</span></div><div><span class="count">44</span><span class="pct">(12%)</span></div></div>
+                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#10b981"></span><span class="name">Other</span></div><div><span class="count">51</span><span class="pct">(13%)</span></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Bar Chart + Completion Donut + KPIs -->
+        <div class="ax-grid-3">
+          <div class="ax-card">
+            <div class="ax-card-header"><h3>Health visits by grade</h3><span class="filter-link">This term</span></div>
+            <div class="ax-card-body">
+              <div class="ax-bar-chart">
+                <div class="ax-bar-row"><span class="ax-bar-label">Grade 6</span><div class="ax-bar-track"><div class="ax-bar-fill green" style="width:45%"></div></div><span class="ax-bar-count">40</span></div>
+                <div class="ax-bar-row"><span class="ax-bar-label">Grade 7</span><div class="ax-bar-track"><div class="ax-bar-fill green" style="width:68%"></div></div><span class="ax-bar-count">62</span></div>
+                <div class="ax-bar-row"><span class="ax-bar-label">Grade 8</span><div class="ax-bar-track"><div class="ax-bar-fill red" style="width:95%"></div></div><span class="ax-bar-count">88</span></div>
+                <div class="ax-bar-row"><span class="ax-bar-label">Grade 9</span><div class="ax-bar-track"><div class="ax-bar-fill amber" style="width:80%"></div></div><span class="ax-bar-count">74</span></div>
+                <div class="ax-bar-row"><span class="ax-bar-label">Grade 10</span><div class="ax-bar-track"><div class="ax-bar-fill blue" style="width:60%"></div></div><span class="ax-bar-count">55</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="ax-card">
+            <div class="ax-card-header"><h3>Appointment completion</h3><span class="filter-link">This month</span></div>
+            <div class="ax-card-body">
+              <div class="ax-completion">
+                <div class="ax-completion-donut">
+                  <svg viewBox="0 0 110 110">
+                    <circle cx="55" cy="55" r="45" fill="none" stroke="#e5e7eb" stroke-width="12"/>
+                    <circle cx="55" cy="55" r="45" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="232 51" stroke-dashoffset="0" stroke-linecap="round"/>
+                  </svg>
+                  <div class="ax-completion-center"><span class="pct">82%</span><span class="lbl">Completed</span></div>
+                </div>
+                <div class="ax-completion-stats">
+                  <div class="ax-cs-row"><span class="label">Completed</span><span class="value green">563</span></div>
+                  <div class="ax-cs-row"><span class="label">No-shows</span><span class="value amber">82</span></div>
+                  <div class="ax-cs-row"><span class="label">Cancelled</span><span class="value red">42</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ax-card">
+            <div class="ax-card-header"><h3>Key performance metrics</h3></div>
+            <div class="ax-card-body">
+              <div class="ax-kpi-list">
+                <div class="ax-kpi-item">
+                  <div class="ax-kpi-top"><span class="ax-kpi-name">Immunization rate</span><span class="ax-kpi-val green">95%</span></div>
+                  <div class="ax-kpi-track"><div class="ax-kpi-fill green" style="width:95%"></div></div>
+                </div>
+                <div class="ax-kpi-item">
+                  <div class="ax-kpi-top"><span class="ax-kpi-name">Lab result turnaround</span><span class="ax-kpi-val blue">78%</span></div>
+                  <div class="ax-kpi-track"><div class="ax-kpi-fill blue" style="width:78%"></div></div>
+                </div>
+                <div class="ax-kpi-item">
+                  <div class="ax-kpi-top"><span class="ax-kpi-name">Patient satisfaction</span><span class="ax-kpi-val purple">88%</span></div>
+                  <div class="ax-kpi-track"><div class="ax-kpi-fill purple" style="width:88%"></div></div>
+                </div>
+                <div class="ax-kpi-item">
+                  <div class="ax-kpi-top"><span class="ax-kpi-name">Pharmacy dispense rate</span><span class="ax-kpi-val amber">70%</span></div>
+                  <div class="ax-kpi-track"><div class="ax-kpi-fill amber" style="width:70%"></div></div>
+                </div>
+                <div class="ax-kpi-item">
+                  <div class="ax-kpi-top"><span class="ax-kpi-name">Critical flag response time</span><span class="ax-kpi-val red">62%</span></div>
+                  <div class="ax-kpi-track"><div class="ax-kpi-fill red" style="width:62%"></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    async function loadAnalytics() {
+      try {
+        const res = await API.getAnalytics();
+        if (res.success) {
+          const a = res.data;
+          document.getElementById('kpiTotal').textContent = a.total_appointments_today;
+          document.getElementById('kpiCompleted').textContent = a.completed;
+          document.getElementById('kpiWait').textContent = a.average_wait_time + 'm';
+          document.getElementById('kpiSatisfaction').textContent = a.satisfaction_rate + '%';
+          const mq = document.getElementById('maxQueue');
+          if (mq) mq.textContent = a.max_queue_length;
+
+          const chart = document.getElementById('weeklyChart');
+          if (chart) {
+            chart.innerHTML = '';
+            const maxVal = Math.max(...a.weekly_trend);
+            a.weekly_trend.forEach((val, i) => {
+              const bar = document.createElement('div');
+              bar.className = 'bar';
+              const pct = (val / maxVal) * 100;
+              bar.style.height = pct + '%';
+              bar.style.background = i === a.weekly_trend.length - 1 ? 'var(--primary)' : 'var(--accent-light)';
+              bar.title = `Day ${i+1}: ${val} appointments`;
+              chart.appendChild(bar);
+            });
+          }
+
+          const workload = document.getElementById('workloadList');
+          if (workload) {
+            workload.innerHTML = '';
+            a.doctor_workload.forEach(d => {
+              const total = a.doctor_workload.reduce((sum, x) => sum + x.patients, 0);
+              const pct = total > 0 ? (d.patients / total) * 100 : 0;
+              workload.innerHTML += `
+                <div style="margin-bottom:16px">
+                  <div class="flex-between mb-sm">
+                    <span style="font-size:14px;font-weight:500">${d.doctor}</span>
+                    <span style="font-size:13px;color:var(--text-secondary)">${d.patients} patients</span>
+                  </div>
+                  <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+                </div>
+              `;
+            });
+          }
+        }
+      } catch(e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('analytics');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Analytics');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
+      }, 100);
+      loadAnalytics();
+      setInterval(loadAnalytics, 60000);
+    });
+  </script>
+</body>
+</html>

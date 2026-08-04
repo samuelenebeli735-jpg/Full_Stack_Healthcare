@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Appointment History - SHMS</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    .history-filters { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
+    .history-stats { margin-bottom: 24px; }
+    .history-item {
+      display: flex;
+      gap: 16px;
+      padding: 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      margin-bottom: 12px;
+      transition: var(--transition);
+      cursor: pointer;
+    }
+    .history-item:hover { box-shadow: var(--shadow-sm); border-color: var(--accent-light); }
+    .history-item .hi-date { text-align: center; min-width: 60px; }
+    .history-item .hi-date .day { font-size: 24px; font-weight: 700; color: var(--primary); line-height: 1; }
+    .history-item .hi-date .month { font-size: 11px; color: var(--text-light); text-transform: uppercase; font-weight: 600; }
+    .history-item .hi-body { flex: 1; }
+    .history-item .hi-body h4 { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .history-item .hi-body p { font-size: 13px; color: var(--text-secondary); }
+    .history-item .hi-body .hi-diagnosis { font-size: 12px; color: var(--text-light); margin-top: 4px; }
+    .history-item .hi-status { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+
+    @media (max-width: 480px) {
+      .history-item { flex-direction: column; }
+      .history-item .hi-date { display: flex; gap: 8px; align-items: center; min-width: auto; }
+      .history-item .hi-status { flex-direction: row; align-items: center; gap: 8px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>Appointment History</h1>
+          <p>View all your past appointments and consultation notes.</p>
+        </div>
+        <div class="grid grid-4 history-stats">
+          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Total Visits</span></div><div class="stat-card-value" id="totalVisits">0</div></div>
+          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">This Month</span></div><div class="stat-card-value" id="monthVisits">0</div></div>
+          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Cancelled</span></div><div class="stat-card-value" id="cancelledVisits">0</div></div>
+          <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Last Visit</span></div><div class="stat-card-value" id="lastVisit" style="font-size:14px">-</div></div>
+        </div>
+        <div class="history-filters">
+          <div class="search-box" style="flex:1;max-width:320px">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" placeholder="Search by service, doctor..." id="historySearch">
+          </div>
+          <select class="form-select" id="historyFilter" style="width:auto;min-width:160px">
+            <option value="all">All Appointments</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div id="historyContainer"></div>
+      </div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let allHistory = [];
+
+    function renderHistory(data) {
+      const container = document.getElementById('historyContainer');
+      if (!data || data.length === 0) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No Appointment History</h3><p>Your completed appointments will appear here.</p></div>';
+        return;
+      }
+      container.innerHTML = '';
+      data.forEach(a => {
+        const d = new Date(a.date);
+        const day = d.getDate();
+        const month = d.toLocaleString('en-US', { month: 'short' });
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+          <div class="hi-date">
+            <div class="day">${day}</div>
+            <div class="month">${month}</div>
+          </div>
+          <div class="hi-body">
+            <h4>${a.service}</h4>
+            <p>${a.doctor_name} &bull; ${Utils.formatTime(a.time)}</p>
+            ${a.diagnosis ? `<p class="hi-diagnosis">Diagnosis: ${a.diagnosis} ${a.treatment ? '| Treatment: ' + a.treatment : ''}</p>` : ''}
+            ${a.notes ? `<p class="hi-diagnosis">Notes: ${Utils.truncate(a.notes, 80)}</p>` : ''}
+          </div>
+          <div class="hi-status">
+            <span class="badge badge-${Utils.getStatusColor(a.status)}">${Utils.capitalize(a.status)}</span>
+          </div>
+        `;
+        div.addEventListener('click', () => {
+          if (a.diagnosis || a.notes) {
+            Utils.showToast(`Diagnosis: ${a.diagnosis || 'N/A'}\nTreatment: ${a.treatment || 'N/A'}`, 'info', 5000);
+          }
+        });
+        container.appendChild(div);
+      });
+    }
+
+    function filterAndRender() {
+      const search = document.getElementById('historySearch').value.toLowerCase();
+      const filter = document.getElementById('historyFilter').value;
+      let filtered = [...allHistory];
+      if (filter !== 'all') filtered = filtered.filter(a => a.status === filter);
+      if (search) filtered = filtered.filter(a =>
+        a.service?.toLowerCase().includes(search) ||
+        a.doctor_name?.toLowerCase().includes(search) ||
+        a.diagnosis?.toLowerCase().includes(search)
+      );
+      renderHistory(filtered);
+    }
+
+    async function loadHistory() {
+      try {
+        const res = await API.getAppointmentHistory();
+        if (res.success) {
+          allHistory = res.data;
+          document.getElementById('totalVisits').textContent = allHistory.length;
+          const thisMonth = allHistory.filter(a => {
+            const d = new Date(a.date);
+            const now = new Date();
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          });
+          document.getElementById('monthVisits').textContent = thisMonth.length;
+          document.getElementById('cancelledVisits').textContent = allHistory.filter(a => a.status === 'cancelled').length;
+          if (allHistory.length > 0) {
+            const sorted = [...allHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+            document.getElementById('lastVisit').textContent = Utils.formatDate(sorted[0].date, 'short');
+          }
+          filterAndRender();
+        }
+      } catch (e) {
+        document.getElementById('historyContainer').innerHTML = '<div class="empty-state"><p>Failed to load history.</p></div>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('history');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('History');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.toggle('open');
+          document.getElementById('sidebarOverlay')?.classList.toggle('active');
+        });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.remove('open');
+          document.getElementById('sidebarOverlay')?.classList.remove('active');
+        });
+      }, 100);
+
+      loadHistory();
+      document.getElementById('historySearch').addEventListener('input', Utils.debounce(filterAndRender, 300));
+      document.getElementById('historyFilter').addEventListener('change', filterAndRender);
+    });
+  </script>
+</body>
+</html>

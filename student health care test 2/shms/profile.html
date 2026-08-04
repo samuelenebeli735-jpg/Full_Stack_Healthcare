@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Profile - SHMS</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    .profile-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 24px; }
+    .profile-card-header { text-align: center; padding: 32px 24px; }
+    .profile-avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: var(--radius-full);
+      background: var(--primary-light);
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 40px;
+      font-weight: 700;
+      margin: 0 auto 16px;
+    }
+    .profile-card-header h2 { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+    .profile-card-header p { font-size: 14px; color: var(--text-secondary); }
+    .profile-meta { padding: 16px 24px; border-top: 1px solid var(--border); }
+    .profile-meta-item { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; }
+    .profile-meta-item .label { color: var(--text-secondary); }
+    .profile-meta-item .value { font-weight: 500; color: var(--text-primary); }
+    .password-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--border); }
+
+    @media (max-width: 768px) {
+      .profile-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>My Profile</h1>
+          <p>Manage your personal information and account settings.</p>
+        </div>
+        <div class="profile-grid">
+          <div class="card">
+            <div class="profile-card-header">
+              <div class="profile-avatar user-initials">JD</div>
+              <h2 class="user-name">John Doe</h2>
+              <p class="user-email">john@university.edu</p>
+              <span class="badge badge-primary mt-sm" id="profileRole">Student</span>
+            </div>
+            <div class="profile-meta">
+              <div class="profile-meta-item" id="pMatricRow"><span class="label">Matric Number</span><span class="value user-matric">STU001</span></div>
+              <div class="profile-meta-item" id="pFacultyRow"><span class="label">Faculty</span><span class="value" id="pFaculty">Engineering</span></div>
+              <div class="profile-meta-item" id="pDeptRow"><span class="label">Department</span><span class="value user-department">Computer Science</span></div>
+              <div class="profile-meta-item" id="pLevelRow"><span class="label">Level</span><span class="value" id="pLevel">400</span></div>
+              <div class="profile-meta-item"><span class="label">Phone</span><span class="value" id="pPhone">+2348012345678</span></div>
+              <div class="profile-meta-item"><span class="label">Member Since</span><span class="value" id="pJoined">Sep 2023</span></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Edit Profile</h3></div>
+            <div class="card-body">
+              <form id="profileForm">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" class="form-input" id="editName">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Email</label>
+                     <input type="email" class="form-input" id="editEmail" readonly>
+                  </div>
+                </div>
+                <div class="form-row" id="editFacultyRow">
+                  <div class="form-group">
+                    <label class="form-label">Phone</label>
+                    <input type="tel" class="form-input" id="editPhone">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Faculty</label>
+                    <select class="form-select" id="editFaculty">
+                      <option value="Engineering">Engineering</option>
+                      <option value="Science">Science</option>
+                      <option value="Arts">Arts</option>
+                      <option value="Social Sciences">Social Sciences</option>
+                      <option value="Medicine">Medicine</option>
+                      <option value="Law">Law</option>
+                      <option value="Education">Education</option>
+                      <option value="Management Sciences">Management Sciences</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-row" id="editStudentRow">
+                  <div class="form-group">
+                    <label class="form-label">Department</label>
+                    <input type="text" class="form-input" id="editDept">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Level</label>
+                    <select class="form-select" id="editLevel">
+                      <option value="100">100 Level</option>
+                      <option value="200">200 Level</option>
+                      <option value="300">300 Level</option>
+                      <option value="400">400 Level</option>
+                      <option value="500">500 Level</option>
+                      <option value="600">600 Level</option>
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Changes</button>
+              </form>
+              <div class="password-section">
+                <h4 style="font-size:15px;font-weight:600;margin-bottom:16px">Change Password</h4>
+                <form id="passwordForm">
+                  <div class="form-group">
+                    <label class="form-label">Current Password</label>
+                    <input type="password" class="form-input" id="currentPassword" required>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">New Password</label>
+                      <input type="password" class="form-input" id="newPassword" required minlength="8">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Confirm New Password</label>
+                      <input type="password" class="form-input" id="confirmNewPassword" required>
+                    </div>
+                  </div>
+                  <button type="submit" class="btn btn-secondary">Update Password</button>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let currentUser = null;
+
+    function applyProfileRole() {
+      if (!currentUser) return;
+      const role = currentUser.role || 'student';
+      const isStudent = role === 'student';
+
+      document.getElementById('profileRole').textContent = Utils.capitalize(role === 'admin' ? 'Administrator' : role);
+      document.getElementById('profileRole').className = 'badge mt-sm badge-primary';
+
+      document.getElementById('pMatricRow').style.display = isStudent ? 'flex' : 'none';
+      document.getElementById('pFacultyRow').style.display = isStudent ? 'flex' : 'none';
+      document.getElementById('pDeptRow').style.display = isStudent ? 'flex' : 'none';
+      document.getElementById('pLevelRow').style.display = isStudent ? 'flex' : 'none';
+      document.getElementById('editFacultyRow').style.display = isStudent ? 'flex' : 'none';
+      document.getElementById('editStudentRow').style.display = isStudent ? 'flex' : 'none';
+    }
+
+    async function loadProfile() {
+      try {
+        const res = await API.getProfile();
+        if (res.success) {
+          const p = res.data;
+          document.getElementById('editName').value = p.full_name || '';
+          document.getElementById('editEmail').value = p.email || '';
+          document.getElementById('editPhone').value = p.phone || '';
+          document.getElementById('editFaculty').value = p.faculty || '';
+          document.getElementById('editDept').value = p.department || '';
+          document.getElementById('editLevel').value = p.level || '';
+          document.getElementById('pFaculty').textContent = p.faculty || '-';
+          document.getElementById('pLevel').textContent = p.level || '-';
+          document.getElementById('pPhone').textContent = p.phone || '-';
+          document.getElementById('pJoined').textContent = p.joined ? Utils.formatDate(p.joined, 'short') : '-';
+          applyProfileRole();
+        }
+      } catch (e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      currentUser = verify.user;
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('profile');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Profile');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.toggle('open');
+          document.getElementById('sidebarOverlay')?.classList.toggle('active');
+        });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.remove('open');
+          document.getElementById('sidebarOverlay')?.classList.remove('active');
+        });
+      }, 100);
+
+      loadProfile();
+
+      document.getElementById('profileForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+        try {
+          const res = await API.updateProfile({
+            full_name: document.getElementById('editName').value,
+            email: document.getElementById('editEmail').value,
+            phone: document.getElementById('editPhone').value,
+            faculty: document.getElementById('editFaculty').value,
+            department: document.getElementById('editDept').value,
+            level: document.getElementById('editLevel').value,
+          });
+          if (res.success) {
+            Utils.showToast('Profile updated successfully', 'success');
+            loadProfile();
+          } else {
+            Utils.showToast(res.message || 'Update failed', 'error');
+          }
+        } catch (err) {
+          Utils.showToast(err.message, 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+      });
+
+      document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const newPass = document.getElementById('newPassword').value;
+        const confirmPass = document.getElementById('confirmNewPassword').value;
+        if (newPass !== confirmPass) {
+          Utils.showToast('Passwords do not match', 'error');
+          return;
+        }
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Updating...';
+        try {
+          const res = await API.changePassword({
+            current_password: document.getElementById('currentPassword').value,
+            new_password: newPass,
+          });
+          if (res.success) {
+            Utils.showToast('Password changed successfully', 'success');
+            e.target.reset();
+          } else {
+            Utils.showToast(res.message || 'Password change failed', 'error');
+          }
+        } catch (err) {
+          Utils.showToast(err.message, 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Update Password';
+      });
+    });
+  </script>
+</body>
+</html>

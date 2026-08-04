@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Check In - SHMS</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    .checkin-container { max-width: 600px; margin: 0 auto; }
+    .checkin-step {
+      display: none;
+      animation: fadeIn 0.4s ease forwards;
+    }
+    .checkin-step.active { display: block; }
+    .qr-code-box {
+      width: 220px;
+      height: 220px;
+      margin: 0 auto 24px;
+      background: white;
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .qr-code-box svg { width: 160px; height: 160px; }
+    .qr-code-box .qr-placeholder {
+      width: 160px;
+      height: 160px;
+      background: repeating-linear-gradient(0deg, #000, #000 4px, #fff 4px, #fff 8px);
+      opacity: 0.15;
+      border-radius: 8px;
+    }
+    .checkin-status-icon {
+      width: 80px;
+      height: 80px;
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      margin: 0 auto 16px;
+    }
+    .checkin-status-icon.success { background: #dcfce7; color: #166534; }
+    .checkin-status-icon.waiting { background: #fef3c7; color: #92400e; }
+    .checkin-status-icon.error { background: #fce4ec; color: #c62828; }
+    .checkin-details {
+      background: var(--bg-secondary);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+    .checkin-details .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border-light);
+      font-size: 14px;
+    }
+    .checkin-details .detail-row:last-child { border-bottom: none; }
+    .checkin-details .detail-row .label { color: var(--text-secondary); }
+    .checkin-details .detail-row .value { font-weight: 500; color: var(--text-primary); }
+
+    @media (max-width: 480px) {
+      .qr-code-box { width: 180px; height: 180px; }
+      .qr-code-box svg { width: 130px; height: 130px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>Check In</h1>
+          <p>Check in for your appointment and join the queue.</p>
+        </div>
+        <div class="card checkin-container">
+          <div class="card-body">
+            <div class="checkin-step active" id="checkinStart">
+              <div style="text-align:center;margin-bottom:24px">
+                <div style="font-size:48px;margin-bottom:12px">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                </div>
+                <h2 style="font-size:22px;font-weight:700;margin-bottom:8px">Ready to Check In?</h2>
+                <p style="color:var(--text-secondary);font-size:14px">Select an appointment below to check in and receive your queue ticket.</p>
+              </div>
+              <div id="checkinAppts"></div>
+              <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border)">
+                <p style="text-align:center;color:var(--text-secondary);font-size:13px;margin-bottom:16px">Or use your QR code at the kiosk</p>
+                <div class="qr-code-box">
+                  <div class="qr-placeholder"></div>
+                </div>
+                <p style="text-align:center;font-size:12px;color:var(--text-light)">Present this QR code at the health center kiosk</p>
+              </div>
+            </div>
+            <div class="checkin-step" id="checkinConfirm">
+              <div style="text-align:center;margin-bottom:24px">
+                <div class="checkin-status-icon success">
+                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg>
+                </div>
+                <h2 style="font-size:22px;font-weight:700;color:var(--success);margin-bottom:4px">Checked In!</h2>
+                <p style="color:var(--text-secondary)">You have been added to the queue</p>
+              </div>
+              <div class="checkin-details" id="checkinDetails"></div>
+              <div style="display:flex;gap:12px;justify-content:center">
+                <a href="queue.html" class="btn btn-primary">View Queue</a>
+                <a href="dashboard.html" class="btn btn-secondary">Dashboard</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    let selectedAppt = null;
+
+    async function loadCheckinAppts() {
+      const container = document.getElementById('checkinAppts');
+      try {
+        const res = await API.getAppointments();
+        if (!res.success || res.data.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No Appointments</h3><p>Book an appointment first.</p><a href="appointments.html" class="btn btn-primary btn-sm mt-md">Book Now</a></div>';
+          return;
+        }
+        container.innerHTML = '';
+        res.data.filter(a => a.status !== 'completed' && a.status !== 'cancelled').forEach(a => {
+          const div = document.createElement('div');
+          div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid var(--border);border-radius:var(--radius-md);margin-bottom:12px;cursor:pointer;transition:all 0.2s';
+          div.innerHTML = `
+            <div style="flex:1">
+              <div style="font-weight:600;font-size:14px;color:var(--text-primary)">${a.service}</div>
+              <div style="font-size:13px;color:var(--text-secondary)">${a.doctor_name} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</div>
+            </div>
+            <span class="badge badge-${Utils.getStatusColor(a.status)}">${Utils.capitalize(a.status.replace(/_/g, ' '))}</span>
+          `;
+          div.addEventListener('mouseenter', () => { div.style.borderColor = 'var(--primary)'; div.style.background = 'var(--primary-light)'; });
+          div.addEventListener('mouseleave', () => { if (selectedAppt?.id !== a.id) { div.style.borderColor = 'var(--border)'; div.style.background = ''; }});
+          div.addEventListener('click', async () => {
+            selectedAppt = a;
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-success btn-lg';
+            btn.style.width = '100%';
+            btn.textContent = 'Check In Now';
+            btn.addEventListener('click', async () => {
+              btn.disabled = true;
+              btn.innerHTML = '<span class="spinner"></span> Checking in...';
+              try {
+                const res = await API.checkIn(a.id);
+                if (res.success) {
+                  document.getElementById('checkinStart').classList.remove('active');
+                  document.getElementById('checkinConfirm').classList.add('active');
+                  const details = document.getElementById('checkinDetails');
+                  details.innerHTML = `
+                    <div class="detail-row"><span class="label">Ticket</span><span class="value" style="color:var(--primary);font-weight:700">${res.data?.ticket || 'A023'}</span></div>
+                    <div class="detail-row"><span class="label">Service</span><span class="value">${a.service}</span></div>
+                    <div class="detail-row"><span class="label">Doctor</span><span class="value">${a.doctor_name}</span></div>
+                    <div class="detail-row"><span class="label">Date</span><span class="value">${Utils.formatDate(a.date)}</span></div>
+                    <div class="detail-row"><span class="label">Time</span><span class="value">${Utils.formatTime(a.time)}</span></div>
+                    <div class="detail-row"><span class="label">Queue Position</span><span class="value" style="color:var(--primary);font-weight:600">#${res.data?.position || 5}</span></div>
+                  `;
+                  Utils.showToast('Check-in successful!', 'success');
+                }
+              } catch (err) {
+                Utils.showToast(err.message || 'Check-in failed', 'error');
+              }
+              btn.disabled = false;
+              btn.textContent = 'Check In Now';
+            });
+            const existing = container.querySelector('.btn-success');
+            if (existing) existing.remove();
+            div.after(btn);
+          });
+          container.appendChild(div);
+        });
+      } catch (e) {
+        container.innerHTML = '<p style="color:var(--danger)">Failed to load appointments.</p>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('checkin');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Check In');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.toggle('open');
+          document.getElementById('sidebarOverlay')?.classList.toggle('active');
+        });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.remove('open');
+          document.getElementById('sidebarOverlay')?.classList.remove('active');
+        });
+      }, 100);
+
+      loadCheckinAppts();
+      setInterval(loadCheckinAppts, 30000);
+    });
+  </script>
+</body>
+</html>

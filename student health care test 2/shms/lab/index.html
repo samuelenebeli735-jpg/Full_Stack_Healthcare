@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lab Results - SHMS</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>Laboratory Results</h1>
+          <p>View your lab test results and reports.</p>
+        </div>
+        <div class="grid grid-3 mb-lg">
+          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Tests</span></div><div class="stat-card-value" id="totalTests">0</div></div>
+          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Completed</span></div><div class="stat-card-value" id="completedTests">0</div></div>
+          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Pending</span></div><div class="stat-card-value" id="pendingTests">0</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Lab Reports</h3></div>
+          <div class="card-body p-0" id="labResultsList">
+            <div class="empty-state"><div class="empty-state-icon">🔬</div><h3>No Lab Results</h3><p>Your lab results will appear here once processed.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    async function loadLabResults() {
+      try {
+        const res = await API.getLabResults();
+        if (res.success) {
+          const data = res.data;
+          document.getElementById('totalTests').textContent = data.length;
+          document.getElementById('completedTests').textContent = data.filter(d => d.status === 'completed').length;
+          document.getElementById('pendingTests').textContent = data.filter(d => d.status === 'pending').length;
+          const container = document.getElementById('labResultsList');
+          container.innerHTML = '';
+          data.forEach(item => {
+            const statusColor = item.status === 'completed' ? 'success' : 'warning';
+            container.innerHTML += `
+              <div class="appointment-card" style="margin:0;border-radius:0;border-left:none;border-right:none">
+                <div class="apt-icon" style="background:#f3e8ff;color:#6d28d9">🧪</div>
+                <div class="apt-info">
+                  <h4>${item.test}</h4>
+                  <p>Ordered by ${item.ordered_by} &bull; ${Utils.formatDate(item.date)}</p>
+                  ${item.result ? `<p style="font-size:13px;font-weight:500;color:var(--text-primary);margin-top:4px">Result: ${item.result}</p>` : ''}
+                </div>
+                <span class="badge badge-${statusColor}">${Utils.capitalize(item.status)}</span>
+              </div>
+            `;
+          });
+        }
+      } catch (e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('lab');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Lab Results');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
+      }, 100);
+      loadLabResults();
+      setInterval(loadLabResults, 30000);
+    });
+  </script>
+</body>
+</html>

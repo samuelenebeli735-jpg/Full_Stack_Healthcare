@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Symptom Checker - SHMS</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+  <style>
+    .chat-container {
+      max-width: 700px;
+      margin: 0 auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      background: var(--bg-primary);
+    }
+    .chat-header {
+      background: var(--primary);
+      color: white;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .chat-header h3 { font-size: 16px; font-weight: 600; }
+    .chat-header p { font-size: 12px; opacity: 0.8; }
+    .chat-messages {
+      padding: 20px;
+      max-height: 400px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .chat-msg {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: var(--radius-md);
+      font-size: 14px;
+      line-height: 1.6;
+      animation: fadeIn 0.3s ease forwards;
+    }
+    .chat-msg.bot {
+      align-self: flex-start;
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border-bottom-left-radius: 4px;
+    }
+    .chat-msg.user {
+      align-self: flex-end;
+      background: var(--primary);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+    .chat-input {
+      display: flex;
+      gap: 12px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-primary);
+    }
+    .chat-input input { flex: 1; }
+    .symptom-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .symptom-tag {
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+    .symptom-tag:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-light); }
+    .symptom-tag.selected { background: var(--primary); color: white; border-color: var(--primary); }
+
+    @media (max-width: 480px) {
+      .chat-msg { max-width: 90%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>AI Symptom Checker</h1>
+          <p>Check your symptoms and get preliminary guidance before booking an appointment.</p>
+        </div>
+        <div class="chat-container">
+          <div class="chat-header">
+            <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px">🤖</div>
+            <div>
+              <h3>Health Assistant</h3>
+              <p>AI-powered symptom analysis</p>
+            </div>
+            <span class="badge" style="margin-left:auto;background:rgba(255,255,255,0.2);color:white">Beta</span>
+          </div>
+          <div class="chat-messages" id="chatMessages">
+            <div class="chat-msg bot">Hello! I'm your AI health assistant. I can help you understand your symptoms and recommend the best course of action. Please select any symptoms you're experiencing, or describe them below.</div>
+          </div>
+          <div style="padding:0 20px">
+            <p style="font-size:12px;color:var(--text-light);margin-bottom:8px;font-weight:500">Common symptoms:</p>
+            <div class="symptom-tags" id="symptomTags">
+              <span class="symptom-tag" data-symptom="Headache">Headache</span>
+              <span class="symptom-tag" data-symptom="Fever">Fever</span>
+              <span class="symptom-tag" data-symptom="Cough">Cough</span>
+              <span class="symptom-tag" data-symptom="Fatigue">Fatigue</span>
+              <span class="symptom-tag" data-symptom="Body Pain">Body Pain</span>
+              <span class="symptom-tag" data-symptom="Sore Throat">Sore Throat</span>
+              <span class="symptom-tag" data-symptom="Nausea">Nausea</span>
+              <span class="symptom-tag" data-symptom="Dizziness">Dizziness</span>
+              <span class="symptom-tag" data-symptom="Chest Pain">Chest Pain</span>
+              <span class="symptom-tag" data-symptom="Shortness of Breath">Shortness of Breath</span>
+            </div>
+          </div>
+          <div class="chat-input">
+            <input type="text" class="form-input" id="chatInput" placeholder="Describe your symptoms..." style="border-radius:20px">
+            <button class="btn btn-primary" id="chatSend" style="border-radius:20px;width:44px;height:44px;padding:0">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="card mt-lg" style="max-width:700px;margin:24px auto 0">
+          <div class="card-body" style="text-align:center">
+            <p style="font-size:13px;color:var(--text-light)">⚠️ This tool provides preliminary guidance only. It does not replace professional medical advice. If you have a medical emergency, please call emergency services immediately.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    const responses = {
+      'headache': 'Headaches can be caused by stress, dehydration, eye strain, or more serious conditions. I recommend: 1) Rest in a quiet, dark room 2) Stay hydrated 3) If persistent, book a General Consultation.',
+      'fever': 'A fever is often a sign of infection. Please: 1) Monitor your temperature 2) Rest and stay hydrated 3) Take acetaminophen if needed 4) If fever exceeds 39°C or lasts more than 3 days, book an appointment urgently.',
+      'cough': 'Coughs can be allergic, viral, or bacterial. Try: 1) Warm honey and lemon 2) Steam inhalation 3) If persistent with fever or breathlessness, schedule a consultation.',
+      'fatigue': 'Fatigue can result from poor sleep, stress, anemia, or infections. I suggest: 1) Improving sleep hygiene 2) Balanced nutrition 3) If persistent for 2+ weeks, consider a checkup.',
+      'body pain': 'Body aches often accompany fevers or flu. Rest, hydration, and over-the-counter pain relief may help. See a doctor if severe or persistent.',
+      'sore throat': 'Sore throats are usually viral. Try: 1) Warm salt water gargle 2) Lozenges 3) If accompanied by high fever or white patches, book an appointment.',
+      'nausea': 'Nausea can be caused by diet, stress, or infections. Try: 1) Small, bland meals 2) Ginger tea 3) If persistent with vomiting, seek medical attention.',
+      'dizziness': 'Dizziness may be due to dehydration, low blood sugar, or inner ear issues. Sit down, hydrate, and eat something. If recurrent, consult a doctor.',
+      'chest pain': '⚠️ Chest pain can be serious. If you have chest pain with shortness of breath, nausea, or sweating, please seek emergency care immediately.',
+      'shortness of breath': '⚠️ Difficulty breathing requires immediate attention. If sudden or severe, please call emergency services or go to the ER.',
+    };
+
+    function addMessage(text, isUser = false) {
+      const container = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      div.className = `chat-msg ${isUser ? 'user' : 'bot'}`;
+      div.textContent = text;
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function getResponse(input) {
+      const lower = input.toLowerCase();
+      for (const [key, response] of Object.entries(responses)) {
+        if (lower.includes(key)) return response;
+      }
+      if (lower.includes('hello') || lower.includes('hi')) return 'Hello! How can I help you today? Please tell me your symptoms.';
+      if (lower.includes('thank')) return "You're welcome! Feel free to ask if you have more questions. Stay healthy!";
+      if (lower.includes('book') || lower.includes('appointment')) return 'You can book an appointment from the Appointments page. I recommend choosing the appropriate service based on your symptoms.';
+      return 'Thank you for sharing. Based on the information provided, I recommend monitoring your symptoms and booking a General Consultation if they persist. For specific concerns, please visit the health center.';
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('ai');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('AI Symptom Checker');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
+      }, 100);
+
+      document.querySelectorAll('.symptom-tag').forEach(tag => {
+        tag.addEventListener('click', () => {
+          const symptom = tag.dataset.symptom;
+          tag.classList.toggle('selected');
+          addMessage(symptom, true);
+          setTimeout(() => addMessage(getResponse(symptom)), 500);
+        });
+      });
+
+      document.getElementById('chatSend').addEventListener('click', () => {
+        const input = document.getElementById('chatInput');
+        const text = input.value.trim();
+        if (!text) return;
+        addMessage(text, true);
+        input.value = '';
+        setTimeout(() => addMessage(getResponse(text)), 600);
+      });
+
+      document.getElementById('chatInput').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') document.getElementById('chatSend').click();
+      });
+    });
+  </script>
+</body>
+</html>

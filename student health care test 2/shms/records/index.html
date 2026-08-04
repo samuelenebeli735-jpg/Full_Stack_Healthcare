@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medical Records - SHMS</title>
+  <link rel="stylesheet" href="../css/styles.css">
+  <link rel="stylesheet" href="../css/dashboard.css">
+  <link rel="stylesheet" href="../css/responsive.css">
+  <style>
+    .record-timeline { position: relative; padding-left: 32px; }
+    .record-timeline::before {
+      content: '';
+      position: absolute;
+      left: 12px;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: var(--border);
+    }
+    .record-item {
+      position: relative;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      transition: var(--transition);
+    }
+    .record-item:hover { box-shadow: var(--shadow-sm); border-color: var(--accent-light); }
+    .record-item::before {
+      content: '';
+      position: absolute;
+      left: -26px;
+      top: 22px;
+      width: 12px;
+      height: 12px;
+      border-radius: var(--radius-full);
+      background: var(--primary);
+      border: 2px solid white;
+    }
+    .record-item .ri-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .record-item .ri-header h4 { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+    .record-item .ri-meta { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; }
+    .record-item .ri-notes { font-size: 14px; color: var(--text-primary); line-height: 1.6; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius); }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header">
+          <h1>Medical Records</h1>
+          <p>Access your complete medical history and consultation notes.</p>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Visit History</h3></div>
+          <div class="card-body" id="recordsContainer">
+            <div class="empty-state"><div class="empty-state-icon">📄</div><h3>No Records Found</h3><p>Your medical records will appear here.</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/auth.js"></script>
+  <script>
+    async function loadRecords() {
+      try {
+        const res = await API.getMedicalRecords();
+        const container = document.getElementById('recordsContainer');
+        if (!res.success || res.data.length === 0) {
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📄</div><h3>No Records Found</h3><p>Your medical records will appear here after your first visit.</p></div>';
+          return;
+        }
+        container.innerHTML = '<div class="record-timeline"></div>';
+        const timeline = container.querySelector('.record-timeline');
+        res.data.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(record => {
+          const typeColors = { consultation: 'blue', lab: 'purple', pharmacy: 'pink', checkup: 'green' };
+          const typeIcons = { consultation: '🩺', lab: '🔬', pharmacy: '💊', checkup: '❤️' };
+          const div = document.createElement('div');
+          div.className = 'record-item';
+          div.innerHTML = `
+            <div class="ri-header">
+              <h4>${typeIcons[record.type] || '📋'} ${Utils.capitalize(record.type)}</h4>
+              <span class="badge badge-${typeColors[record.type] || 'neutral'}">${Utils.formatDate(record.date)}</span>
+            </div>
+            <div class="ri-meta">${record.doctor} ${record.diagnosis ? '&bull; ' + record.diagnosis : ''}</div>
+            <div class="ri-notes">${record.notes || 'No notes recorded.'}</div>
+          `;
+          timeline.appendChild(div);
+        });
+      } catch (e) {
+        document.getElementById('recordsContainer').innerHTML = '<div class="empty-state"><p style="color:var(--danger)">Failed to load records.</p></div>';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('records');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Medical Records');
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
+      }, 100);
+      loadRecords();
+      setInterval(loadRecords, 30000);
+    });
+  </script>
+</body>
+</html>

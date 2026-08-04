@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Queue Management - SHMS</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    .qm-layout { display:grid; grid-template-columns:1fr 400px; gap:24px; }
+    .qm-stats { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
+    .qm-stat-card {
+      background:var(--bg-primary); border-radius:var(--radius-md); padding:20px 24px;
+      border:1px solid var(--border); display:flex; align-items:center; gap:16px;
+      transition:all 0.3s;
+    }
+    .qm-stat-card:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); }
+    .qm-stat-icon {
+      width:48px; height:48px; border-radius:var(--radius-md);
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .qm-stat-icon svg { width:22px; height:22px; }
+    .qm-stat-icon.green { background:#dcfce7; color:#16a34a; }
+    .qm-stat-icon.orange { background:#fff7ed; color:#ea580c; }
+    .qm-stat-icon.blue { background:#eff6ff; color:#2563eb; }
+    .qm-stat-icon.purple { background:#faf5ff; color:#9333ea; }
+    .qm-stat-content { flex:1; }
+    .qm-stat-value { font-size:28px; font-weight:700; color:var(--text-primary); line-height:1.2; }
+    .qm-stat-label { font-size:13px; color:var(--text-secondary); margin-top:2px; }
+    .qm-stat-sub { font-size:12px; font-weight:500; margin-top:2px; }
+    .qm-stat-sub.green { color:#16a34a; }
+    .qm-stat-sub.blue { color:#2563eb; }
+    .qm-stat-sub.orange { color:#ea580c; }
+    .qm-stat-sub.neutral { color:var(--text-light); }
+
+    .qm-now-serving {
+      background:linear-gradient(135deg, #10b981 0%, #059669 100%);
+      border-radius:var(--radius-lg); padding:32px; color:white; position:relative; overflow:hidden;
+    }
+    .qm-now-serving::after {
+      content:''; position:absolute; top:-40%; right:-10%; width:300px; height:300px;
+      border-radius:50%; background:rgba(255,255,255,0.08);
+    }
+    .qm-ns-inner { position:relative; z-index:1; }
+    .qm-ns-row { display:flex; justify-content:space-between; align-items:flex-start; }
+    .qm-ns-label { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; opacity:0.9; }
+    .qm-ns-timer { text-align:right; }
+    .qm-ns-timer-label { font-size:11px; text-transform:uppercase; letter-spacing:0.05em; opacity:0.8; }
+    .qm-ns-timer-value { font-size:36px; font-weight:700; line-height:1; }
+    .qm-ns-timer-sub { font-size:12px; opacity:0.8; margin-top:2px; }
+    .qm-ns-number {
+      font-size:72px; font-weight:800; line-height:1; margin:12px 0 16px;
+      font-variant-numeric:tabular-nums;
+    }
+    .qm-ns-patient-name { font-size:18px; font-weight:600; margin-bottom:4px; }
+    .qm-ns-patient-details { font-size:13px; opacity:0.85; line-height:1.6; }
+    .qm-ns-footer { display:flex; justify-content:space-between; align-items:flex-end; margin-top:24px; }
+    .qm-ns-finish { text-align:right; }
+    .qm-ns-finish-label { font-size:11px; opacity:0.8; text-transform:uppercase; letter-spacing:0.05em; }
+    .qm-ns-finish-time { font-size:20px; font-weight:700; }
+    .qm-ns-call-btn {
+      padding:12px 24px; background:rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3);
+      border-radius:var(--radius); color:white; font-size:14px; font-weight:600;
+      cursor:pointer; transition:all 0.3s; backdrop-filter:blur(4px);
+    }
+    .qm-ns-call-btn:hover { background:rgba(255,255,255,0.3); }
+
+    .qm-progress-section {
+      background:var(--bg-primary); border-radius:var(--radius-md);
+      border:1px solid var(--border); padding:24px; margin-top:24px;
+    }
+    .qm-progress-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+    .qm-progress-title { font-size:16px; font-weight:600; color:var(--text-primary); }
+    .qm-progress-count { font-size:13px; color:var(--text-secondary); font-weight:500; }
+    .qm-progress-bar-wrapper { position:relative; margin-bottom:4px; }
+    .qm-progress-labels { display:flex; justify-content:space-between; font-size:12px; color:var(--text-light); margin-bottom:8px; }
+    .qm-progress-bar { height:8px; background:var(--bg-tertiary); border-radius:4px; overflow:hidden; }
+    .qm-progress-bar-fill { height:100%; background:linear-gradient(90deg, #10b981, #059669); border-radius:4px; transition:width 0.8s ease; }
+    .qm-progress-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+    .qm-progress-stat { padding:16px; border-radius:var(--radius-md); text-align:center; }
+    .qm-progress-stat.completed { background:#dcfce7; }
+    .qm-progress-stat.in-progress { background:#eff6ff; }
+    .qm-progress-stat.waiting { background:#fff7ed; }
+    .qm-ps-value { font-size:24px; font-weight:700; line-height:1.2; }
+    .qm-progress-stat.completed .qm-ps-value { color:#16a34a; }
+    .qm-progress-stat.in-progress .qm-ps-value { color:#2563eb; }
+    .qm-progress-stat.waiting .qm-ps-value { color:#ea580c; }
+    .qm-ps-label { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+
+    .qm-queue-panel {
+      background:var(--bg-primary); border-radius:var(--radius-md);
+      border:1px solid var(--border); display:flex; flex-direction:column; max-height:calc(100vh - 200px);
+    }
+    .qm-queue-header { padding:20px 24px; border-bottom:1px solid var(--border); }
+    .qm-queue-title { font-size:16px; font-weight:600; color:var(--text-primary); margin-bottom:12px; }
+    .qm-queue-controls { display:flex; gap:12px; }
+    .qm-queue-filter {
+      display:flex; gap:4px; background:var(--bg-tertiary); padding:4px; border-radius:var(--radius);
+    }
+    .qm-queue-filter-btn {
+      padding:6px 14px; font-size:13px; font-weight:500; border:none; background:transparent;
+      color:var(--text-secondary); border-radius:6px; cursor:pointer; transition:all 0.2s;
+    }
+    .qm-queue-filter-btn.active { background:var(--bg-primary); color:var(--text-primary); box-shadow:var(--shadow-sm); }
+    .qm-queue-search { position:relative; flex:1; }
+    .qm-queue-search input {
+      width:100%; padding:8px 12px 8px 36px; border:1px solid var(--border); border-radius:var(--radius);
+      font-size:13px; background:var(--bg-primary); transition:all 0.2s;
+    }
+    .qm-queue-search input:focus { border-color:var(--primary); outline:none; box-shadow:0 0 0 3px rgba(var(--theme-rgb),0.1); }
+    .qm-queue-search svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-light); width:16px; height:16px; }
+
+    .qm-queue-list { flex:1; overflow-y:auto; }
+
+    .qm-section-title {
+      font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;
+      color:var(--text-light); padding:12px 24px 8px; background:var(--bg-secondary);
+      border-bottom:1px solid var(--border-light);
+    }
+
+    .qm-queue-footer {
+      padding:12px 24px; border-top:1px solid var(--border);
+      display:flex; justify-content:space-between; align-items:center;
+    }
+    .qm-queue-footer-text { font-size:12px; color:var(--text-light); }
+    .qm-queue-pagination { display:flex; gap:4px; }
+    .qm-queue-pagination button {
+      width:28px; height:28px; border-radius:6px; border:1px solid var(--border);
+      background:var(--bg-primary); color:var(--text-secondary); font-size:12px; font-weight:500;
+      cursor:pointer; transition:all 0.2s;
+    }
+    .qm-queue-pagination button.active { background:var(--primary); color:white; border-color:var(--primary); }
+    .qm-queue-pagination button:hover:not(.active) { background:var(--bg-secondary); }
+
+    .qm-header-actions { display:flex; align-items:center; gap:12px; }
+    .qm-live-badge {
+      display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+      background:#dcfce7; color:#16a34a; border-radius:20px; font-size:12px; font-weight:600;
+    }
+    .qm-live-dot { width:7px; height:7px; border-radius:50%; background:#16a34a; animation:pulse 2s infinite; }
+    .qm-add-btn {
+      display:inline-flex; align-items:center; gap:6px; padding:10px 20px;
+      background:#10b981; color:white; border-radius:var(--radius); font-size:14px; font-weight:600;
+      border:none; cursor:pointer; transition:all 0.3s;
+    }
+    .qm-add-btn:hover { background:#059669; transform:translateY(-1px); box-shadow:0 4px 12px rgba(16,185,129,0.3); }
+    .qm-add-btn svg { width:16px; height:16px; }
+
+    .queue-list-item {
+      display:flex; align-items:center; gap:12px; padding:14px 24px;
+      border-bottom:1px solid var(--border-light); transition:all 0.2s;
+    }
+    .queue-list-item:hover { background:var(--bg-secondary); }
+    .queue-list-item.highlight { background:#f0fdf4; }
+    .queue-list-item .qli-ticket {
+      width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:13px; font-weight:600; flex-shrink:0; background:var(--bg-tertiary); color:var(--text-secondary);
+    }
+    .queue-list-item.highlight .qli-ticket { background:#10b981; color:white; }
+    .queue-list-item .qli-patient { flex:1; min-width:0; font-size:14px; color:var(--text-primary); }
+    .queue-list-item .qli-patient strong { font-weight:600; }
+    .queue-list-item .qli-patient span { font-size:12px; color:var(--text-secondary); display:block; margin-top:2px; }
+    .queue-list-item .qli-status { font-size:11px; font-weight:500; padding:4px 10px; border-radius:12px; white-space:nowrap; }
+
+    @media (max-width:1024px) {
+      .qm-layout { grid-template-columns:1fr; }
+      .qm-stats { grid-template-columns:repeat(2,1fr); }
+      .qm-queue-panel { max-height:500px; }
+    }
+    @media (max-width:768px) {
+      .qm-stats { grid-template-columns:1fr; }
+      .qm-progress-stats { grid-template-columns:1fr; }
+      .qm-ns-number { font-size:56px; }
+      .qm-ns-timer-value { font-size:28px; }
+      .page-header { flex-direction:column !important; gap:12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard-layout">
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <div id="sidebarContainer"></div>
+    <div class="main-content">
+      <div id="navbarContainer"></div>
+      <div class="main-body">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <h1>Queue Management</h1>
+            <p>Live patient queue with estimated wait times — <span id="qmCurrentDate"></span></p>
+          </div>
+          <div class="qm-header-actions">
+            <span class="qm-live-badge"><span class="qm-live-dot"></span>Live · auto-refreshing</span>
+            <button class="qm-add-btn" id="refreshQueue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+              Refresh
+            </button>
+          </div>
+        </div>
+
+        <div class="qm-stats">
+          <div class="qm-stat-card">
+            <div class="qm-stat-icon green">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+            </div>
+            <div class="qm-stat-content">
+              <div class="qm-stat-value" id="qTotalToday">23</div>
+              <div class="qm-stat-label">Total in queue today</div>
+              <div class="qm-stat-sub green" id="qTotalSub">18 seen · 5 remaining</div>
+            </div>
+          </div>
+          <div class="qm-stat-card">
+            <div class="qm-stat-icon orange">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="qm-stat-content">
+              <div class="qm-stat-value" id="qAvgWait">12 min</div>
+              <div class="qm-stat-label">Avg. wait time</div>
+              <div class="qm-stat-sub green" id="qAvgWaitSub">↓ 3 min from yesterday</div>
+            </div>
+          </div>
+          <div class="qm-stat-card">
+            <div class="qm-stat-icon blue">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            </div>
+            <div class="qm-stat-content">
+              <div class="qm-stat-value" id="qAvgConsult">14 min</div>
+              <div class="qm-stat-label">Avg. consultation time</div>
+              <div class="qm-stat-sub neutral" id="qAvgConsultSub">Within target</div>
+            </div>
+          </div>
+          <div class="qm-stat-card">
+            <div class="qm-stat-icon purple">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            </div>
+            <div class="qm-stat-content">
+              <div class="qm-stat-value" id="qCompletionRate">96%</div>
+              <div class="qm-stat-label">Completion rate today</div>
+              <div class="qm-stat-sub orange" id="qCompletionSub">1 no-show</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="qm-layout">
+          <div class="qm-left">
+            <div class="qm-now-serving">
+              <div class="qm-ns-inner">
+                <div class="qm-ns-row">
+                  <div>
+                    <div class="qm-ns-label">Now Serving</div>
+                    <div class="qm-ns-number" id="queueTicket">019</div>
+                    <div class="qm-ns-patient-name" id="qPatientName">Riya Sharma</div>
+                    <div class="qm-ns-patient-details" id="qPatientDetails">Grade 8-A · Anaemia review<br>Room 1 · Dr. Ananya Sharma</div>
+                  </div>
+                  <div class="qm-ns-timer">
+                    <div class="qm-ns-timer-label">In Session</div>
+                    <div class="qm-ns-timer-value" id="qSessionTimer">08:32</div>
+                    <div class="qm-ns-timer-sub">min elapsed</div>
+                    <div class="qm-ns-finish">
+                      <div class="qm-ns-finish-label">Est. finish</div>
+                      <div class="qm-ns-finish-time" id="qEstFinish">~12:22 PM</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="qm-ns-footer">
+                  <div></div>
+                  <button class="qm-ns-call-btn" id="callNext">Call next &rsaquo;</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="qm-progress-section">
+              <div class="qm-progress-header">
+                <div class="qm-progress-title">Queue progress today</div>
+                <div class="qm-progress-count" id="qProgressText">18 / 23 completed</div>
+              </div>
+              <div class="qm-progress-bar-wrapper">
+                <div class="qm-progress-labels">
+                  <span>0</span>
+                  <span id="qProgressMid">18 done</span>
+                  <span id="qProgressTotal">23 total</span>
+                </div>
+                <div class="qm-progress-bar">
+                  <div class="qm-progress-bar-fill" id="qProgressFill" style="width:78%"></div>
+                </div>
+              </div>
+              <div class="qm-progress-stats">
+                <div class="qm-progress-stat completed">
+                  <div class="qm-ps-value" id="qCompleted">18</div>
+                  <div class="qm-ps-label">Completed</div>
+                </div>
+                <div class="qm-progress-stat in-progress">
+                  <div class="qm-ps-value" id="qInProgress">1</div>
+                  <div class="qm-ps-label">In progress</div>
+                </div>
+                <div class="qm-progress-stat waiting">
+                  <div class="qm-ps-value" id="qWaiting">4</div>
+                  <div class="qm-ps-label">Waiting</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="qm-queue-panel">
+            <div class="qm-queue-header">
+              <div class="qm-queue-title">Full queue</div>
+              <div class="qm-queue-controls">
+                <div class="qm-queue-filter">
+                  <button class="qm-queue-filter-btn active" data-filter="all">All patients</button>
+                </div>
+                <div class="qm-queue-search">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" id="queueSearch" placeholder="Search patient...">
+                </div>
+              </div>
+            </div>
+            <div class="qm-queue-list" id="queueListContainer"></div>
+            <div class="qm-queue-footer">
+              <span class="qm-queue-footer-text" id="qmFooterText">Showing 5 active + 18 completed</span>
+              <div class="qm-queue-pagination">
+                <button class="active">1</button>
+                <button>2</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hidden elements for JS compatibility -->
+        <div style="display:none">
+          <span id="qCurrentServing"></span>
+          <span id="qPatientsAhead"></span>
+          <span id="qEstWait"></span>
+          <span id="qProgressFill_"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/utils.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    async function loadQueueData() {
+      try {
+        const res = await API.getQueue();
+        if (res.success) {
+          const q = res.data;
+          document.getElementById('queueTicket').textContent = q.ticket_number;
+          document.getElementById('qCurrentServing').textContent = q.current_serving;
+          document.getElementById('qPatientsAhead').textContent = q.patients_ahead;
+          document.getElementById('qEstWait').textContent = q.estimated_wait_minutes + ' min';
+          const total = (q.patients_ahead + q.position) || 1;
+          const progress = Math.max(5, Math.min(95, ((total - q.patients_ahead) / total) * 100));
+          document.getElementById('qProgressFill').style.width = progress + '%';
+          document.getElementById('qProgressText').textContent = `${total - q.patients_ahead} of ${total}`;
+          document.getElementById('qProgressMid').textContent = (total - q.patients_ahead) + ' done';
+          document.getElementById('qProgressTotal').textContent = total + ' total';
+          document.getElementById('qCompleted').textContent = total - q.patients_ahead - 1;
+          document.getElementById('qWaiting').textContent = q.patients_ahead;
+        }
+      } catch (e) {}
+      try {
+        const listRes = await API.getQueueList();
+        const container = document.getElementById('queueListContainer');
+        container.innerHTML = '';
+        if (listRes.success) {
+          const items = listRes.data || [];
+          items.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'queue-list-item' + (item.patient === 'You' ? ' highlight' : '');
+            const statusColors = { serving: 'success', waiting: 'warning' };
+            div.innerHTML = `
+              <span class="qli-ticket">${item.ticket}</span>
+              <span class="qli-patient">${Utils.sanitize(item.patient)}</span>
+              <span class="qli-status badge badge-${statusColors[item.status] || 'neutral'}">${Utils.capitalize(item.status)}</span>
+            `;
+            container.appendChild(div);
+          });
+          const footer = document.getElementById('qmFooterText');
+          if (footer) footer.textContent = 'Showing ' + items.length + ' queue entries today';
+        }
+      } catch (e) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!Auth.requireAuth()) return;
+      const verify = await Auth.verifySession();
+      if (!verify.success) { Auth.logout(); return; }
+      Auth.updateUI(verify.user);
+      document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('queue');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Queue');
+
+      const dateEl = document.getElementById('qmCurrentDate');
+      if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+      setTimeout(() => {
+        document.getElementById('sidebarToggle')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.toggle('open');
+          document.getElementById('sidebarOverlay')?.classList.toggle('active');
+        });
+        document.getElementById('sidebarOverlay')?.addEventListener('click', () => {
+          document.getElementById('sidebar')?.classList.remove('open');
+          document.getElementById('sidebarOverlay')?.classList.remove('active');
+        });
+      }, 100);
+
+      loadQueueData();
+      document.getElementById('refreshQueue')?.addEventListener('click', loadQueueData);
+      const callNextBtn = document.getElementById('callNext');
+      if (callNextBtn) {
+        const role = Auth.getUser()?.role;
+        if (role === 'student') {
+          callNextBtn.style.display = 'none';
+        } else {
+          callNextBtn.addEventListener('click', async () => {
+            callNextBtn.disabled = true;
+            try {
+              await API.updateQueue(null, 'call');
+              Utils.showToast('Next patient called', 'success');
+              await loadQueueData();
+            } catch (err) {
+              Utils.showToast(err.message || 'Could not call next patient', 'error');
+            }
+            callNextBtn.disabled = false;
+          });
+        }
+      }
+      setInterval(loadQueueData, 15000);
+    });
+  </script>
+</body>
+</html>

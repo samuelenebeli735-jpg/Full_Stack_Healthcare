@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SHMS - Student Health Management System</title>
+  <meta name="description" content="School Health Management System - Track appointments, vaccinations, and medical history in one secure place.">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:var(--font-family); color:var(--text-primary); background:#fff; overflow-x:hidden; }
+
+    .lp-nav {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 48px; background:#fff; position:sticky; top:0; z-index:100;
+    }
+    .lp-nav-logo { display:flex; align-items:center; gap:10px; text-decoration:none; }
+    .lp-nav-logo svg { width:32px; height:32px; color:#10b981; }
+    .lp-nav-logo span { font-size:18px; font-weight:700; color:var(--text-primary); }
+    .lp-nav-links { display:flex; align-items:center; gap:32px; }
+    .lp-nav-links a { font-size:14px; font-weight:500; color:var(--text-secondary); text-decoration:none; transition:color 0.2s; }
+    .lp-nav-links a:hover { color:var(--text-primary); }
+    .lp-nav-actions { display:flex; align-items:center; gap:12px; }
+    .lp-btn-login {
+      padding:10px 24px; border:1.5px solid var(--border); border-radius:var(--radius);
+      background:transparent; font-size:14px; font-weight:600; color:var(--text-primary);
+      cursor:pointer; transition:all 0.2s; text-decoration:none;
+    }
+    .lp-btn-login:hover { border-color:var(--primary); color:var(--primary); }
+    .lp-btn-getstarted {
+      padding:10px 24px; border:none; border-radius:var(--radius);
+      background:#10b981; font-size:14px; font-weight:600; color:#fff;
+      cursor:pointer; transition:all 0.3s; text-decoration:none; display:inline-flex; align-items:center; gap:6px;
+    }
+    .lp-btn-getstarted:hover { background:#059669; transform:translateY(-1px); box-shadow:0 4px 12px rgba(16,185,129,0.3); }
+
+    .lp-hero { display:flex; align-items:center; max-width:1280px; margin:0 auto; padding:60px 48px 40px; gap:40px; min-height:calc(100vh - 70px); }
+    .lp-hero-content { flex:1; max-width:580px; }
+    .lp-trust-badge {
+      display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+      border:1.5px solid #10b981; border-radius:20px; font-size:13px; font-weight:500; color:var(--text-primary);
+      margin-bottom:24px;
+    }
+    .lp-trust-badge svg { width:16px; height:16px; color:#10b981; }
+    .lp-hero-content h1 {
+      font-size:52px; font-weight:800; line-height:1.1; color:var(--text-primary); margin-bottom:20px;
+    }
+    .lp-hero-content h1 .green { color:#10b981; }
+    .lp-hero-content p {
+      font-size:17px; color:var(--text-secondary); line-height:1.7; margin-bottom:32px; max-width:480px;
+    }
+    .lp-hero-actions { display:flex; align-items:center; gap:20px; margin-bottom:32px; }
+    .lp-hero-cta {
+      display:inline-flex; align-items:center; gap:8px; padding:14px 28px;
+      background:#10b981; color:#fff; border-radius:var(--radius); font-size:15px; font-weight:600;
+      text-decoration:none; transition:all 0.3s; border:none; cursor:pointer;
+    }
+    .lp-hero-cta:hover { background:#059669; transform:translateY(-2px); box-shadow:0 8px 24px rgba(16,185,129,0.3); }
+    .lp-hero-watch {
+      display:inline-flex; align-items:center; gap:10px; font-size:14px; font-weight:600;
+      color:var(--text-primary); cursor:pointer; text-decoration:none;
+    }
+    .lp-hero-watch .play-icon {
+      width:40px; height:40px; border-radius:50%; background:var(--bg-secondary);
+      display:flex; align-items:center; justify-content:center; transition:all 0.2s;
+    }
+    .lp-hero-watch:hover .play-icon { background:var(--primary-light); }
+    .lp-social-proof { display:flex; align-items:center; gap:12px; }
+    .lp-avatars { display:flex; }
+    .lp-avatars .avatar {
+      width:32px; height:32px; border-radius:50%; border:2px solid #fff;
+      display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; color:#fff;
+      margin-left:-8px;
+    }
+    .lp-avatars .avatar:first-child { margin-left:0; }
+    .lp-avatars .avatar.a1 { background:#10b981; }
+    .lp-avatars .avatar.a2 { background:#f59e0b; }
+    .lp-avatars .avatar.a3 { background:#8b5cf6; }
+    .lp-avatars .avatar.a4 { background:#ec4899; }
+    .lp-social-text { font-size:13px; color:var(--text-secondary); }
+    .lp-social-text strong { color:var(--text-primary); font-weight:600; }
+    .lp-stars { color:#f59e0b; font-size:14px; letter-spacing:1px; }
+
+    .lp-hero-visual { flex:1; position:relative; min-height:420px; }
+    .lp-floating-card {
+      position:absolute; background:#fff; border-radius:var(--radius-md); box-shadow:0 8px 32px rgba(0,0,0,0.08);
+      border:1px solid var(--border); padding:16px 20px; animation:float 6s ease-in-out infinite;
+    }
+    .lp-card-patient {
+      top:40px; left:20px; width:300px; z-index:2;
+    }
+    .lp-card-patient-header { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+    .lp-card-patient-avatar {
+      width:44px; height:44px; border-radius:var(--radius-md); background:#10b981;
+      display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:#fff;
+    }
+    .lp-card-patient-name { font-size:15px; font-weight:600; color:var(--text-primary); }
+    .lp-card-patient-role { font-size:12px; color:var(--text-secondary); }
+    .lp-card-patient-stats { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+    .lp-card-patient-stat .label { font-size:11px; color:var(--text-light); text-transform:uppercase; letter-spacing:0.05em; }
+    .lp-card-patient-stat .value { font-size:18px; font-weight:700; color:var(--text-primary); }
+    .lp-card-vaccination-progress { margin-top:4px; }
+    .lp-card-vaccination-progress .label { font-size:12px; color:var(--text-secondary); margin-bottom:6px; display:flex; justify-content:space-between; }
+    .lp-card-vaccination-bar { height:6px; background:var(--bg-tertiary); border-radius:3px; overflow:hidden; }
+    .lp-card-vaccination-fill { height:100%; background:#10b981; border-radius:3px; width:75%; transition:width 1s ease; }
+
+    .lp-card-vaccine {
+      top:180px; right:80px; z-index:3; animation-delay:-2s;
+    }
+    .lp-card-vaccine-inner { display:flex; align-items:center; gap:12px; }
+    .lp-card-vaccine-check {
+      width:36px; height:36px; border-radius:50%; background:#dcfce7;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .lp-card-vaccine-check svg { width:18px; height:18px; color:#10b981; }
+    .lp-card-vaccine-text .title { font-size:14px; font-weight:600; color:var(--text-primary); }
+    .lp-card-vaccine-text .sub { font-size:12px; color:#10b981; font-weight:500; }
+
+    .lp-card-appointment {
+      top:0; right:0; z-index:1; animation-delay:-4s;
+    }
+    .lp-card-appointment-inner { display:flex; align-items:center; gap:12px; }
+    .lp-card-appt-icon {
+      width:36px; height:36px; border-radius:var(--radius); background:#dcfce7;
+      display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    }
+    .lp-card-appt-icon svg { width:18px; height:18px; color:#10b981; }
+    .lp-card-appt-text .title { font-size:14px; font-weight:600; color:var(--text-primary); }
+    .lp-card-appt-text .sub { font-size:12px; color:var(--text-secondary); }
+
+    @keyframes float {
+      0%,100% { transform:translateY(0); }
+      50% { transform:translateY(-12px); }
+    }
+
+    .lp-stats-bar {
+      display:grid; grid-template-columns:repeat(5,1fr); gap:0;
+      max-width:1280px; margin:0 auto 60px; padding:0 48px;
+    }
+    .lp-stat-item { text-align:center; padding:24px 16px; }
+    .lp-stat-item .value { font-size:32px; font-weight:800; color:var(--text-primary); }
+    .lp-stat-item .label { font-size:13px; color:var(--text-secondary); margin-top:4px; }
+
+    .lp-section-label {
+      font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em;
+      color:#10b981; margin-bottom:8px;
+    }
+    .lp-section-title {
+      font-size:32px; font-weight:700; color:var(--text-primary); margin-bottom:40px;
+    }
+
+    .lp-features { max-width:1280px; margin:0 auto; padding:60px 48px 80px; }
+    .lp-features-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:20px; }
+    .lp-feature-card {
+      background:#fff; border:1px solid var(--border); border-radius:var(--radius-md);
+      padding:28px 24px; transition:all 0.3s;
+    }
+    .lp-feature-card:hover { box-shadow:0 8px 24px rgba(0,0,0,0.06); transform:translateY(-2px); }
+    .lp-feature-icon {
+      width:44px; height:44px; border-radius:var(--radius); background:#f0fdf4;
+      display:flex; align-items:center; justify-content:center; margin-bottom:16px;
+    }
+    .lp-feature-icon svg { width:20px; height:20px; color:#10b981; }
+    .lp-feature-card h3 { font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:8px; }
+    .lp-feature-card p { font-size:13px; color:var(--text-secondary); line-height:1.6; }
+
+    .lp-how { max-width:1280px; margin:0 auto; padding:60px 48px 80px; }
+    .lp-steps-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:20px; }
+    .lp-step-card {
+      background:#fff; border:1px solid var(--border); border-radius:var(--radius-md);
+      padding:28px 24px; position:relative; transition:all 0.3s;
+    }
+    .lp-step-card:hover { box-shadow:0 8px 24px rgba(0,0,0,0.06); }
+    .lp-step-number {
+      position:absolute; top:-12px; left:20px; width:28px; height:28px; border-radius:50%;
+      background:#10b981; color:#fff; font-size:13px; font-weight:700;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .lp-step-icon {
+      width:44px; height:44px; border-radius:var(--radius); background:#f0fdf4;
+      display:flex; align-items:center; justify-content:center; margin-bottom:16px; margin-top:8px;
+    }
+    .lp-step-icon svg { width:20px; height:20px; color:#10b981; }
+    .lp-step-card h3 { font-size:15px; font-weight:600; color:var(--text-primary); margin-bottom:8px; }
+    .lp-step-card p { font-size:13px; color:var(--text-secondary); line-height:1.6; }
+
+    .lp-bottom-row { max-width:1280px; margin:0 auto; padding:0 48px 80px; display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+    .lp-testimonial {
+      background:#0f2d24; border-radius:var(--radius-lg); padding:40px; color:#fff; display:flex; flex-direction:column; justify-content:space-between;
+    }
+    .lp-testimonial-quote { font-size:17px; line-height:1.7; font-weight:500; opacity:0.95; margin-bottom:24px; }
+    .lp-testimonial-author { display:flex; align-items:center; gap:12px; }
+    .lp-testimonial-avatar {
+      width:40px; height:40px; border-radius:50%; background:#10b981;
+      display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700; color:#fff;
+    }
+    .lp-testimonial-name { font-size:14px; font-weight:600; }
+    .lp-testimonial-role { font-size:12px; opacity:0.7; }
+
+    .lp-schools-used {
+      background:#fff; border:1px solid var(--border); border-radius:var(--radius-lg); padding:40px;
+    }
+    .lp-schools-label { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.1em; color:var(--text-light); margin-bottom:20px; }
+    .lp-school-list { display:flex; flex-direction:column; gap:14px; }
+    .lp-school-item { display:flex; align-items:center; justify-content:space-between; }
+    .lp-school-item-left { display:flex; align-items:center; gap:10px; }
+    .lp-school-dot { width:8px; height:8px; border-radius:50%; }
+    .lp-school-dot.green { background:#10b981; }
+    .lp-school-dot.blue { background:#2563eb; }
+    .lp-school-dot.purple { background:#8b5cf6; }
+    .lp-school-item-name { font-size:14px; font-weight:500; color:var(--text-primary); }
+    .lp-school-item-city { font-size:13px; color:var(--text-light); }
+
+    .lp-footer {
+      background:#0f2d24; padding:60px 48px 32px; color:#fff;
+    }
+    .lp-footer-grid { max-width:1280px; margin:0 auto; display:grid; grid-template-columns:1.5fr 1fr 1fr 1fr 1.5fr; gap:40px; margin-bottom:40px; }
+    .lp-footer-brand p { font-size:13px; opacity:0.7; line-height:1.6; margin-top:12px; max-width:280px; }
+    .lp-footer-brand-logo { display:flex; align-items:center; gap:8px; }
+    .lp-footer-brand-logo svg { width:24px; height:24px; color:#10b981; }
+    .lp-footer-brand-logo span { font-size:16px; font-weight:700; color:#fff; }
+    .lp-footer-socials { display:flex; gap:10px; margin-top:16px; }
+    .lp-footer-social-icon {
+      width:32px; height:32px; border-radius:50%; background:rgba(255,255,255,0.1);
+      display:flex; align-items:center; justify-content:center; transition:all 0.2s; cursor:pointer;
+    }
+    .lp-footer-social-icon:hover { background:rgba(255,255,255,0.2); }
+    .lp-footer-social-icon svg { width:14px; height:14px; color:#fff; }
+    .lp-footer-col h4 { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; opacity:0.5; margin-bottom:16px; }
+    .lp-footer-col a { display:block; font-size:13px; color:rgba(255,255,255,0.75); text-decoration:none; margin-bottom:10px; transition:color 0.2s; }
+    .lp-footer-col a:hover { color:#fff; }
+    .lp-footer-newsletter p { font-size:13px; opacity:0.7; margin-bottom:12px; }
+    .lp-footer-newsletter-form { display:flex; gap:8px; }
+    .lp-footer-newsletter-input {
+      flex:1; padding:10px 14px; border:1px solid rgba(255,255,255,0.2); border-radius:var(--radius);
+      background:transparent; color:#fff; font-size:13px;
+    }
+    .lp-footer-newsletter-input::placeholder { color:rgba(255,255,255,0.4); }
+    .lp-footer-newsletter-btn {
+      width:40px; height:40px; border-radius:var(--radius); background:#10b981; border:none;
+      display:flex; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;
+    }
+    .lp-footer-newsletter-btn:hover { background:#059669; }
+    .lp-footer-newsletter-btn svg { width:16px; height:16px; color:#fff; }
+    .lp-footer-bottom {
+      max-width:1280px; margin:0 auto; padding-top:24px; border-top:1px solid rgba(255,255,255,0.1);
+      display:flex; justify-content:center; align-items:center;
+    }
+    .lp-footer-bottom svg { width:16px; height:16px; color:rgba(255,255,255,0.3); }
+
+    @media (max-width:1024px) {
+      .lp-hero { flex-direction:column; padding:40px 24px; text-align:center; }
+      .lp-hero-content { max-width:100%; }
+      .lp-hero-content p { margin-left:auto; margin-right:auto; }
+      .lp-hero-actions { justify-content:center; }
+      .lp-social-proof { justify-content:center; }
+      .lp-hero-visual { display:none; }
+      .lp-stats-bar { grid-template-columns:repeat(3,1fr); }
+      .lp-features-grid { grid-template-columns:repeat(2,1fr); }
+      .lp-steps-grid { grid-template-columns:1fr; }
+      .lp-bottom-row { grid-template-columns:1fr; }
+      .lp-footer-grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media (max-width:768px) {
+      .lp-nav { padding:12px 20px; }
+      .lp-nav-links { display:none; }
+      .lp-hero-content h1 { font-size:36px; }
+      .lp-stats-bar { grid-template-columns:repeat(2,1fr); padding:0 20px; }
+      .lp-features, .lp-how, .lp-bottom-row { padding-left:20px; padding-right:20px; }
+      .lp-features-grid { grid-template-columns:1fr; }
+      .lp-footer { padding:40px 20px 24px; }
+      .lp-footer-grid { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="lp-nav">
+    <a href="index.html" class="lp-nav-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      <span>SHMS Portal</span>
+    </a>
+    <div class="lp-nav-links">
+      <a href="#features">Features</a>
+      <a href="#how-it-works">How it works</a>
+      <a href="#schools">For schools</a>
+      <a href="#support">Support</a>
+    </div>
+    <div class="lp-nav-actions">
+      <a href="login.html" class="lp-btn-login">Log in</a>
+      <a href="register.html" class="lp-btn-getstarted">Get started <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+    </div>
+  </nav>
+
+  <section class="lp-hero">
+    <div class="lp-hero-content">
+      <div class="lp-trust-badge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Trusted by 18 schools
+      </div>
+      <h1>Your school health record,<br><span class="green">made simple</span></h1>
+      <p>Track appointments, vaccinations, and medical history in one secure place — built for students, loved by school nurses.</p>
+      <div class="lp-hero-actions">
+        <a href="register.html" class="lp-hero-cta">Create your account <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
+        <a href="#" class="lp-hero-watch">
+          <span class="play-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
+          Watch how it works
+        </a>
+      </div>
+      <div class="lp-social-proof">
+        <div class="lp-avatars">
+          <span class="avatar a1">AC</span>
+          <span class="avatar a2">TQ</span>
+          <span class="avatar a3">KJ</span>
+          <span class="avatar a4">MB</span>
+        </div>
+        <div>
+          <div class="lp-stars">★★★★★</div>
+          <div class="lp-social-text"><strong>2,400+ students</strong> already on board</div>
+        </div>
+      </div>
+    </div>
+    <div class="lp-hero-visual">
+      <div class="lp-floating-card lp-card-patient">
+        <div class="lp-card-patient-header">
+          <div class="lp-card-patient-avatar">AC</div>
+          <div>
+            <div class="lp-card-patient-name">Amara Chukwu</div>
+            <div class="lp-card-patient-role">Grade 7B · Student</div>
+          </div>
+        </div>
+        <div class="lp-card-patient-stats">
+          <div class="lp-card-patient-stat">
+            <div class="label">BMI</div>
+            <div class="value">18.0</div>
+          </div>
+          <div class="lp-card-patient-stat">
+            <div class="label">Vaccines</div>
+            <div class="value">3/4</div>
+          </div>
+        </div>
+        <div class="lp-card-vaccination-progress">
+          <div class="label"><span>Vaccination progress</span><span>75%</span></div>
+          <div class="lp-card-vaccination-bar"><div class="lp-card-vaccination-fill"></div></div>
+        </div>
+      </div>
+      <div class="lp-floating-card lp-card-vaccine">
+        <div class="lp-card-vaccine-inner">
+          <div class="lp-card-vaccine-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="lp-card-vaccine-text">
+            <div class="title">Hep B — 3rd dose</div>
+            <div class="sub">Marked complete</div>
+          </div>
+        </div>
+      </div>
+      <div class="lp-floating-card lp-card-appointment">
+        <div class="lp-card-appointment-inner">
+          <div class="lp-card-appt-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <div class="lp-card-appt-text">
+            <div class="title">Appointment confirmed</div>
+            <div class="sub">Fri, 10 Jul · 10:30 AM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-stats-bar">
+    <div class="lp-stat-item">
+      <div class="value">2,400+</div>
+      <div class="label">Students tracked</div>
+    </div>
+    <div class="lp-stat-item">
+      <div class="value">98%</div>
+      <div class="label">Vaccination compliance</div>
+    </div>
+    <div class="lp-stat-item">
+      <div class="value">18</div>
+      <div class="label">Partner schools</div>
+    </div>
+    <div class="lp-stat-item">
+      <div class="value">4.9/5</div>
+      <div class="label">Guardian satisfaction</div>
+    </div>
+    <div class="lp-stat-item">
+      <div class="value">&lt;2min</div>
+      <div class="label">Avg. nurse response</div>
+    </div>
+  </section>
+
+  <section class="lp-features" id="features">
+    <div class="lp-section-label">What's Inside</div>
+    <div class="lp-section-title">Everything about your health, organized</div>
+    <div class="lp-features-grid">
+      <div class="lp-feature-card">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <h3>Appointment booking</h3>
+        <p>Schedule checkups, screenings and follow-ups without a single phone call.</p>
+      </div>
+      <div class="lp-feature-card">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 2v7.31l-6 9.2A2 2 0 0 0 5.64 22h12.72a2 2 0 0 0 1.64-3.49l-6-9.2V2"/><line x1="10" y1="2" x2="14" y2="2"/></svg>
+        </div>
+        <h3>Vaccination tracking</h3>
+        <p>Digital immunization cards with dose history and upcoming due dates.</p>
+      </div>
+      <div class="lp-feature-card">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </div>
+        <h3>Allergies & conditions</h3>
+        <p>Keep asthma, allergies and chronic conditions visible to staff instantly.</p>
+      </div>
+      <div class="lp-feature-card">
+        <div class="lp-feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        </div>
+        <h3>Growth & vitals</h3>
+        <p>Height, weight and BMI trends charted automatically over time.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-how" id="how-it-works">
+    <div class="lp-section-label">Getting Started</div>
+    <div class="lp-section-title">Up and running in three steps</div>
+    <div class="lp-steps-grid">
+      <div class="lp-step-card">
+        <div class="lp-step-number">1</div>
+        <div class="lp-step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        </div>
+        <h3>Create your account</h3>
+        <p>Sign up with your student ID — your school pre-verifies enrollment.</p>
+      </div>
+      <div class="lp-step-card">
+        <div class="lp-step-number">2</div>
+        <div class="lp-step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        </div>
+        <h3>Sync your health record</h3>
+        <p>Upload existing immunization cards or let the nurse's office link them.</p>
+      </div>
+      <div class="lp-step-card">
+        <div class="lp-step-number">3</div>
+        <div class="lp-step-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
+        <h3>Stay on top of it</h3>
+        <p>Get reminders for appointments and doses before they're due.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-bottom-row">
+    <div class="lp-testimonial">
+      <div class="lp-testimonial-quote">
+        SHMS cut our appointment no-show rate in half and finally gave parents visibility into their kid's vaccination status without chasing paper forms.
+      </div>
+      <div class="lp-testimonial-author">
+        <div class="lp-testimonial-avatar">FA</div>
+        <div>
+          <div class="lp-testimonial-name">Nurse Folake Adewale</div>
+          <div class="lp-testimonial-role">Head School Nurse, Lekki International</div>
+        </div>
+      </div>
+    </div>
+    <div class="lp-schools-used" id="schools">
+      <div class="lp-schools-label">Used across schools like</div>
+      <div class="lp-school-list">
+        <div class="lp-school-item">
+          <div class="lp-school-item-left"><span class="lp-school-dot green"></span><span class="lp-school-item-name">Lekki International School</span></div>
+          <span class="lp-school-item-city">Lagos</span>
+        </div>
+        <div class="lp-school-item">
+          <div class="lp-school-item-left"><span class="lp-school-dot blue"></span><span class="lp-school-item-name">Greenview Secondary</span></div>
+          <span class="lp-school-item-city">Abuja</span>
+        </div>
+        <div class="lp-school-item">
+          <div class="lp-school-item-left"><span class="lp-school-dot purple"></span><span class="lp-school-item-name">Bright Path Academy</span></div>
+          <span class="lp-school-item-city">Ibadan</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="lp-footer">
+    <div class="lp-footer-grid">
+      <div class="lp-footer-brand">
+        <div class="lp-footer-brand-logo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+          <span>SHMS</span>
+        </div>
+        <p>The school health management system trusted by nurses, students, and guardians across 18 schools.</p>
+        <div class="lp-footer-socials">
+          <span class="lp-footer-social-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/></svg></span>
+          <span class="lp-footer-social-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5"/></svg></span>
+          <span class="lp-footer-social-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></span>
+        </div>
+      </div>
+      <div class="lp-footer-col">
+        <h4>Product</h4>
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#schools">For schools</a>
+        <a href="#">Pricing</a>
+        <a href="#">Security</a>
+      </div>
+      <div class="lp-footer-col">
+        <h4>Company</h4>
+        <a href="#">About us</a>
+        <a href="#">Careers</a>
+        <a href="#">Blog</a>
+        <a href="#">Partners</a>
+        <a href="#">Contact</a>
+      </div>
+      <div class="lp-footer-col">
+        <h4>Resources</h4>
+        <a href="#">Help center</a>
+        <a href="#">Guardian FAQs</a>
+        <a href="#">Nurse toolkit</a>
+        <a href="#">Vaccination guide</a>
+        <a href="#">System status</a>
+      </div>
+      <div class="lp-footer-newsletter">
+        <h4 style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;opacity:0.5;margin-bottom:16px;">Stay in the loop</h4>
+        <p>Product updates and school health tips, once a month.</p>
+        <div class="lp-footer-newsletter-form">
+          <input type="email" class="lp-footer-newsletter-input" placeholder="you@school.edu">
+          <button class="lp-footer-newsletter-btn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="lp-footer-bottom">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
+  </footer>
+
+</body>
+</html>
