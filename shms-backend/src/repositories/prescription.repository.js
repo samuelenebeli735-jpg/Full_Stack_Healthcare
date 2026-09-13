@@ -1,4 +1,5 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
 const prescriptionInclude = {
@@ -20,26 +21,26 @@ const prescriptionInclude = {
   items: true,
 };
 
-export async function createPrescription(data, db = prisma) {
+export async function createPrescription(data, db = getTenantClient()) {
   return await db.prescription.create({
     data,
   });
 }
 
-export async function createPrescriptionItems(items, db = prisma) {
+export async function createPrescriptionItems(items, db = getTenantClient()) {
   return await db.prescriptionItem.createMany({
     data: items,
   });
 }
 
-export async function findPrescriptionById(id, db = prisma) {
+export async function findPrescriptionById(id, db = getTenantClient()) {
   return await db.prescription.findUnique({
     where: { id },
     include: prescriptionInclude,
   });
 }
 
-export async function findPrescriptionByConsultation(consultationId, db = prisma) {
+export async function findPrescriptionByConsultation(consultationId, db = getTenantClient()) {
   return await db.prescription.findUnique({
     where: { consultationId },
   });
@@ -48,7 +49,7 @@ export async function findPrescriptionByConsultation(consultationId, db = prisma
 export async function findPrescriptions(
   organizationId = null,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["createdAt", "updatedAt"],
@@ -77,20 +78,20 @@ export async function findPrescriptions(
   return { items, total };
 }
 
-export async function updatePrescription(id, data, db = prisma) {
+export async function updatePrescription(id, data, db = getTenantClient()) {
   return await db.prescription.update({
     where: { id },
     data,
   });
 }
 
-export async function deletePrescriptionItems(prescriptionId, db = prisma) {
+export async function deletePrescriptionItems(prescriptionId, db = getTenantClient()) {
   return await db.prescriptionItem.deleteMany({
     where: { prescriptionId },
   });
 }
 
-export async function deletePrescription(id, db = prisma) {
+export async function deletePrescription(id, db = getTenantClient()) {
   return await db.prescription.delete({
     where: { id },
   });

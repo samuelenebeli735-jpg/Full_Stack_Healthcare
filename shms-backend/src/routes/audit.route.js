@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import authenticate from "../middleware/auth.middleware.js";
 import authorize from "../middleware/role.middleware.js";
+import { authorizePolicy } from "../middleware/policy.middleware.js";
 import validate from "../middleware/validate.middleware.js";
 
 import {
@@ -25,6 +26,7 @@ router.get(
   "/",
   authenticate,
   authorize("admin", "super_admin"),
+  authorizePolicy({ action: "read", resourceType: "auditLog", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   getAll
 );
 
@@ -35,6 +37,7 @@ router.get(
   "/organization/:organizationId",
   authenticate,
   authorize("admin", "super_admin"),
+  authorizePolicy({ action: "read", resourceType: "auditLog", organizationId: "param:organizationId", onDeny: { crossOrgStatus: 403, ownershipStatus: 404 } }),
   validate({ params: organizationAuditSchema }),
   getByOrganization
 );
@@ -46,6 +49,7 @@ router.get(
   "/:id",
   authenticate,
   authorize("admin", "super_admin"),
+  authorizePolicy({ action: "read", resourceType: "auditLog", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ params: auditIdSchema }),
   getById
 );
@@ -57,6 +61,7 @@ router.delete(
   "/:id",
   authenticate,
   authorize("super_admin"),
+  authorizePolicy({ action: "delete", resourceType: "auditLog", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ params: auditIdSchema }),
   remove
 );

@@ -8,6 +8,7 @@ import {
   getSummary,
   getAppointments,
   getQueue,
+  getHealth,
 } from "../controllers/dashboard.controller.js";
 
 import { dashboardQuerySchema } from "../validations/dashboard.validation.js";
@@ -36,6 +37,14 @@ router.get(
   authorize("staff", "admin", "super_admin"),
   validate({ query: dashboardQuerySchema }),
   getQueue
+);
+
+router.get(
+  "/health",
+  authenticate,
+  authorize("staff", "admin", "super_admin"),
+  validate({ query: dashboardQuerySchema }),
+  getHealth
 );
 
 export default router;

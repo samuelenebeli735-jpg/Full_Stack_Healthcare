@@ -1,0 +1,6 @@
+# Internal QA/handoff notes (contains test credentials — not for public repo)
+QA_HANDOFF.md
+
+# OS junk
+.DS_Store
+Thumbs.db

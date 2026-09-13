@@ -1,4 +1,5 @@
 import { resolveOrganizationId } from "../utils/tenantAccess.js";
+import { withTenant } from "../utils/tenantContext.js";
 
 import {
   findAppointmentsForReport,
@@ -39,11 +40,10 @@ function groupByDay(rows, dateField, statusField = null) {
 
 export async function getAppointmentReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
+  const isSuperAdmin = user.role === "super_admin";
 
-  const { statusCounts, rows } = await findAppointmentsForReport(
-    orgId,
-    query.from,
-    query.to
+  const { statusCounts, rows } = await withTenant(orgId, { isSuperAdmin }, (tx) =>
+    findAppointmentsForReport(orgId, query.from, query.to, tx)
   );
 
   return {
@@ -58,11 +58,10 @@ export async function getAppointmentReport(user, query = {}) {
 
 export async function getConsultationReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
+  const isSuperAdmin = user.role === "super_admin";
 
-  const rows = await findConsultationsForReport(
-    orgId,
-    query.from,
-    query.to
+  const rows = await withTenant(orgId, { isSuperAdmin }, (tx) =>
+    findConsultationsForReport(orgId, query.from, query.to, tx)
   );
 
   return {
@@ -73,8 +72,11 @@ export async function getConsultationReport(user, query = {}) {
 
 export async function getPatientReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
+  const isSuperAdmin = user.role === "super_admin";
 
-  const stats = await findPatientStats(orgId);
+  const stats = await withTenant(orgId, { isSuperAdmin }, (tx) =>
+    findPatientStats(orgId, tx)
+  );
 
   return {
     total: stats.total,
@@ -91,6 +93,9 @@ export async function getPatientReport(user, query = {}) {
 
 export async function getStaffReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
+  const isSuperAdmin = user.role === "super_admin";
 
-  return await findStaffStats(orgId);
+  return await withTenant(orgId, { isSuperAdmin }, (tx) =>
+    findStaffStats(orgId, tx)
+  );
 }

@@ -3,3 +3,14 @@ node_modules/
 .env.local
 .tmp/
 /src/generated/prisma
+
+# local run artifacts
+server.log
+*.log
+
+# editor / personal
+.vscode/
+fork.bat
+
+# dev-only scripts (contain hardcoded test credentials)
+scripts/

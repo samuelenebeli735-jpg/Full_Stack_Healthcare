@@ -2,6 +2,7 @@ import { Router } from "express";
 
 import authenticate from "../middleware/auth.middleware.js";
 import authorize from "../middleware/role.middleware.js";
+import { authorizePolicy } from "../middleware/policy.middleware.js";
 import validate from "../middleware/validate.middleware.js";
 
 import {
@@ -27,6 +28,7 @@ router.post(
   "/",
   authenticate,
   authorize("staff", "admin", "super_admin"),
+  authorizePolicy({ action: "create", resourceType: "consultation", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ body: createConsultationSchema }),
   create
 );
@@ -38,6 +40,7 @@ router.get(
   "/",
   authenticate,
   authorize("staff", "admin", "super_admin"),
+  authorizePolicy({ action: "read", resourceType: "consultation", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   getAll
 );
 
@@ -48,6 +51,7 @@ router.get(
   "/:id",
   authenticate,
   authorize("staff", "admin", "super_admin"),
+  authorizePolicy({ action: "read", resourceType: "consultation", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ params: consultationIdSchema }),
   getById
 );
@@ -59,6 +63,7 @@ router.patch(
   "/:id",
   authenticate,
   authorize("staff", "admin", "super_admin"),
+  authorizePolicy({ action: "update", resourceType: "consultation", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({
     params: consultationIdSchema,
     body: updateConsultationSchema,
@@ -73,6 +78,7 @@ router.delete(
   "/:id",
   authenticate,
   authorize("staff", "admin", "super_admin"),
+  authorizePolicy({ action: "delete", resourceType: "consultation", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ params: consultationIdSchema }),
   remove
 );

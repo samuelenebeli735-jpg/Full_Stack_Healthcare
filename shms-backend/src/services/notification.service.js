@@ -1,5 +1,5 @@
-import prisma from "../config/db.js";
 import AppError from "../utils/AppError.js";
+import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 
 import {
@@ -14,19 +14,33 @@ import {
   createManyNotifications,
 } from "../repositories/notification.repository.js";
 
-import { findUserById } from "../repositories/user.repository.js";
+import {
+  findUserOrgHint,
+} from "../repositories/user.repository.js";
 
 import { getPagination, buildPaginationMeta } from "../utils/pagination.js";
 
+async function resolveUserOrg(userId) {
+  const hint = await findUserOrgHint(userId);
+  return hint?.organizationId ?? null;
+}
+
 export async function listNotifications(userId, query) {
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("User not found.", 404);
+  }
+
   const { page, limit, skip } = getPagination(query);
 
-  const { items, total } = await findNotificationsByUserId(
-    userId,
-    query
+  const { items, total } = await withTenant(organizationId, (tx) =>
+    findNotificationsByUserId(userId, query, tx)
   );
 
-  const unreadCount = await findUnreadNotificationCount(userId);
+  const unreadCount = await withTenant(organizationId, (tx) =>
+    findUnreadNotificationCount(userId, tx)
+  );
 
   return {
     items,
@@ -36,7 +50,15 @@ export async function listNotifications(userId, query) {
 }
 
 export async function readNotification(id, userId) {
-  const result = await markNotificationRead(id, userId);
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("Notification not found.", 404);
+  }
+
+  const result = await withTenant(organizationId, (tx) =>
+    markNotificationRead(id, userId, tx)
+  );
 
   if (result.count === 0) {
     throw new AppError("Notification not found.", 404);
@@ -46,13 +68,29 @@ export async function readNotification(id, userId) {
 }
 
 export async function readAllNotifications(userId) {
-  const count = await markAllNotificationsRead(userId);
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("User not found.", 404);
+  }
+
+  const count = await withTenant(organizationId, (tx) =>
+    markAllNotificationsRead(userId, tx)
+  );
 
   return { success: true, markedRead: count.count };
 }
 
 export async function getPreferences(userId) {
-  const prefs = await findPreferenceByUserId(userId);
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("User not found.", 404);
+  }
+
+  const prefs = await withTenant(organizationId, (tx) =>
+    findPreferenceByUserId(userId, tx)
+  );
 
   if (!prefs) {
     return {
@@ -71,6 +109,12 @@ export async function getPreferences(userId) {
 }
 
 export async function savePreferences(userId, data) {
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("User not found.", 404);
+  }
+
   const allowedFields = [
     "emailEnabled",
     "whatsappEnabled",
@@ -89,12 +133,12 @@ export async function savePreferences(userId, data) {
     }
   }
 
-  const prefs = await upsertPreference(userId, updateData);
-
-  const user = await findUserById(userId);
+  const prefs = await withTenant(organizationId, (tx) =>
+    upsertPreference(userId, updateData, tx)
+  );
 
   await auditLogger({
-    organizationId: user?.organizationId,
+    organizationId,
     userId,
     action: "UPDATE",
     entity: "NotificationPreference",
@@ -106,19 +150,21 @@ export async function savePreferences(userId, data) {
 }
 
 export async function sendNotification(userId, title, message, type = "general") {
-  const user = await findUserById(userId);
+  const organizationId = await resolveUserOrg(userId);
 
-  if (!user) {
+  if (!organizationId) {
     throw new AppError("User not found.", 404);
   }
 
-  return await createNotification({
-    userId,
-    organizationId: user.organizationId,
-    title,
-    message,
-    type,
-  });
+  return await withTenant(organizationId, (tx) =>
+    createNotification({
+      userId,
+      organizationId,
+      title,
+      message,
+      type,
+    }, tx)
+  );
 }
 
 export async function sendNotificationToOrganization(
@@ -127,7 +173,9 @@ export async function sendNotificationToOrganization(
   message,
   type = "general"
 ) {
-  const users = await findUsersByOrganization(organizationId);
+  const users = await withTenant(organizationId, async (tx) =>
+    findUsersByOrganization(organizationId, tx)
+  );
 
   const notifications = users.map((user) => ({
     userId: user.id,
@@ -138,7 +186,7 @@ export async function sendNotificationToOrganization(
   }));
 
   if (notifications.length > 0) {
-    await prisma.$transaction(async (tx) => {
+    await withTenant(organizationId, async (tx) => {
       await createManyNotifications(notifications, tx);
     });
   }

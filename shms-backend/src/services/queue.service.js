@@ -1,6 +1,6 @@
-import prisma from "../config/db.js";
 import AppError from "../utils/AppError.js";
 import { resolveOrganizationId } from "../utils/tenantAccess.js";
+import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import {
   getPagination,
@@ -43,7 +43,11 @@ function getLocalDateString(date = new Date()) {
 }
 
 export async function checkInPatient(data, user) {
-  const appointment = await findAppointmentById(data.appointmentId);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const appointment = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findAppointmentById(data.appointmentId, tx)
+  );
 
   if (!appointment) {
     throw new AppError("Appointment not found.", 404);
@@ -83,7 +87,9 @@ export async function checkInPatient(data, user) {
     );
   }
 
-  const existingQueue = await findQueueByAppointmentId(data.appointmentId);
+  const existingQueue = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findQueueByAppointmentId(data.appointmentId, tx)
+  );
 
   if (existingQueue) {
     throw new AppError("Patient has already checked in.", 409);
@@ -91,13 +97,15 @@ export async function checkInPatient(data, user) {
 
   const queueDate = getLocalDateString();
 
+  const organizationId = appointment.organizationId;
+
   let result;
 
   // Retry on the unique (organizationId, queueDate, queueNumber) constraint
   // so concurrent check-ins receive distinct sequential numbers.
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      result = await prisma.$transaction(async (tx) => {
+      result = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
         const lastQueue = await findLastQueueByDate(
           appointment.organizationId,
           queueDate,
@@ -154,14 +162,19 @@ export async function checkInPatient(data, user) {
 export async function getTodayQueue(organizationId, user, query = {}) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
+  const isSuperAdmin = user.role === "super_admin";
+
   const { startOfDay, endOfDay } = getTodayRange();
   const { page, limit, skip } = getPagination(query);
 
-  const { items, total } = await findTodayQueue(
-    resolvedOrgId,
-    startOfDay,
-    endOfDay,
-    { skip, limit }
+  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
+    findTodayQueue(
+      resolvedOrgId,
+      startOfDay,
+      endOfDay,
+      { skip, limit },
+      tx
+    )
   );
 
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
@@ -171,17 +184,22 @@ export async function getMyQueue(user) {
   const queueDate = getLocalDateString();
   const { startOfDay, endOfDay } = getTodayRange();
 
-  const queue = await findQueueByUserIdAndDate(user.id, queueDate);
+  const queue = await withTenant(user.organizationId, (tx) =>
+    findQueueByUserIdAndDate(user.id, queueDate, tx)
+  );
 
   if (!queue) {
     return null;
   }
 
-  const { items: todayQueue } = await findTodayQueue(
-    queue.organizationId,
-    startOfDay,
-    endOfDay,
-    { skip: 0, limit: 500 }
+  const { items: todayQueue } = await withTenant(queue.organizationId, (tx) =>
+    findTodayQueue(
+      queue.organizationId,
+      startOfDay,
+      endOfDay,
+      { skip: 0, limit: 500 },
+      tx
+    )
   );
 
   const active = todayQueue
@@ -214,7 +232,9 @@ export async function getMyQueue(user) {
 }
 
 export async function getQueueById(id, user) {
-  const queue = await findQueueById(id);
+  const queue = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findQueueById(id, tx)
+  );
 
   if (!queue) {
     throw new AppError("Queue entry not found.", 404);
@@ -236,56 +256,116 @@ export async function getQueueById(id, user) {
 export async function callNextPatient(organizationId, user) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
+  const isSuperAdmin = user.role === "super_admin";
+
   const { startOfDay, endOfDay } = getTodayRange();
 
-  const { items: queue } = await findTodayQueue(
-    resolvedOrgId,
-    startOfDay,
-    endOfDay,
-    { skip: 0, limit: 500 }
-  );
-
-  const nextPatient = queue.find((item) => item.status === "waiting");
-
-  if (!nextPatient) {
-    throw new AppError(
-      "There are no patients waiting in the queue.",
-      404
+  return await withTenant(resolvedOrgId, { isSuperAdmin }, async (tx) => {
+    const { items: queue } = await findTodayQueue(
+      resolvedOrgId,
+      startOfDay,
+      endOfDay,
+      { skip: 0, limit: 500 },
+      tx
     );
-  }
 
-  // Atomically claim the entry so two concurrent calls never call the same patient.
-  const claimed = await prisma.queue.updateMany({
-    where: { id: nextPatient.id, status: "waiting" },
-    data: { status: "called", calledAt: new Date() },
+    const nextPatient = queue.find((item) => item.status === "waiting");
+
+    if (!nextPatient) {
+      throw new AppError(
+        "There are no patients waiting in the queue.",
+        404
+      );
+    }
+
+    // Atomically claim the entry so two concurrent calls never call the same patient.
+    const claimed = await tx.queue.updateMany({
+      where: { id: nextPatient.id, status: "waiting" },
+      data: { status: "called", calledAt: new Date() },
+    });
+
+    if (claimed.count === 0) {
+      throw new AppError(
+        "There are no patients waiting in the queue.",
+        404
+      );
+    }
+
+    const updatedQueue = await updateQueue(nextPatient.id, {
+      status: "called",
+      calledAt: new Date(),
+    }, tx);
+
+    await auditLogger({
+      organizationId: resolvedOrgId,
+      userId: user.id,
+      action: "CALL",
+      entity: "Queue",
+      entityId: nextPatient.id,
+      description: `Called queue number ${nextPatient.queueNumber}.`,
+    });
+
+    return updatedQueue;
   });
+}
 
-  if (claimed.count === 0) {
-    throw new AppError(
-      "There are no patients waiting in the queue.",
-      404
+export async function skipPatient(organizationId, user) {
+  const resolvedOrgId = resolveOrganizationId(organizationId, user);
+
+  const isSuperAdmin = user.role === "super_admin";
+
+  const { startOfDay, endOfDay } = getTodayRange();
+
+  return await withTenant(resolvedOrgId, { isSuperAdmin }, async (tx) => {
+    const { items: queue } = await findTodayQueue(
+      resolvedOrgId,
+      startOfDay,
+      endOfDay,
+      { skip: 0, limit: 500 },
+      tx
     );
-  }
 
-  const updatedQueue = await updateQueue(nextPatient.id, {
-    status: "called",
-    calledAt: new Date(),
+    const currentPatient = queue.find(
+      (item) => item.status === "called"
+    );
+
+    if (!currentPatient) {
+      throw new AppError(
+        "There is no patient currently called to skip.",
+        404
+      );
+    }
+
+    const result = await updateQueue(currentPatient.id, {
+      status: "cancelled",
+      completedAt: new Date(),
+    }, tx);
+
+    await updateAppointment(
+      currentPatient.appointmentId,
+      { status: "cancelled" },
+      tx
+    );
+
+    await auditLogger({
+      organizationId: resolvedOrgId,
+      userId: user.id,
+      action: "SKIP",
+      entity: "Queue",
+      entityId: currentPatient.id,
+      description: `Skipped queue number ${currentPatient.queueNumber}.`,
+    });
+
+    return result;
   });
-
-  await auditLogger({
-    organizationId: resolvedOrgId,
-    userId: user.id,
-    action: "CALL",
-    entity: "Queue",
-    entityId: nextPatient.id,
-    description: `Called queue number ${nextPatient.queueNumber}.`,
-  });
-
-  return updatedQueue;
 }
 
 export async function startConsultation(queueId, user) {
-  const queue = await findQueueById(queueId);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const queue = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findQueueById(queueId, tx)
+  );
 
   if (!queue) {
     throw new AppError("Queue entry not found.", 404);
@@ -305,7 +385,7 @@ export async function startConsultation(queueId, user) {
     throw new AppError("Patient has not been called yet.", 400);
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
+  const updated = await withTenant(queue.organizationId, { isSuperAdmin }, async (tx) => {
     const result = await updateQueue(queueId, {
       status: "in_progress",
       startedAt: new Date(),
@@ -333,7 +413,11 @@ export async function startConsultation(queueId, user) {
 }
 
 export async function completeConsultation(queueId, user) {
-  const queue = await findQueueById(queueId);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const queue = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findQueueById(queueId, tx)
+  );
 
   if (!queue) {
     throw new AppError("Queue entry not found.", 404);
@@ -353,7 +437,7 @@ export async function completeConsultation(queueId, user) {
     throw new AppError("Consultation has not started.", 400);
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await withTenant(queue.organizationId, { isSuperAdmin }, async (tx) => {
     await updateAppointment(
       queue.appointmentId,
       { status: "completed" },

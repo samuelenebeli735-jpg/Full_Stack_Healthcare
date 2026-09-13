@@ -5,6 +5,7 @@ import {
   getDashboardSummary,
   getAppointmentOverview,
   getQueueOverview,
+  getHealthAnalytics,
 } from "../services/dashboard.service.js";
 
 export const getSummary = asyncHandler(async (req, res) => {
@@ -34,5 +35,15 @@ export const getQueue = asyncHandler(async (req, res) => {
     res,
     result,
     "Queue overview retrieved successfully."
+  );
+});
+
+export const getHealth = asyncHandler(async (req, res) => {
+  const result = await getHealthAnalytics(req.user, req.query);
+
+  return successResponse(
+    res,
+    result,
+    "Health analytics retrieved successfully."
   );
 });

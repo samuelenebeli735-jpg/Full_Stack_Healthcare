@@ -2,6 +2,7 @@ import AppError from "../utils/AppError.js";
 import {
   resolveOrganizationId,
 } from "../utils/tenantAccess.js";
+import { withTenant } from "../utils/tenantContext.js";
 import {
   getPagination,
   buildPaginationMeta,
@@ -17,14 +18,22 @@ import {
 
 export async function logAction(data) {
   try {
-    return await createAuditLog(data);
+    if (!data.organizationId) {
+      return;
+    }
+
+    return await withTenant(data.organizationId, { isSuperAdmin: true }, (tx) =>
+      createAuditLog(data, tx)
+    );
   } catch (error) {
     // Audit logging must never break the main operation
   }
 }
 
 export async function getAuditLogById(id, user) {
-  const log = await findAuditLogById(id);
+  const log = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findAuditLogById(id, tx)
+  );
 
   if (!log) {
     throw new AppError("Audit log not found.", 404);
@@ -46,15 +55,16 @@ export async function getAuditLogById(id, user) {
 export async function getAllAuditLogs(user, query = {}) {
   if (user.role === "super_admin") {
     const { page, limit, skip } = getPagination(query);
-    const { items, total } = await findAuditLogs(null, query);
+    const { items, total } = await withTenant(null, { isSuperAdmin: true }, (tx) =>
+      findAuditLogs(null, query, tx)
+    );
     return { items, pagination: buildPaginationMeta({ page, limit, total }) };
   }
 
   if (user.role === "admin") {
     const { page, limit, skip } = getPagination(query);
-    const { items, total } = await findAuditLogsByOrganization(
-      user.organizationId,
-      query
+    const { items, total } = await withTenant(user.organizationId, (tx) =>
+      findAuditLogsByOrganization(user.organizationId, query, tx)
     );
     return { items, pagination: buildPaginationMeta({ page, limit, total }) };
   }
@@ -68,17 +78,20 @@ export async function getAllAuditLogs(user, query = {}) {
 export async function getOrganizationAuditLogs(organizationId, user, query = {}) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
+  const isSuperAdmin = user.role === "super_admin";
+
   const { page, limit, skip } = getPagination(query);
-  const { items, total } = await findAuditLogsByOrganization(
-    resolvedOrgId,
-    query
+  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
+    findAuditLogsByOrganization(resolvedOrgId, query, tx)
   );
 
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
 }
 
 export async function removeAuditLog(id, user) {
-  const log = await findAuditLogById(id);
+  const log = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findAuditLogById(id, tx)
+  );
 
   if (!log) {
     throw new AppError("Audit log not found.", 404);
@@ -94,5 +107,9 @@ export async function removeAuditLog(id, user) {
     );
   }
 
-  await deleteAuditLog(id);
+  const organizationId = log.organizationId;
+
+  await withTenant(organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    deleteAuditLog(id, tx)
+  );
 }

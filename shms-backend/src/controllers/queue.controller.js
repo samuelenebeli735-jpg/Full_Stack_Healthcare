@@ -7,6 +7,7 @@ import {
   getQueueById,
   getMyQueue,
   callNextPatient,
+  skipPatient,
   startConsultation,
   completeConsultation,
 } from "../services/queue.service.js";
@@ -43,6 +44,12 @@ export const callNext = asyncHandler(async (req, res) => {
   const result = await callNextPatient(req.params.organizationId, req.user);
 
   return successResponse(res, result, "Next patient called successfully.");
+});
+
+export const skip = asyncHandler(async (req, res) => {
+  const result = await skipPatient(req.params.organizationId, req.user);
+
+  return successResponse(res, result, "Patient skipped successfully.");
 });
 
 export const start = asyncHandler(async (req, res) => {

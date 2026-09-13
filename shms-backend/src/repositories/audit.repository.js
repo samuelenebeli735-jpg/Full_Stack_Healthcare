@@ -1,7 +1,8 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
-export async function createAuditLog(data, db = prisma) {
+export async function createAuditLog(data, db = getTenantClient()) {
   return await db.auditLog.create({
     data,
     include: {
@@ -17,7 +18,7 @@ export async function createAuditLog(data, db = prisma) {
   });
 }
 
-export async function findAuditLogById(id, db = prisma) {
+export async function findAuditLogById(id, db = getTenantClient()) {
   return await db.auditLog.findUnique({
     where: { id },
     include: {
@@ -36,7 +37,7 @@ export async function findAuditLogById(id, db = prisma) {
 export async function findAuditLogs(
   organizationId = null,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["createdAt"],
@@ -78,7 +79,7 @@ export async function findAuditLogs(
 export async function findAuditLogsByOrganization(
   organizationId,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["createdAt"],
@@ -116,7 +117,7 @@ export async function findAuditLogsByOrganization(
   return { items, total };
 }
 
-export async function deleteAuditLog(id, db = prisma) {
+export async function deleteAuditLog(id, db = getTenantClient()) {
   return await db.auditLog.delete({
     where: { id },
   });

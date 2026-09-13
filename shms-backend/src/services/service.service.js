@@ -2,6 +2,7 @@ import AppError from "../utils/AppError.js";
 import {
   resolveOrganizationId,
 } from "../utils/tenantAccess.js";
+import { withTenant } from "../utils/tenantContext.js";
 import {
   getPagination,
   buildPaginationMeta,
@@ -26,16 +27,18 @@ export async function createNewService(data, user) {
     user.role === "super_admin"
       ? data.organizationId
       : user.organizationId;
+  const isSuperAdmin = user.role === "super_admin";
 
-  const organization = await findOrganizationById(organizationId);
+  const organization = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findOrganizationById(organizationId, tx)
+  );
 
   if (!organization) {
     throw new AppError("Organization not found.", 404);
   }
 
-  const existingService = await findServiceByCode(
-    organizationId,
-    data.code
+  const existingService = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findServiceByCode(organizationId, data.code, tx)
   );
 
   if (existingService) {
@@ -45,13 +48,15 @@ export async function createNewService(data, user) {
     );
   }
 
-  const service = await createService({
-    organizationId,
-    name: data.name,
-    code: data.code,
-    description: data.description,
-    estimatedDuration: data.estimatedDuration,
-  });
+  const service = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    createService({
+      organizationId,
+      name: data.name,
+      code: data.code,
+      description: data.description,
+      estimatedDuration: data.estimatedDuration,
+    }, tx)
+  );
 
   await auditLogger({
     organizationId,
@@ -68,9 +73,13 @@ export async function createNewService(data, user) {
 export async function getOrganizationServices(organizationId, user, query = {}) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
+  const isSuperAdmin = user.role === "super_admin";
+
   const { page, limit, skip } = getPagination(query);
 
-  const { items, total } = await findServicesByOrganization(resolvedOrgId, query);
+  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
+    findServicesByOrganization(resolvedOrgId, query, tx)
+  );
 
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
 }
@@ -78,7 +87,9 @@ export async function getOrganizationServices(organizationId, user, query = {}) 
 export async function getServiceById(id, organizationId, user) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
-  const service = await findServiceById(id);
+  const service = await withTenant(resolvedOrgId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findServiceById(id, tx)
+  );
 
   if (!service || service.organizationId !== resolvedOrgId) {
     throw new AppError("Service not found.", 404);
@@ -88,7 +99,11 @@ export async function getServiceById(id, organizationId, user) {
 }
 
 export async function updateExistingService(id, data, user) {
-  const service = await findServiceById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const service = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findServiceById(id, tx)
+  );
 
   if (!service) {
     throw new AppError("Service not found.", 404);
@@ -101,10 +116,11 @@ export async function updateExistingService(id, data, user) {
     throw new AppError("Service not found.", 404);
   }
 
+  const organizationId = service.organizationId;
+
   if (data.code !== undefined && data.code !== service.code) {
-    const existingService = await findServiceByCode(
-      service.organizationId,
-      data.code
+    const existingService = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+      findServiceByCode(organizationId, data.code, tx)
     );
 
     if (existingService) {
@@ -122,10 +138,12 @@ export async function updateExistingService(id, data, user) {
   if (data.description !== undefined) updateData.description = data.description;
   if (data.estimatedDuration !== undefined) updateData.estimatedDuration = data.estimatedDuration;
 
-  const updated = await updateService(id, updateData);
+  const updated = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    updateService(id, updateData, tx)
+  );
 
   await auditLogger({
-    organizationId: service.organizationId,
+    organizationId,
     userId: user.id,
     action: "UPDATE",
     entity: "Service",
@@ -137,7 +155,11 @@ export async function updateExistingService(id, data, user) {
 }
 
 export async function removeService(id, user) {
-  const service = await findServiceById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const service = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findServiceById(id, tx)
+  );
 
   if (!service) {
     throw new AppError("Service not found.", 404);
@@ -150,8 +172,12 @@ export async function removeService(id, user) {
     throw new AppError("Service not found.", 404);
   }
 
+  const organizationId = service.organizationId;
+
   try {
-    await deleteService(id);
+    await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+      deleteService(id, tx)
+    );
   } catch (error) {
     if (error.code === "P2003") {
       throw new AppError(
@@ -163,7 +189,7 @@ export async function removeService(id, user) {
   }
 
   await auditLogger({
-    organizationId: service.organizationId,
+    organizationId,
     userId: user.id,
     action: "DELETE",
     entity: "Service",

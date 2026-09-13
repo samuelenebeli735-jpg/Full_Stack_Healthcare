@@ -16,6 +16,7 @@ import {
   getQueue,
   getMyQueueController,
   callNext,
+  skip,
   start,
   complete,
 } from "../controllers/queue.controller.js";
@@ -71,6 +72,17 @@ router.post(
   authorize("staff", "admin", "super_admin"),
   validate({ params: organizationQueueSchema }),
   callNext
+);
+
+/**
+ * Skip current patient.
+ */
+router.post(
+  "/skip/:organizationId",
+  authenticate,
+  authorize("staff", "admin", "super_admin"),
+  validate({ params: organizationQueueSchema }),
+  skip
 );
 
 /**

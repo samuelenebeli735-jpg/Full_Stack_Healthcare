@@ -1,5 +1,5 @@
-import prisma from "../config/db.js";
 import AppError from "../utils/AppError.js";
+import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import {
   getPagination,
@@ -22,7 +22,11 @@ import {
 } from "../repositories/consultation.repository.js";
 
 export async function createNewPrescription(data, user) {
-  const consultation = await findConsultationById(data.consultationId);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const consultation = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findConsultationById(data.consultationId, tx)
+  );
 
   if (!consultation) {
     throw new AppError("Consultation not found.", 404);
@@ -35,8 +39,10 @@ export async function createNewPrescription(data, user) {
     throw new AppError("Consultation not found.", 404);
   }
 
-  const existingPrescription = await findPrescriptionByConsultation(
-    data.consultationId
+  const organizationId = consultation.queue.organizationId;
+
+  const existingPrescription = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findPrescriptionByConsultation(data.consultationId, tx)
   );
 
   if (existingPrescription) {
@@ -57,7 +63,7 @@ export async function createNewPrescription(data, user) {
     );
   }
 
-  const prescription = await prisma.$transaction(async (tx) => {
+  const prescription = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
     const createdPrescription = await createPrescription(
       { consultationId: data.consultationId },
       tx
@@ -95,14 +101,19 @@ export async function getAllPrescriptions(user, query = {}) {
   const { page, limit, skip } = getPagination(query);
   const organizationId =
     user.role === "super_admin" ? null : user.organizationId;
+  const isSuperAdmin = user.role === "super_admin";
 
-  const { items, total } = await findPrescriptions(organizationId, query);
+  const { items, total } = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findPrescriptions(organizationId, query, tx)
+  );
 
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
 }
 
 export async function getPrescriptionById(id, user) {
-  const prescription = await findPrescriptionById(id);
+  const prescription = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findPrescriptionById(id, tx)
+  );
 
   if (!prescription) {
     throw new AppError("Prescription not found.", 404);
@@ -119,7 +130,11 @@ export async function getPrescriptionById(id, user) {
 }
 
 export async function updateExistingPrescription(id, data, user) {
-  const prescription = await findPrescriptionById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const prescription = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findPrescriptionById(id, tx)
+  );
 
   if (!prescription) {
     throw new AppError("Prescription not found.", 404);
@@ -132,6 +147,8 @@ export async function updateExistingPrescription(id, data, user) {
     throw new AppError("Prescription not found.", 404);
   }
 
+  const organizationId = prescription.consultation.queue.organizationId;
+
   if (
     !data.items ||
     !Array.isArray(data.items) ||
@@ -143,7 +160,7 @@ export async function updateExistingPrescription(id, data, user) {
     );
   }
 
-  const updatedPrescription = await prisma.$transaction(async (tx) => {
+  const updatedPrescription = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
     await updatePrescription(id, {}, tx);
     await deletePrescriptionItems(id, tx);
     await createPrescriptionItems(
@@ -176,7 +193,11 @@ export async function updateExistingPrescription(id, data, user) {
 }
 
 export async function removePrescription(id, user) {
-  const prescription = await findPrescriptionById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const prescription = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findPrescriptionById(id, tx)
+  );
 
   if (!prescription) {
     throw new AppError("Prescription not found.", 404);
@@ -189,7 +210,11 @@ export async function removePrescription(id, user) {
     throw new AppError("Prescription not found.", 404);
   }
 
-  await deletePrescription(id);
+  const organizationId = prescription.consultation.queue.organizationId;
+
+  await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    deletePrescription(id, tx)
+  );
 
   await auditLogger({
     organizationId:

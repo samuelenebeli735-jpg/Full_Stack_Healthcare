@@ -86,7 +86,10 @@
     .lr-field{margin-bottom:20px}
     .lr-field label{display:block;font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:6px}
     .lr-input-wrap{position:relative}
-    .lr-input-wrap svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--text-light);pointer-events:none}
+    .lr-input-wrap > svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);width:18px;height:18px;color:var(--text-light);pointer-events:none}
+    .lr-input-wrap .toggle-pw svg{
+      position:static;left:auto;top:auto;transform:none;width:18px;height:18px;pointer-events:none;
+    }
     .lr-input-wrap input{
       width:100%;padding:12px 14px 12px 42px;border:1.5px solid var(--border);
       border-radius:var(--radius);font-size:14px;background:var(--bg-primary);
@@ -139,17 +142,6 @@
     .lr-footer-links a{color:var(--text-secondary);text-decoration:none;margin:0 6px}
     .lr-footer-links a:hover{color:var(--text-primary)}
     .lr-footer-links .sep{margin:0 2px}
-
-    .role-tabs{display:flex;gap:6px;margin-bottom:20px}
-    .role-tab{
-      flex:1;padding:10px 12px;font-size:12px;font-weight:600;cursor:pointer;
-      border:1.5px solid var(--border);border-radius:8px;background:var(--bg-primary);
-      color:var(--text-secondary);transition:all 0.3s;text-align:center;
-      display:flex;align-items:center;justify-content:center;gap:6px;
-    }
-    .role-tab:hover{border-color:#10b981;color:#10b981}
-    .role-tab.active{border-color:#10b981;background:#f0fdf4;color:#10b981}
-    .role-tab svg{width:16px;height:16px;flex-shrink:0}
 
     .login-tabs{display:flex;gap:0;margin-bottom:20px;border:1.5px solid var(--border);border-radius:8px;overflow:hidden}
     .login-tab{
@@ -215,15 +207,9 @@
     </div>
     <div class="login-right">
       <div class="lr-form">
-        <div class="lr-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Secure student login</div>
+        <div class="lr-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Secure portal login</div>
         <h2 id="authTitle">Welcome back</h2>
-        <div class="subtitle" id="authSubtitle">New here? <a href="register.html">Ask your school to set up access</a></div>
-
-        <div class="role-tabs" id="roleTabs">
-          <button class="role-tab active" data-role="student"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Student</button>
-          <button class="role-tab" data-role="staff"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg> Staff</button>
-          <button class="role-tab" data-role="admin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Admin</button>
-        </div>
+        <div class="subtitle" id="authSubtitle">New here? <a href="register.html">Create Account</a></div>
 
         <div class="login-tabs" id="loginModeTabs">
           <button class="login-tab active" data-mode="email">Email</button>
@@ -232,10 +218,10 @@
 
         <form class="auth-form" id="loginForm" novalidate>
           <div class="lr-field" id="emailField">
-            <label for="email">Student ID or email</label>
+            <label for="email">Email</label>
             <div class="lr-input-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              <input type="email" id="email" placeholder="STU-04821 or amara@school.edu" autocomplete="email">
+              <input type="email" id="email" name="email" placeholder="you@school.edu" autocomplete="email" required>
             </div>
           </div>
           <div class="lr-field" id="idField" style="display:none">
@@ -250,7 +236,7 @@
             <div class="lr-input-wrap">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
-              <button type="button" class="toggle-password toggle-pw" aria-label="Toggle password visibility">
+              <button type="button" class="toggle-password toggle-pw" data-target="password" aria-label="Show password">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
@@ -278,72 +264,25 @@
     </div>
   </div>
 
-  <script src="js/config.js"></script>
+  <script src="js/config.js?v=2"></script>
   <script src="js/api.js"></script>
   <script src="js/utils.js"></script>
   <script src="js/auth.js"></script>
   <script>
-    const roleConfig = {
-      student: {
-        title: 'Student Portal', sub: 'Sign in to access your health services', badge: 'Student',
-        icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
-        cls: '',
-        idLabel: 'Matric Number', idPlaceholder: 'e.g. STU001', idMode: 'Login with Matric No.',
-        idApiField: 'matric',
-        idIcon: '<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>'
-      },
-      staff: {
-        title: 'Staff Portal', sub: 'Sign in to manage patients and queues', badge: 'Staff',
-        icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/><circle cx="12" cy="12" r="3"/>',
-        cls: 'theme-staff',
-        idLabel: 'Staff ID', idPlaceholder: 'e.g. SFT042', idMode: 'Login with Staff ID',
-        idApiField: 'staff_id',
-        idIcon: '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>'
-      },
-      admin: {
-        title: 'Admin Dashboard', sub: 'Sign in to manage the health center', badge: 'Administrator',
-        icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-        cls: 'theme-admin',
-        idLabel: 'Admin ID', idPlaceholder: 'e.g. ADM001', idMode: 'Login with Admin ID',
-        idApiField: 'admin_id',
-        idIcon: '<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'
-      },
-    };
-
     document.addEventListener('DOMContentLoaded', () => {
       Auth.redirectIfAuthenticated();
       Auth.initLoginForm('loginForm');
-
-      document.querySelectorAll('.role-tab').forEach(tab => {
-        tab.addEventListener('click', () => {
-          document.querySelectorAll('.role-tab').forEach(t => t.classList.remove('active'));
-          tab.classList.add('active');
-          const role = tab.dataset.role;
-          const cfg = roleConfig[role] || roleConfig.student;
-          document.querySelector('.auth-page')?.classList.add(cfg.cls);
-          document.getElementById('authTitle').textContent = cfg.title;
-          document.getElementById('authSubtitle').innerHTML = role === 'student'
-            ? 'New here? <a href="register.html">Ask your school to set up access</a>'
-            : cfg.sub;
-          const badge = document.querySelector('.lr-badge');
-          if (badge) badge.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Secure ' + cfg.badge.toLowerCase() + ' login';
-          document.getElementById('idLabel').textContent = cfg.idLabel;
-          document.getElementById('idInput').placeholder = cfg.idPlaceholder;
-          document.getElementById('loginModeTabs').children[1].textContent = cfg.idMode;
-          document.getElementById('idIcon').innerHTML = cfg.idIcon.toLowerCase();
-          const mode = document.querySelector('.login-tab.active')?.dataset.mode;
-          document.getElementById('emailField').style.display = mode === 'email' ? 'block' : 'none';
-          document.getElementById('idField').style.display = mode === 'id' ? 'block' : 'none';
-        });
-      });
+      Auth.initPasswordToggle();
 
       document.querySelectorAll('.login-tab').forEach(tab => {
         tab.addEventListener('click', () => {
           document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
           const mode = tab.dataset.mode;
-          document.getElementById('emailField').style.display = mode === 'email' ? 'block' : 'none';
-          document.getElementById('idField').style.display = mode === 'id' ? 'block' : 'none';
+          const emailField = document.getElementById('emailField');
+          const idField = document.getElementById('idField');
+          if (emailField) emailField.style.display = mode === 'email' ? 'block' : 'none';
+          if (idField) idField.style.display = mode === 'id' ? 'block' : 'none';
         });
       });
     });

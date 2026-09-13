@@ -20,7 +20,13 @@ const app = express();
 |--------------------------------------------------------------------------
 */
 
-const defaultOrigins = [env.FRONTEND_URL, "http://localhost:5500", "http://127.0.0.1:5500"].filter(Boolean);
+const defaultOrigins = [
+  env.FRONTEND_URL,
+  "http://localhost:5500",
+  "http://127.0.0.1:5500",
+  "http://localhost:8080",
+  "http://127.0.0.1:8080",
+].filter(Boolean);
 
 const allowedOrigins = env.CORS_ORIGINS
   ? env.CORS_ORIGINS.split(",").map((o) => o.trim())
@@ -29,7 +35,7 @@ const allowedOrigins = env.CORS_ORIGINS
 app.use(cors({
   origin: allowedOrigins,
   credentials: true,
-  methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 

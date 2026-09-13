@@ -204,6 +204,10 @@
               <div class="card-body" id="deptPerformance"></div>
             </div>
             <div class="card">
+              <div class="card-header"><h3>Patient Demographics</h3></div>
+              <div class="card-body" id="patientDemographics"></div>
+            </div>
+            <div class="card">
               <div class="card-header"><h3>Top Conditions</h3></div>
               <div class="card-body" id="topConditions"></div>
             </div>
@@ -247,9 +251,9 @@
     </div>
   </div>
   <script src="../js/config.js"></script>
-  <script src="../js/api.js"></script>
+  <script src="../js/api.js?v=3"></script>
   <script src="../js/utils.js"></script>
-  <script src="../js/auth.js"></script>
+  <script src="../js/auth.js?v=3"></script>
   <script>
     let adminDoctors = [];
     let adminStudents = [];
@@ -595,10 +599,13 @@
           <div class="stat-card red"><div class="stat-card-header"><span class="stat-card-label">No Shows</span></div><div class="stat-card-value">${d.monthly_summary.no_show}</div></div>
         `;
         const deptDiv = document.getElementById('deptPerformance');
-        deptDiv.innerHTML = '';
-        d.department_breakdown.forEach(dept => {
-          deptDiv.innerHTML += `<div class="flex-between mb-sm"><span style="font-size:14px">${dept.dept}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${dept.patients} patients &middot; ${dept.satisfaction}%</span></div><div class="progress-bar mb-md"><div class="progress-bar-fill success" style="width:${dept.satisfaction}%"></div></div>`;
-        });
+        deptDiv.innerHTML = d.department_breakdown.length
+          ? d.department_breakdown.map(dept => `<div class="flex-between mb-sm"><span style="font-size:14px">${dept.dept}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${dept.patients} patients &middot; ${dept.satisfaction}%</span></div><div class="progress-bar mb-md"><div class="progress-bar-fill success" style="width:${dept.satisfaction}%"></div></div>`).join('')
+          : '<div class="empty-state"><p>Department performance data is not available.</p></div>';
+        const demographics = document.getElementById('patientDemographics');
+        demographics.innerHTML = d.patient_demographics.length
+          ? d.patient_demographics.map(group => `<div class="flex-between mb-sm"><span style="font-size:14px">${group.label}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${group.value} patients</span></div>`).join('')
+          : '<div class="empty-state"><p>No patient demographic data available.</p></div>';
         const condDiv = document.getElementById('topConditions');
         condDiv.innerHTML = '';
         d.top_conditions.forEach(c => {
@@ -628,6 +635,7 @@
       if (!Auth.requireAuth()) return;
       const verify = await Auth.verifySession();
       if (!verify.success) { Auth.logout(); return; }
+      if (!Auth.requireRole(['admin', 'super_admin'])) return;
       Auth.updateUI(verify.user);
       document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('');
       document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Admin Dashboard');

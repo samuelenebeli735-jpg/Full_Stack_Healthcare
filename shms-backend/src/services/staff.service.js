@@ -1,10 +1,11 @@
-import prisma from "../config/db.js";
 import AppError from "../utils/AppError.js";
+import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import {
   getPagination,
   buildPaginationMeta,
 } from "../utils/pagination.js";
+import { resolveOrganizationId } from "../utils/tenantAccess.js";
 
 import {
   findStaffById,
@@ -38,8 +39,11 @@ export async function createNewStaff(data, user) {
     user.role === "super_admin"
       ? data.organizationId
       : user.organizationId;
+  const isSuperAdmin = user.role === "super_admin";
 
-  const department = await findDepartmentById(data.departmentId);
+  const department = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findDepartmentById(data.departmentId, tx)
+  );
 
   if (!department) {
     throw new AppError("Department not found.", 404);
@@ -49,7 +53,9 @@ export async function createNewStaff(data, user) {
     throw new AppError("Department not found.", 404);
   }
 
-  const position = await findPositionById(data.positionId);
+  const position = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findPositionById(data.positionId, tx)
+  );
 
   if (!position) {
     throw new AppError("Position not found.", 404);
@@ -73,14 +79,13 @@ export async function createNewStaff(data, user) {
   // Retry on the unique staffNumber constraint so concurrent creates
   // get distinct numbers instead of a generic 409.
   for (let attempt = 0; attempt < 5; attempt++) {
-    const { total } = await findStaffByOrganization(organizationId, {
-      skip: 0,
-      limit: 1,
-    });
+    const { total } = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+      findStaffByOrganization(organizationId, { skip: 0, limit: 1 }, tx)
+    );
     staffNumber = `RUN-STF-${String(total + 1).padStart(6, "0")}`;
 
     try {
-      result = await prisma.$transaction(async (tx) => {
+      result = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
         const newUser = await createUser(
           {
             organizationId,
@@ -133,16 +138,15 @@ export async function createNewStaff(data, user) {
 }
 
 export async function getOrganizationStaff(organizationId, user, query = {}) {
-  // null means "all organizations" for super_admin; the repository
-  // only filters by organizationId when it is provided.
-  const resolvedOrgId =
-    user.role === "super_admin"
-      ? organizationId ?? null
-      : user.organizationId;
+  const resolvedOrgId = resolveOrganizationId(organizationId, user);
+
+  const isSuperAdmin = user.role === "super_admin";
 
   const { page, limit, skip } = getPagination(query);
 
-  const { items, total } = await findStaffByOrganization(resolvedOrgId, query);
+  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
+    findStaffByOrganization(resolvedOrgId, query, tx)
+  );
 
   if (user.role === "student") {
     const safeItems = items.map((staff) => ({
@@ -169,7 +173,9 @@ export async function getOrganizationStaff(organizationId, user, query = {}) {
 }
 
 export async function getStaffById(id, user) {
-  const staff = await findStaffById(id);
+  const staff = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findStaffById(id, tx)
+  );
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -183,7 +189,11 @@ export async function getStaffById(id, user) {
 }
 
 export async function updateExistingStaff(id, data, user) {
-  const staff = await findStaffById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const staff = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findStaffById(id, tx)
+  );
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -199,14 +209,18 @@ export async function updateExistingStaff(id, data, user) {
   }
 
   if (data.departmentId) {
-    const department = await findDepartmentById(data.departmentId);
+    const department = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+      findDepartmentById(data.departmentId, tx)
+    );
     if (!department || department.organizationId !== organizationId) {
       throw new AppError("Department not found.", 404);
     }
   }
 
   if (data.positionId) {
-    const position = await findPositionById(data.positionId);
+    const position = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+      findPositionById(data.positionId, tx)
+    );
     if (!position || position.organizationId !== organizationId) {
       throw new AppError("Position not found.", 404);
     }
@@ -228,7 +242,9 @@ export async function updateExistingStaff(id, data, user) {
     }
   }
 
-  const updated = await updateStaff(id, updateData);
+  const updated = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    updateStaff(id, updateData, tx)
+  );
 
   await auditLogger({
     organizationId: staff.user.organizationId,
@@ -243,7 +259,11 @@ export async function updateExistingStaff(id, data, user) {
 }
 
 export async function removeStaff(id, user) {
-  const staff = await findStaffById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const staff = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findStaffById(id, tx)
+  );
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -253,8 +273,10 @@ export async function removeStaff(id, user) {
     throw new AppError("Staff not found.", 404);
   }
 
+  const organizationId = staff.user.organizationId;
+
   try {
-    await prisma.$transaction(async (tx) => {
+    await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
       await deleteStaff(id, tx);
       await tx.user.update({
         where: { id: staff.userId },

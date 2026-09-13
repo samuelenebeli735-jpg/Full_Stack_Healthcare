@@ -3,6 +3,7 @@ import AppError from "../utils/AppError.js";
 import {
   resolveOrganizationId,
 } from "../utils/tenantAccess.js";
+import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 
 import validateSchedule from "../utils/scheduleValidator.js";
@@ -167,7 +168,7 @@ export async function createNewAppointment(data, user) {
   const appointmentDate = new Date(data.appointmentDate);
   validateAppointmentDate(appointmentDate);
 
-  return await prisma.$transaction(async (tx) => {
+  return await withTenant(organizationId, { isSuperAdmin: user.role === "super_admin" }, async (tx) => {
     const organization = await findOrganizationById(organizationId, tx);
 
     if (!organization) {
@@ -214,7 +215,9 @@ export async function createNewAppointment(data, user) {
 export async function getAppointmentById(id, organizationId, user) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
-  const appointment = await findAppointmentById(id);
+  const appointment = await withTenant(resolvedOrgId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findAppointmentById(id, tx)
+  );
 
   if (!appointment || appointment.organizationId !== resolvedOrgId) {
     throw new AppError("Appointment not found.", 404);
@@ -224,7 +227,11 @@ export async function getAppointmentById(id, organizationId, user) {
 }
 
 export async function updateExistingAppointment(id, data, user) {
-  const appointment = await findAppointmentById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const appointment = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findAppointmentById(id, tx)
+  );
 
   if (!appointment) {
     throw new AppError("Appointment not found.", 404);
@@ -243,7 +250,7 @@ export async function updateExistingAppointment(id, data, user) {
     assertValidTransition(appointment.status, data.status);
   }
 
-  return await prisma.$transaction(async (tx) => {
+  return await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
     const updateData = {};
 
     if (data.appointmentDate !== undefined) {
@@ -305,7 +312,11 @@ export async function updateExistingAppointment(id, data, user) {
 }
 
 export async function removeAppointment(id, user) {
-  const appointment = await findAppointmentById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const appointment = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findAppointmentById(id, tx)
+  );
 
   if (!appointment) {
     throw new AppError("Appointment not found.", 404);
@@ -316,7 +327,9 @@ export async function removeAppointment(id, user) {
   }
 
   try {
-    await deleteAppointment(id);
+    await withTenant(appointment.organizationId, { isSuperAdmin }, (tx) =>
+      deleteAppointment(id, tx)
+    );
   } catch (error) {
     if (error.code === "P2003") {
       throw new AppError(
@@ -348,9 +361,11 @@ export async function getOrganizationAppointments(
       user
     );
 
+  const isSuperAdmin = user.role === "super_admin";
+
   const organization =
-    await findOrganizationById(
-      resolvedOrgId
+    await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
+      findOrganizationById(resolvedOrgId, tx)
     );
 
   if (!organization) {
@@ -369,9 +384,12 @@ export async function getOrganizationAppointments(
   const {
     items,
     total,
-  } = await findAppointmentsByOrganization(
-    resolvedOrgId,
-    query
+  } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
+    findAppointmentsByOrganization(
+      resolvedOrgId,
+      query,
+      tx
+    )
   );
 
   return {
@@ -393,9 +411,12 @@ export async function getMyAppointments(user, query = {}) {
   const {
     items,
     total,
-  } = await findAppointmentsByStudent(
-    user.id,
-    query
+  } = await withTenant(user.organizationId, (tx) =>
+    findAppointmentsByStudent(
+      user.id,
+      query,
+      tx
+    )
   );
 
   return {

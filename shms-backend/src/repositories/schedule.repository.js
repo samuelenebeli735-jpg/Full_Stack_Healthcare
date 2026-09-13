@@ -1,9 +1,10 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 
 /**
  * Find schedule by ID.
  */
-export async function findScheduleById(id, db = prisma) {
+export async function findScheduleById(id, db = getTenantClient()) {
   return await db.schedule.findUnique({
     where: {
       id,
@@ -21,7 +22,7 @@ export async function findScheduleById(id, db = prisma) {
 export async function findScheduleByStaffAndDay(
   staffId,
   dayOfWeek,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.schedule.findUnique({
     where: {
@@ -42,7 +43,7 @@ export async function findScheduleByStaffAndDay(
  */
 export async function findSchedulesByStaff(
   staffId,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.schedule.findMany({
     where: {
@@ -64,7 +65,7 @@ export async function findSchedulesByStaff(
 export async function findSchedulesByDay(
   organizationId,
   dayOfWeek,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.schedule.findMany({
     where: {
@@ -86,7 +87,7 @@ export async function findSchedulesByDay(
  */
 export async function findSchedulesByOrganization(
   organizationId,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.schedule.findMany({
     where: {
@@ -105,7 +106,7 @@ export async function findSchedulesByOrganization(
  */
 export async function createSchedule(
   data,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.schedule.create({
     data,
@@ -122,7 +123,7 @@ export async function createSchedule(
 export async function updateSchedule(
   id,
   data,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.schedule.update({
     where: {
@@ -141,7 +142,7 @@ export async function updateSchedule(
  */
 export async function deleteSchedule(
   id,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.schedule.delete({
     where: {

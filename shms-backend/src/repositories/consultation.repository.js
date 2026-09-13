@@ -1,4 +1,5 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
 const consultationInclude = {
@@ -15,14 +16,14 @@ const consultationInclude = {
   },
 };
 
-export async function findConsultationById(id, db = prisma) {
+export async function findConsultationById(id, db = getTenantClient()) {
   return await db.consultation.findUnique({
     where: { id },
     include: consultationInclude,
   });
 }
 
-export async function findConsultationByQueueId(queueId, db = prisma) {
+export async function findConsultationByQueueId(queueId, db = getTenantClient()) {
   return await db.consultation.findUnique({
     where: { queueId },
     include: consultationInclude,
@@ -32,7 +33,7 @@ export async function findConsultationByQueueId(queueId, db = prisma) {
 export async function findConsultations(
   organizationId = null,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["consultationDate", "createdAt", "updatedAt"],
@@ -64,14 +65,14 @@ export async function findConsultations(
   return { items, total };
 }
 
-export async function createConsultation(data, db = prisma) {
+export async function createConsultation(data, db = getTenantClient()) {
   return await db.consultation.create({
     data,
     include: consultationInclude,
   });
 }
 
-export async function updateConsultation(id, data, db = prisma) {
+export async function updateConsultation(id, data, db = getTenantClient()) {
   return await db.consultation.update({
     where: { id },
     data,
@@ -79,7 +80,7 @@ export async function updateConsultation(id, data, db = prisma) {
   });
 }
 
-export async function deleteConsultation(id, db = prisma) {
+export async function deleteConsultation(id, db = getTenantClient()) {
   return await db.consultation.delete({
     where: { id },
   });

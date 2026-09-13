@@ -9,11 +9,21 @@
   }
 
   var configuredBase = window.SHMS_API_BASE;
-  var fallbackBase = window.location && window.location.origin
+  var fallbackBase = window.location && window.location.hostname === '127.0.0.1'
+    ? 'http://127.0.0.1:5000/api/v1'
+    : window.location && window.location.hostname === 'localhost'
+      ? 'http://localhost:5000/api/v1'
+      : window.location && window.location.origin
+        ? window.location.origin + '/api/v1'
+        : '/api/v1';
+  var sameOriginBase = window.location && window.location.origin
     ? window.location.origin + '/api/v1'
-    : '/api/v1';
+    : '';
+  var isLocalHost = window.location
+    && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+  var useConfiguredBase = !isLocalHost && configuredBase && String(configuredBase).trim();
 
-  window.SHMS_API_BASE = configuredBase && String(configuredBase).trim()
+  window.SHMS_API_BASE = useConfiguredBase
     ? String(configuredBase).trim()
     : fallbackBase;
 })();

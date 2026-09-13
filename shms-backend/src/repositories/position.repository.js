@@ -1,13 +1,14 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
-export async function findPositionById(id, db = prisma) {
+export async function findPositionById(id, db = getTenantClient()) {
   return await db.position.findUnique({
     where: { id },
   });
 }
 
-export async function findPositionByCode(organizationId, code, db = prisma) {
+export async function findPositionByCode(organizationId, code, db = getTenantClient()) {
   return await db.position.findUnique({
     where: {
       organizationId_code: { organizationId, code },
@@ -18,7 +19,7 @@ export async function findPositionByCode(organizationId, code, db = prisma) {
 export async function findPositionsByOrganization(
   organizationId = null,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["name", "code", "createdAt", "updatedAt"],
@@ -44,14 +45,14 @@ export async function findPositionsByOrganization(
   return { items, total };
 }
 
-export async function createPosition(data, db = prisma) {
+export async function createPosition(data, db = getTenantClient()) {
   return await db.position.create({ data });
 }
 
-export async function updatePosition(id, data, db = prisma) {
+export async function updatePosition(id, data, db = getTenantClient()) {
   return await db.position.update({ where: { id }, data });
 }
 
-export async function deletePosition(id, db = prisma) {
+export async function deletePosition(id, db = getTenantClient()) {
   return await db.position.delete({ where: { id } });
 }

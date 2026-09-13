@@ -341,22 +341,15 @@
   <script src="js/auth.js"></script>
   <script>
     async function loadQueueData() {
+      if (!Auth.isAuthenticated()) return;
       try {
         const res = await API.getQueue();
         if (res.success) {
           const q = res.data;
-          document.getElementById('queueTicket').textContent = q.ticket_number;
-          document.getElementById('qCurrentServing').textContent = q.current_serving;
-          document.getElementById('qPatientsAhead').textContent = q.patients_ahead;
-          document.getElementById('qEstWait').textContent = q.estimated_wait_minutes + ' min';
-          const total = (q.patients_ahead + q.position) || 1;
-          const progress = Math.max(5, Math.min(95, ((total - q.patients_ahead) / total) * 100));
-          document.getElementById('qProgressFill').style.width = progress + '%';
-          document.getElementById('qProgressText').textContent = `${total - q.patients_ahead} of ${total}`;
-          document.getElementById('qProgressMid').textContent = (total - q.patients_ahead) + ' done';
-          document.getElementById('qProgressTotal').textContent = total + ' total';
-          document.getElementById('qCompleted').textContent = total - q.patients_ahead - 1;
-          document.getElementById('qWaiting').textContent = q.patients_ahead;
+          document.getElementById('queueTicket').textContent = q.ticket_number || '--';
+          document.getElementById('qCurrentServing').textContent = q.current_serving || '--';
+          document.getElementById('qPatientsAhead').textContent = q.patients_ahead || 0;
+          document.getElementById('qEstWait').textContent = (q.estimated_wait_minutes || 0) + ' min';
         }
       } catch (e) {}
       try {
@@ -365,19 +358,36 @@
         container.innerHTML = '';
         if (listRes.success) {
           const items = listRes.data || [];
+          let completed = 0, inProgress = 0, waiting = 0;
           items.forEach(item => {
+            if (item.status === 'completed') completed++;
+            else if (item.status === 'in_consultation' || item.status === 'serving') inProgress++;
+            else waiting++;
             const div = document.createElement('div');
             div.className = 'queue-list-item' + (item.patient === 'You' ? ' highlight' : '');
-            const statusColors = { serving: 'success', waiting: 'warning' };
+            const statusColors = { serving: 'success', in_consultation: 'success', waiting: 'warning', checked_in: 'info' };
             div.innerHTML = `
               <span class="qli-ticket">${item.ticket}</span>
               <span class="qli-patient">${Utils.sanitize(item.patient)}</span>
-              <span class="qli-status badge badge-${statusColors[item.status] || 'neutral'}">${Utils.capitalize(item.status)}</span>
+              <span class="qli-status badge badge-${statusColors[item.status] || 'neutral'}">${Utils.capitalize(item.status || '').replace('_', ' ')}</span>
             `;
             container.appendChild(div);
           });
+          const total = items.length;
+          document.getElementById('qTotalToday').textContent = total;
+          document.getElementById('qTotalSub').textContent = completed + ' seen · ' + waiting + ' remaining';
+          document.getElementById('qCompleted').textContent = completed;
+          document.getElementById('qInProgress').textContent = inProgress;
+          document.getElementById('qWaiting').textContent = waiting;
+          const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+          document.getElementById('qCompletionRate').textContent = pct + '%';
+          document.getElementById('qCompletionSub').textContent = total > 0 ? (total - completed) + ' remaining' : 'No data';
+          document.getElementById('qProgressText').textContent = completed + ' / ' + total + ' completed';
+          document.getElementById('qProgressFill').style.width = pct + '%';
+          document.getElementById('qProgressMid').textContent = completed + ' done';
+          document.getElementById('qProgressTotal').textContent = total + ' total';
           const footer = document.getElementById('qmFooterText');
-          if (footer) footer.textContent = 'Showing ' + items.length + ' queue entries today';
+          if (footer) footer.textContent = 'Showing ' + total + ' queue entries today';
         }
       } catch (e) {}
     }

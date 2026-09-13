@@ -1,7 +1,8 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
-export async function findMedicalRecordByProfileId(profileId, db = prisma) {
+export async function findMedicalRecordByProfileId(profileId, db = getTenantClient()) {
   return await db.medicalRecord.findUnique({
     where: { profileId },
     include: {
@@ -22,7 +23,7 @@ export async function findMedicalRecordByProfileId(profileId, db = prisma) {
   });
 }
 
-export async function findMedicalRecordById(id, db = prisma) {
+export async function findMedicalRecordById(id, db = getTenantClient()) {
   return await db.medicalRecord.findUnique({
     where: { id },
     include: {
@@ -43,7 +44,7 @@ export async function findMedicalRecordById(id, db = prisma) {
   });
 }
 
-export async function findMedicalRecordByRecordNumber(recordNumber, db = prisma) {
+export async function findMedicalRecordByRecordNumber(recordNumber, db = getTenantClient()) {
   return await db.medicalRecord.findUnique({
     where: { recordNumber },
     include: {
@@ -64,7 +65,7 @@ export async function findMedicalRecordByRecordNumber(recordNumber, db = prisma)
   });
 }
 
-export async function countMedicalRecordsByYear(recordYear, db = prisma) {
+export async function countMedicalRecordsByYear(recordYear, db = getTenantClient()) {
   return await db.medicalRecord.count({
     where: { recordYear },
   });
@@ -73,7 +74,7 @@ export async function countMedicalRecordsByYear(recordYear, db = prisma) {
 export async function findMedicalRecords(
   organizationId = null,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["recordNumber", "recordYear", "status", "createdAt"],
@@ -118,7 +119,7 @@ export async function findMedicalRecords(
   return { items, total };
 }
 
-export async function createMedicalRecord(data, db = prisma) {
+export async function createMedicalRecord(data, db = getTenantClient()) {
   return await db.medicalRecord.create({
     data,
     include: {
@@ -142,7 +143,7 @@ export async function createMedicalRecord(data, db = prisma) {
   });
 }
 
-export async function updateMedicalRecord(id, data, db = prisma) {
+export async function updateMedicalRecord(id, data, db = getTenantClient()) {
   return await db.medicalRecord.update({
     where: { id },
     data,

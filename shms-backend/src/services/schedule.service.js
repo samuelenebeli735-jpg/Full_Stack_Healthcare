@@ -1,4 +1,5 @@
 import AppError from "../utils/AppError.js";
+import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import { resolveOrganizationId } from "../utils/tenantAccess.js";
 
@@ -24,14 +25,19 @@ export async function createStaffSchedule(data, user) {
     user.role === "super_admin"
       ? data.organizationId
       : user.organizationId;
+  const isSuperAdmin = user.role === "super_admin";
 
-  const organization = await findOrganizationById(organizationId);
+  const organization = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findOrganizationById(organizationId, tx)
+  );
 
   if (!organization) {
     throw new AppError("Organization not found.", 404);
   }
 
-  const staff = await findStaffById(data.staffId);
+  const staff = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findStaffById(data.staffId, tx)
+  );
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -41,9 +47,8 @@ export async function createStaffSchedule(data, user) {
     throw new AppError("Staff not found.", 404);
   }
 
-  const existingSchedule = await findScheduleByStaffAndDay(
-    data.staffId,
-    data.dayOfWeek
+  const existingSchedule = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    findScheduleByStaffAndDay(data.staffId, data.dayOfWeek, tx)
   );
 
   if (existingSchedule) {
@@ -89,7 +94,9 @@ export async function createStaffSchedule(data, user) {
     }
   }
 
-  const schedule = await createSchedule({ ...data, organizationId });
+  const schedule = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
+    createSchedule({ ...data, organizationId }, tx)
+  );
 
   await auditLogger({
     organizationId,
@@ -107,7 +114,9 @@ export async function createStaffSchedule(data, user) {
  * Get schedule by ID.
  */
 export async function getScheduleById(id, user) {
-  const schedule = await findScheduleById(id);
+  const schedule = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findScheduleById(id, tx)
+  );
 
   if (!schedule) {
     throw new AppError("Schedule not found.", 404);
@@ -127,7 +136,9 @@ export async function getScheduleById(id, user) {
  * Get schedules for a staff member.
  */
 export async function getStaffSchedules(staffId, user) {
-  const staff = await findStaffById(staffId);
+  const staff = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findStaffById(staffId, tx)
+  );
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -140,7 +151,9 @@ export async function getStaffSchedules(staffId, user) {
     throw new AppError("Staff not found.", 404);
   }
 
-  return await findSchedulesByStaff(staffId);
+  return await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findSchedulesByStaff(staffId, tx)
+  );
 }
 
 /**
@@ -149,7 +162,9 @@ export async function getStaffSchedules(staffId, user) {
 export async function getSchedulesByDay(organizationId, dayOfWeek, user) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
-  return await findSchedulesByDay(resolvedOrgId, dayOfWeek);
+  return await withTenant(resolvedOrgId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findSchedulesByDay(resolvedOrgId, dayOfWeek, tx)
+  );
 }
 
 /**
@@ -158,14 +173,20 @@ export async function getSchedulesByDay(organizationId, dayOfWeek, user) {
 export async function getOrganizationSchedules(organizationId, user) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
-  return await findSchedulesByOrganization(resolvedOrgId);
+  return await withTenant(resolvedOrgId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
+    findSchedulesByOrganization(resolvedOrgId, tx)
+  );
 }
 
 /**
  * Update schedule.
  */
 export async function updateStaffSchedule(id, data, user) {
-  const schedule = await findScheduleById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const schedule = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findScheduleById(id, tx)
+  );
 
   if (!schedule) {
     throw new AppError("Schedule not found.", 404);
@@ -218,9 +239,8 @@ export async function updateStaffSchedule(id, data, user) {
   }
 
   if (data.dayOfWeek !== undefined && data.dayOfWeek !== schedule.dayOfWeek) {
-    const existingSchedule = await findScheduleByStaffAndDay(
-      schedule.staffId,
-      data.dayOfWeek
+    const existingSchedule = await withTenant(schedule.organizationId, { isSuperAdmin }, (tx) =>
+      findScheduleByStaffAndDay(schedule.staffId, data.dayOfWeek, tx)
     );
 
     if (existingSchedule) {
@@ -240,7 +260,9 @@ export async function updateStaffSchedule(id, data, user) {
   if (data.breakEnd !== undefined) updateData.breakEnd = data.breakEnd;
   if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
-  const updated = await updateSchedule(id, updateData);
+  const updated = await withTenant(schedule.organizationId, { isSuperAdmin }, (tx) =>
+    updateSchedule(id, updateData, tx)
+  );
 
   await auditLogger({
     organizationId: schedule.organizationId,
@@ -258,7 +280,11 @@ export async function updateStaffSchedule(id, data, user) {
  * Delete schedule.
  */
 export async function removeSchedule(id, user) {
-  const schedule = await findScheduleById(id);
+  const isSuperAdmin = user.role === "super_admin";
+
+  const schedule = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
+    findScheduleById(id, tx)
+  );
 
   if (!schedule) {
     throw new AppError("Schedule not found.", 404);
@@ -272,7 +298,9 @@ export async function removeSchedule(id, user) {
   }
 
   try {
-    await deleteSchedule(id);
+    await withTenant(schedule.organizationId, { isSuperAdmin }, (tx) =>
+      deleteSchedule(id, tx)
+    );
   } catch (error) {
     if (error.code === "P2003") {
       throw new AppError(

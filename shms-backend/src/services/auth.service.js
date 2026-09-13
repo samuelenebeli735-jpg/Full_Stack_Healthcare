@@ -1,23 +1,21 @@
-import prisma from "../config/db.js";
 import AppError from "../utils/AppError.js";
 import { auditLogger } from "../utils/auditLogger.js";
+import { withTenant } from "../utils/tenantContext.js";
 
 import {
   findOrganizationById,
 } from "../repositories/organization.repository.js";
 
 import {
+  findAuthUserByIdentifier,
   findUserByEmail,
-  findUserWithProfileByEmail,
-  findUserWithProfileByMatricNumber,
+  findUserByResetToken,
   createUser,
   updateResetToken,
-  findUserByResetToken,
   updatePassword,
 } from "../repositories/user.repository.js";
 
 import {
-  findProfileByMatricNumber,
   createProfile,
 } from "../repositories/profile.repository.js";
 
@@ -28,10 +26,20 @@ import {
 
 import generateToken from "../utils/generateToken.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
+import {
+  recordLoginFailure,
+  recordLoginSuccess,
+} from "../authorization/risk.js";
+import { securityAudit } from "../utils/securityAudit.js";
 import crypto from "crypto";
 
 /**
  * Register a new student.
+ *
+ * The pre-registration duplicate checks (email / matric number) are
+ * intentionally cross-tenant and therefore run through the SECURITY
+ * DEFINER authentication helper. Account creation itself runs under a
+ * tenant transaction scoped to the target organization.
  */
 export async function registerStudent(data) {
   const organization = await findOrganizationById(data.organizationId);
@@ -44,15 +52,13 @@ export async function registerStudent(data) {
     throw new AppError("Organization not found.", 404);
   }
 
-  const existingUser = await findUserByEmail(data.email);
+  const existingUser = await findAuthUserByIdentifier(data.email);
 
   if (existingUser) {
-  throw new AppError("Email already exists.", 409);
-}
+    throw new AppError("Email already exists.", 409);
+  }
 
-  const existingProfile = await findProfileByMatricNumber(
-    data.matricNumber
-  );
+  const existingProfile = await findAuthUserByIdentifier(data.matricNumber);
 
   if (existingProfile) {
     throw new AppError("Matric number already exists.", 409);
@@ -60,7 +66,7 @@ export async function registerStudent(data) {
 
   const hashedPassword = await hashPassword(data.password);
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await withTenant(data.organizationId, async (tx) => {
     const user = await createUser(
       {
         organizationId: data.organizationId,
@@ -100,40 +106,60 @@ export async function registerStudent(data) {
 
   const token = generateToken({ userId: safeUser.id, organizationId: safeUser.organizationId, role: safeUser.role });
 
-await auditLogger({
-  organizationId: safeUser.organizationId,
-  userId: safeUser.id,
-  action: "REGISTER",
-  entity: "User",
-  entityId: safeUser.id,
-  description: `Student ${result.profile.firstName} ${result.profile.lastName} registered.`,
-});
+  await auditLogger({
+    organizationId: safeUser.organizationId,
+    userId: safeUser.id,
+    action: "REGISTER",
+    entity: "User",
+    entityId: safeUser.id,
+    description: `Student ${result.profile.firstName} ${result.profile.lastName} registered.`,
+  });
 
-return {
-  user: safeUser,
-  profile: result.profile,
-  token,
-};
+  return {
+    user: safeUser,
+    profile: result.profile,
+    token,
+  };
 }
 
 /**
  * Login a student.
+ *
+ * The user is resolved BEFORE any tenant context exists (identifier can
+ * be email, matric number, or staff number), so this lookup uses the
+ * SECURITY DEFINER authentication helper rather than a tenant-scoped
+ * query.
  */
-export async function loginStudent(data) {
-  const user =
-    (await findUserWithProfileByEmail(data.identifier)) ||
-    (await findUserWithProfileByMatricNumber(data.identifier));
+export async function loginStudent(data, context = {}) {
+  const identifier = String(data.identifier ?? "").trim();
+  const password = String(data.password ?? "");
+  const ip = context.ipAddress || null;
+
+  if (!identifier || !password) {
+    throw new AppError("Email or password is required.", 401);
+  }
+
+  const user = await findAuthUserByIdentifier(identifier);
 
   if (!user) {
+    recordLoginFailure(identifier, ip);
     throw new AppError("Invalid email or password.", 401);
   }
 
-  const passwordMatches = await comparePassword(
-    data.password,
-    user.password
-  );
+  const passwordMatches = await comparePassword(password, user.password);
 
   if (!passwordMatches) {
+    recordLoginFailure(identifier, ip);
+    securityAudit({
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: "AUTH_FAILURE",
+      entity: "User",
+      entityId: user.id,
+      description: `Failed login attempt for ${user.email}.`,
+      ipAddress: ip,
+      userAgent: context.userAgent || null,
+    });
     throw new AppError("Invalid email or password.", 401);
   }
 
@@ -141,23 +167,29 @@ export async function loginStudent(data) {
     throw new AppError("Your account has been deactivated.", 403);
   }
 
-  const { password, resetToken, resetTokenExpiry, ...safeUser } = user;
+  recordLoginSuccess(identifier, ip);
 
-  const token = generateToken({ userId: safeUser.id, organizationId: safeUser.organizationId, role: safeUser.role });
+  const { password: _password, resetToken, resetTokenExpiry, ...safeUser } = user;
 
-await auditLogger({
-  organizationId: safeUser.organizationId,
-  userId: safeUser.id,
-  action: "LOGIN",
-  entity: "User",
-  entityId: safeUser.id,
-  description: `${safeUser.email} logged in.`,
-});
+  const token = generateToken({
+    userId: safeUser.id,
+    organizationId: safeUser.organizationId,
+    role: safeUser.role,
+  });
 
-return {
-  user: safeUser,
-  token,
-};
+  await auditLogger({
+    organizationId: safeUser.organizationId,
+    userId: safeUser.id,
+    action: "LOGIN",
+    entity: "User",
+    entityId: safeUser.id,
+    description: `${safeUser.email} logged in.`,
+  });
+
+  return {
+    user: safeUser,
+    token,
+  };
 }
 
 export async function forgotPassword(email) {
@@ -173,9 +205,14 @@ export async function forgotPassword(email) {
 
   const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
 
-  await updateResetToken(user.id, hashedToken, resetTokenExpiry);
+  await withTenant(user.organizationId, (tx) =>
+    updateResetToken(user.id, hashedToken, resetTokenExpiry, tx)
+  );
 
-  await sendPasswordResetEmail(user, resetToken);
+  await sendPasswordResetEmail(
+    { email: user.email },
+    resetToken
+  );
 
   return { success: true };
 }
@@ -191,7 +228,9 @@ export async function resetPassword(resetToken, newPassword) {
 
   const hashedPassword = await hashPassword(newPassword);
 
-  await updatePassword(user.id, hashedPassword);
+  await withTenant(user.organizationId, (tx) =>
+    updatePassword(user.id, hashedPassword, tx)
+  );
 
   return { success: true, message: "Password reset successfully." };
 }

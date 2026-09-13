@@ -1,4 +1,5 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
 /**
@@ -6,7 +7,7 @@ import { buildPrismaQuery } from "../utils/query.js";
  */
 export async function findAppointmentById(
   id,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.appointment.findUnique({
     where: {
@@ -47,7 +48,7 @@ export async function findAppointmentById(
 export async function findAppointmentsByStudent(
   userId,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["appointmentDate", "status", "createdAt", "updatedAt"],
@@ -111,7 +112,7 @@ export async function findAppointmentsByStudent(
 export async function findAppointmentsByOrganization(
   organizationId = null,
   query = {},
-  db = prisma
+  db = getTenantClient()
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["appointmentDate", "status", "createdAt", "updatedAt"],
@@ -157,7 +158,7 @@ export async function findAppointmentsByOrganization(
  */
 export async function createAppointment(
   data,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.appointment.create({
     data,
@@ -175,7 +176,7 @@ export async function createAppointment(
 export async function updateAppointment(
   id,
   data,
-  db = prisma
+  db = getTenantClient()
 ) {
   return await db.appointment.update({
     where: {
@@ -193,7 +194,7 @@ export async function updateAppointment(
 /**
  * Delete an appointment.
  */
-export async function deleteAppointment(id, db = prisma) {
+export async function deleteAppointment(id, db = getTenantClient()) {
   return await db.appointment.delete({ where: { id } });
 }
 /**
@@ -204,7 +205,7 @@ export async function findAppointmentsForStaffOnDate(
   staffId,
   appointmentDate,
   excludeAppointmentId = null,
-  db = prisma
+  db = getTenantClient()
 ) {
   const startOfDay = new Date(appointmentDate);
   startOfDay.setHours(0, 0, 0, 0);
@@ -244,7 +245,7 @@ export async function findAppointmentByStaffAndDate(
   staffId,
   appointmentDate,
   excludeAppointmentId = null,
-  db = prisma
+  db = getTenantClient()
 ) {
   const where = {
     staffId,

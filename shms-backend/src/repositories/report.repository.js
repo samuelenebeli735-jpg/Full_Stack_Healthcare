@@ -1,4 +1,5 @@
 import prisma from "../config/db.js";
+import { getTenantClient } from "../utils/tenantContext.js";
 
 const scopeWhere = (organizationId) =>
   organizationId ? { organizationId } : {};
@@ -16,7 +17,7 @@ export async function findAppointmentsForReport(
   organizationId,
   from,
   to,
-  db = prisma
+  db = getTenantClient()
 ) {
   const range = dateRangeWhere(from, to);
 
@@ -47,7 +48,7 @@ export async function findConsultationsForReport(
   organizationId,
   from,
   to,
-  db = prisma
+  db = getTenantClient()
 ) {
   const range = dateRangeWhere(from, to);
 
@@ -64,7 +65,7 @@ export async function findConsultationsForReport(
   });
 }
 
-export async function findPatientStats(organizationId, db = prisma) {
+export async function findPatientStats(organizationId, db = getTenantClient()) {
   const where = organizationId ? { user: { organizationId } } : {};
 
   const [total, byGender, byLevel] = await Promise.all([
@@ -84,8 +85,12 @@ export async function findPatientStats(organizationId, db = prisma) {
   return { total, byGender, byLevel };
 }
 
-export async function findStaffStats(organizationId, db = prisma) {
+export async function findStaffStats(organizationId, db = getTenantClient()) {
   const where = organizationId ? { user: { organizationId } } : {};
+
+  const departmentWhere = organizationId
+    ? { organizationId }
+    : {};
 
   const [
     total,
@@ -111,8 +116,14 @@ export async function findStaffStats(organizationId, db = prisma) {
       where,
       _count: { _all: true },
     }),
-    db.department.findMany({ select: { id: true, name: true } }),
-    db.position.findMany({ select: { id: true, name: true } }),
+    db.department.findMany({
+      where: departmentWhere,
+      select: { id: true, name: true },
+    }),
+    db.position.findMany({
+      where: departmentWhere,
+      select: { id: true, name: true },
+    }),
   ]);
 
   const departmentNames = Object.fromEntries(

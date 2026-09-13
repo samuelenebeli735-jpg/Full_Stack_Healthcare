@@ -555,8 +555,11 @@ const API = (() => {
     },
     async updateQueue(ticket, action, data) {
       const orgId = _orgId();
-      if (action === 'call' || action === 'skip' || action === 'reassign') {
+      if (action === 'call') {
         return _request('POST', `/queues/call-next/${orgId}`);
+      }
+      if (action === 'skip') {
+        return _request('POST', `/queues/skip/${orgId}`);
       }
       if (action === 'start' || action === 'complete') {
         let queueId = queueIdByTicket[ticket] || (data && data.queueId) || null;
@@ -769,7 +772,8 @@ const API = (() => {
             cancelled: statusCounts.cancelled || 0,
             no_show: statusCounts.no_show || 0,
           },
-          department_breakdown: byGender,
+          department_breakdown: [],
+          patient_demographics: byGender,
           top_conditions: [],
           peak_times: [],
           peak_counts: [],
@@ -836,6 +840,12 @@ const API = (() => {
       };
     },
     getStaffPatients: () => this.getStudents(),
+
+    async getHealthAnalytics() {
+      const orgId = _orgId();
+      const res = await _request('GET', `/dashboard/health?organizationId=${orgId}`);
+      return { success: true, data: res.data };
+    },
 
     /* ---------- Clinical / ancillary ---------- */
     async getPrescriptions() {

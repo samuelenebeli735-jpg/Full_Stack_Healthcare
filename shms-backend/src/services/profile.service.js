@@ -1,6 +1,6 @@
-import prisma from "../config/db.js";
 import AppError from "../utils/AppError.js";
 import { hashPassword, comparePassword } from "../utils/password.js";
+import { withTenant } from "../utils/tenantContext.js";
 
 import {
   findProfileByUserId,
@@ -10,10 +10,24 @@ import {
 import {
   findUserWithProfileById,
   findUserWithPasswordById,
+  findUserOrgHint,
 } from "../repositories/user.repository.js";
 
+async function resolveUserOrg(userId) {
+  const hint = await findUserOrgHint(userId);
+  return hint?.organizationId ?? null;
+}
+
 export async function getProfile(userId) {
-  const user = await findUserWithProfileById(userId);
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("User not found.", 404);
+  }
+
+  const user = await withTenant(organizationId, (tx) =>
+    findUserWithProfileById(userId, tx)
+  );
 
   if (!user) {
     throw new AppError("User not found.", 404);
@@ -23,7 +37,15 @@ export async function getProfile(userId) {
 }
 
 export async function updateStudentProfile(userId, data) {
-  const user = await findUserWithProfileById(userId);
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("User not found.", 404);
+  }
+
+  const user = await withTenant(organizationId, (tx) =>
+    findUserWithProfileById(userId, tx)
+  );
 
   if (!user) {
     throw new AppError("User not found.", 404);
@@ -64,11 +86,21 @@ export async function updateStudentProfile(userId, data) {
     throw new AppError("No valid fields to update.", 400);
   }
 
-  return await updateProfile(user.profile.id, updateData);
+  return await withTenant(organizationId, (tx) =>
+    updateProfile(user.profile.id, updateData, tx)
+  );
 }
 
 export async function changePassword(userId, data) {
-  const user = await findUserWithPasswordById(userId);
+  const organizationId = await resolveUserOrg(userId);
+
+  if (!organizationId) {
+    throw new AppError("User not found.", 404);
+  }
+
+  const user = await withTenant(organizationId, (tx) =>
+    findUserWithPasswordById(userId, tx)
+  );
 
   if (!user) {
     throw new AppError("User not found.", 404);
@@ -86,9 +118,11 @@ export async function changePassword(userId, data) {
 
   const hashedPassword = await hashPassword(data.newPassword);
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { password: hashedPassword, resetToken: null, resetTokenExpiry: null },
+  await withTenant(organizationId, async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword, resetToken: null, resetTokenExpiry: null },
+    });
   });
 
   return { success: true, message: "Password changed successfully." };
