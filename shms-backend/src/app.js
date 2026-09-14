@@ -10,6 +10,8 @@ import { apiLimiter, authLimiter } from "./middleware/rateLimiter.middleware.js"
 
 import { API_PREFIX, APP_NAME, APP_VERSION } from "./config/constants.js";
 import env from "./config/env.js";
+import prisma from "./config/db.js";
+import { ensureRedis, isRedisAvailable } from "./config/redis.js";
 import logger from "./utils/logger.js";
 
 const app = express();
@@ -90,6 +92,35 @@ app.get(`${API_PREFIX}/health`, (req, res) => {
     success: true,
     status: "OK",
     uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
+app.get(`${API_PREFIX}/health/deep`, async (req, res) => {
+  let db = "down";
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    db = "up";
+  } catch {
+    // db remains "down"
+  }
+
+  let redis = env.REDIS_URL ? "down" : "disabled";
+  if (env.REDIS_URL) {
+    try {
+      await ensureRedis();
+      if (isRedisAvailable()) redis = "up";
+    } catch {
+      redis = "down";
+    }
+  }
+
+  const ok = db === "up" && (redis === "up" || redis === "disabled");
+  res.status(ok ? 200 : 503).json({
+    success: ok,
+    status: ok ? "OK" : "DEGRADED",
+    uptime: process.uptime(),
+    services: { database: db, redis },
     timestamp: new Date().toISOString(),
   });
 });

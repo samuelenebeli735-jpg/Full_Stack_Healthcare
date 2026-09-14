@@ -1,0 +1,3 @@
+# Copy to userlist.txt (same directory) and replace with the real
+# shms_app password. This file is NOT committed (password is a secret).
+"shms_app" "REPLACE_WITH_SHMS_APP_PASSWORD"

@@ -876,3 +876,43 @@ Use this as the authoritative baseline in this chat:
 - There may be a separate Zod-based branch/review in parallel; do not mix it with this conversation’s current codebase unless you verify it first.
 
 If you want the next response to be built on this reconstructed baseline, I’ll treat it as the current source of truth from here onward.
+
+---
+
+## 9. Operations & Scaling (20k–50k users)
+
+The application is stateless (only DB + Redis hold state), so it scales out
+behind a load balancer. These are the operational pieces for that range:
+
+### Environment
+```
+REDIS_URL=redis://127.0.0.1:6379   # empty => in-memory fallback (single instance only)
+BACKUP_DATABASE_URL=               # empty => falls back to DATABASE_URL
+```
+
+### Multi-instance (#2)
+- **Node 22.6+ / PM2 cluster:** run `npm run cluster` (instances = CPU count).
+  On Windows PM2 forces fork mode — use multiple processes or Linux for production.
+- **Docker:** `docker compose up -d` runs the API plus Redis and PgBouncer.
+- All session/risk/rate-limit state lives in Redis (`rl:*`, `rs:*` keys), so any
+  number of instances share one accounting window.
+
+### Connection pooling (#3)
+- `deploy/pgbouncer/pgbouncer.ini` + `userlist.txt.example` are provided.
+- Point `DATABASE_URL` at PgBouncer (`port 6432`) so Prisma pools across N
+  instances don't exhaust PostgreSQL `max_connections`.
+
+### Retention (#4)
+- `npm run retention` — deletes `AuditLog`/`Notification` rows older than the
+  window (default 365 days). Preview first: `node jobs/retention.js --days 365 --dry-run`.
+- Run on a schedule (cron / Task Scheduler).
+
+### Backups & monitoring (#5)
+- `npm run backup` — `pg_dump -Fc` to `./backups`, keeps the newest N
+  (`--keep 7`). Requires PostgreSQL client tools on PATH (`PGDUMP_BIN` to override).
+- The role in the connection string must be able to dump the whole database:
+  the RLS-restricted app role (`shms_app`) makes `pg_dump` fail on `COPY`.
+  Set `BACKUP_DATABASE_URL` to an owner/`postgres` connection for backups.
+- Health endpoints: `GET /api/v1/health` (liveness) and
+  `GET /api/v1/health/deep` (DB + Redis status, 503 when degraded) for
+  orchestrators/uptime checks.

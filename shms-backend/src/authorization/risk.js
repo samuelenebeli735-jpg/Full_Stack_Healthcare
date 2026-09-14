@@ -1,3 +1,5 @@
+import { sessionStore } from "../utils/sessionStore.js";
+
 const WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_FAIL_LIMIT = 10;
 const AUTHZ_DENIAL_LIMIT = 30;
@@ -5,90 +7,54 @@ const CROSS_ORG_LIMIT = 30;
 const SENSITIVE_MEDIUM_LIMIT = 100;
 const SENSITIVE_HIGH_LIMIT = 500;
 
-const counts = new Map();
-const blockedUntil = new Map();
-
 const now = () => Date.now();
 
-function prune(key) {
-  const arr = counts.get(key);
-  if (!arr) return [];
-  while (arr.length && arr[0] <= now() - WINDOW_MS) arr.shift();
-  return arr;
-}
+const level = (n, limit) =>
+  n >= limit ? "HIGH" : n >= Math.ceil(limit / 2) ? "MEDIUM" : "LOW";
 
-function hit(key) {
-  const arr = prune(key);
-  arr.push(now());
-  counts.set(key, arr);
-  return arr.length;
-}
-
-function count(key) {
-  return prune(key).length;
-}
-
-function clear(key) {
-  counts.delete(key);
-}
-
-function block(key) {
-  blockedUntil.set(key, now() + WINDOW_MS);
-}
-
-export function isBlocked(userId, ip) {
+export async function isBlocked(userId, ip) {
   const ukey = `user:${userId}`;
   const ikey = `ip:${ip}`;
-  return blockedUntil.get(ukey) > now() || blockedUntil.get(ikey) > now();
+  return (
+    (await sessionStore.isBlocked(ukey)) || (await sessionStore.isBlocked(ikey))
+  );
 }
 
-export function recordLoginFailure(identifier, ip) {
-  const n = hit(`login:${ip || "unknown"}:${identifier}`);
-  return n >= LOGIN_FAIL_LIMIT
-    ? "HIGH"
-    : n >= Math.ceil(LOGIN_FAIL_LIMIT / 2)
-      ? "MEDIUM"
-      : "LOW";
+export async function recordLoginFailure(identifier, ip) {
+  const n = await sessionStore.incr(`login:${ip || "unknown"}:${identifier}`, WINDOW_MS);
+  return level(n, LOGIN_FAIL_LIMIT);
 }
 
-export function recordLoginSuccess(identifier, ip) {
-  clear(`login:${ip || "unknown"}:${identifier}`);
+export async function recordLoginSuccess(identifier, ip) {
+  await sessionStore.clear(`login:${ip || "unknown"}:${identifier}`);
 }
 
-export function recordAuthzDenial({ userId }) {
-  const n = hit(`authz:user:${userId}`);
-  if (n >= AUTHZ_DENIAL_LIMIT * 2) block(`user:${userId}`);
-  return n >= AUTHZ_DENIAL_LIMIT
-    ? "HIGH"
-    : n >= Math.ceil(AUTHZ_DENIAL_LIMIT / 2)
-      ? "MEDIUM"
-      : "LOW";
+export async function recordAuthzDenial({ userId }) {
+  const n = await sessionStore.incr(`authz:${userId}`, WINDOW_MS);
+  if (n >= AUTHZ_DENIAL_LIMIT * 2) {
+    await sessionStore.block(`user:${userId}`, WINDOW_MS);
+  }
+  return level(n, AUTHZ_DENIAL_LIMIT);
 }
 
-export function recordCrossOrgAttempt({ userId }) {
-  const n = hit(`cross:user:${userId}`);
-  if (n >= CROSS_ORG_LIMIT * 2) block(`user:${userId}`);
-  return n >= CROSS_ORG_LIMIT
-    ? "HIGH"
-    : n >= Math.ceil(CROSS_ORG_LIMIT / 2)
-      ? "MEDIUM"
-      : "LOW";
+export async function recordCrossOrgAttempt({ userId }) {
+  const n = await sessionStore.incr(`cross:${userId}`, WINDOW_MS);
+  if (n >= CROSS_ORG_LIMIT * 2) {
+    await sessionStore.block(`user:${userId}`, WINDOW_MS);
+  }
+  return level(n, CROSS_ORG_LIMIT);
 }
 
-export function recordSensitiveAccess({ userId }) {
-  const n = hit(`sens:user:${userId}`);
-  return n >= SENSITIVE_HIGH_LIMIT
-    ? "HIGH"
-    : n >= SENSITIVE_MEDIUM_LIMIT
-      ? "MEDIUM"
-      : "LOW";
+export async function recordSensitiveAccess({ userId }) {
+  const n = await sessionStore.incr(`sens:${userId}`, WINDOW_MS);
+  return level(n, SENSITIVE_HIGH_LIMIT);
 }
 
-export function assessRisk(userId, ip) {
-  if (isBlocked(userId, ip)) return "HIGH";
-  const sens = count(`sens:user:${userId}`);
-  if (count(`authz:user:${userId}`) >= AUTHZ_DENIAL_LIMIT) return "HIGH";
-  if (count(`cross:user:${userId}`) >= CROSS_ORG_LIMIT) return "HIGH";
+export async function assessRisk(userId, ip) {
+  if (await isBlocked(userId, ip)) return "HIGH";
+  const sens = await sessionStore.count(`sens:${userId}`, WINDOW_MS);
+  if ((await sessionStore.count(`authz:${userId}`, WINDOW_MS)) >= AUTHZ_DENIAL_LIMIT) return "HIGH";
+  if ((await sessionStore.count(`cross:${userId}`, WINDOW_MS)) >= CROSS_ORG_LIMIT) return "HIGH";
   if (sens >= SENSITIVE_HIGH_LIMIT) return "HIGH";
   if (sens >= SENSITIVE_MEDIUM_LIMIT) return "MEDIUM";
   return "LOW";

@@ -11,7 +11,7 @@ export function resolveOrganizationId(organizationId, user, req = null) {
     organizationId &&
     organizationId !== user.organizationId
   ) {
-    recordCrossOrgAttempt({ userId: user.id });
+    recordCrossOrgAttempt({ userId: user.id }).catch(() => {});
     securityAudit({
       organizationId: organizationId || user.organizationId,
       userId: user.id,

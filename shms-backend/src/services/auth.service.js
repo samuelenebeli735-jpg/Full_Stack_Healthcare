@@ -142,14 +142,14 @@ export async function loginStudent(data, context = {}) {
   const user = await findAuthUserByIdentifier(identifier);
 
   if (!user) {
-    recordLoginFailure(identifier, ip);
+    await recordLoginFailure(identifier, ip);
     throw new AppError("Invalid email or password.", 401);
   }
 
   const passwordMatches = await comparePassword(password, user.password);
 
   if (!passwordMatches) {
-    recordLoginFailure(identifier, ip);
+    await recordLoginFailure(identifier, ip);
     securityAudit({
       organizationId: user.organizationId,
       userId: user.id,
@@ -167,7 +167,7 @@ export async function loginStudent(data, context = {}) {
     throw new AppError("Your account has been deactivated.", 403);
   }
 
-  recordLoginSuccess(identifier, ip);
+  await recordLoginSuccess(identifier, ip);
 
   const { password: _password, resetToken, resetTokenExpiry, ...safeUser } = user;
 

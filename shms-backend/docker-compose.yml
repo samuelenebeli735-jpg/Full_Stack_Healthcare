@@ -1,0 +1,64 @@
+# SHMS containerized support stack: Redis + PgBouncer + API.
+# The PostgreSQL server (shms_db) is expected to run on the host at
+# 127.0.0.1:5432 (see pgbouncer.ini); override with the `postgres_host`
+# arg if it runs in another container.
+#
+# Usage:
+#   docker compose build
+#   docker compose up -d
+# Then point .env DATABASE_URL at the API via PgBouncer, e.g.:
+#   DATABASE_URL=postgresql://shms_app:CHANGE_ME@127.0.0.1:6432/shms_db
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer
+    restart: unless-stopped
+    environment:
+      DB_HOST: ${POSTGRES_HOST:-host.docker.internal}
+      DB_PORT: "5432"
+      DB_USER: shms_app
+      DB_PASSWORD: ${SHMS_APP_PASSWORD:?set SHMS_APP_PASSWORD in .env}
+      AUTH_TYPE: md5
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: "500"
+      DEFAULT_POOL_SIZE: "20"
+    ports:
+      - "6432:6432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  api:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+      pgbouncer:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      DATABASE_URL: postgresql://shms_app:${SHMS_APP_PASSWORD:?}@pgbouncer:6432/shms_db
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    ports:
+      - "5000:5000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/api/v1/health/deep || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

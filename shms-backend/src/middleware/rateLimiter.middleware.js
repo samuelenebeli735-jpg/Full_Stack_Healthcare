@@ -1,7 +1,11 @@
 import rateLimit from "express-rate-limit";
 import { errorResponse } from "../utils/apiResponse.js";
+import { isRedisStoreReady, RedisRateLimitStore } from "../utils/rateLimitStore.js";
+
+const redisReady = await isRedisStoreReady();
 
 export const authLimiter = rateLimit({
+  store: redisReady ? new RedisRateLimitStore("rl:auth:") : undefined,
   windowMs: 15 * 60 * 1000,
   max: 30,
   standardHeaders: true,
@@ -17,6 +21,7 @@ export const authLimiter = rateLimit({
 });
 
 export const apiLimiter = rateLimit({
+  store: redisReady ? new RedisRateLimitStore("rl:api:") : undefined,
   windowMs: 15 * 60 * 1000,
   max: 200,
   standardHeaders: true,
@@ -32,6 +37,7 @@ export const apiLimiter = rateLimit({
 });
 
 export const passwordResetLimiter = rateLimit({
+  store: redisReady ? new RedisRateLimitStore("rl:reset:") : undefined,
   windowMs: 60 * 60 * 1000,
   max: 5,
   standardHeaders: true,

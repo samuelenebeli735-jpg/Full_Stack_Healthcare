@@ -24,10 +24,14 @@ const env = {
 
   DATABASE_URL: process.env.DATABASE_URL,
 
+  BACKUP_DATABASE_URL: process.env.BACKUP_DATABASE_URL || process.env.DATABASE_URL,
+
   CORS_ORIGINS: process.env.CORS_ORIGINS || "",
 
   FRONTEND_URL: process.env.FRONTEND_URL || "http://localhost:5500",
   EMAIL_WEBHOOK_URL: process.env.EMAIL_WEBHOOK_URL || "",
+
+  REDIS_URL: process.env.REDIS_URL || "",
 };
 
 export default env;
