@@ -33,6 +33,8 @@ model Organization {
   schedules    Schedule[]
   auditLogs          AuditLog[]
   notifications      Notification[]
+  medicalRecords         MedicalRecord[]
+  medicalRecordCounters  MedicalRecordCounter[]
 }
 
 model User {
@@ -110,7 +112,17 @@ model MedicalRecord {
 
   profile Profile @relation(fields: [profileId], references: [id])
 
-  recordNumber String @unique
+  organizationId String
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  // Sequential number within (organizationId, recordYear). Uniqueness is
+  // enforced per-organization + per-year, so two different organizations may
+  // independently hold the same formatted recordNumber for the same year.
+  recordSeq Int
+
+  // Human-facing identifier; not globally unique by itself.
+  recordNumber String
 
   recordYear Int
 
@@ -123,6 +135,26 @@ model MedicalRecord {
   updatedAt DateTime @updatedAt
 
   @@index([recordYear])
+  @@index([organizationId])
+  @@unique([organizationId, recordYear, recordSeq])
+}
+
+model MedicalRecordCounter {
+  id String @id @default(cuid())
+
+  organizationId String
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  recordYear Int
+
+  nextSeq Int @default(1)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId, recordYear])
 }
 
 model Staff {

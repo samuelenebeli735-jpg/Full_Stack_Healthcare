@@ -1,16 +1,13 @@
 import AppError from "../utils/AppError.js";
-import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
+import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
 import {
   getPagination,
   buildPaginationMeta,
 } from "../utils/pagination.js";
-import { resolveOrganizationId } from "../utils/tenantAccess.js";
 
 import {
   findStaffById,
-  findStaffByStaffNumber,
-  findStaffByUserId,
   findStaffByOrganization,
   createStaff,
   updateStaff,
@@ -39,32 +36,8 @@ export async function createNewStaff(data, user) {
     user.role === "super_admin"
       ? data.organizationId
       : user.organizationId;
-  const isSuperAdmin = user.role === "super_admin";
 
-  const department = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findDepartmentById(data.departmentId, tx)
-  );
-
-  if (!department) {
-    throw new AppError("Department not found.", 404);
-  }
-
-  if (department.organizationId !== organizationId) {
-    throw new AppError("Department not found.", 404);
-  }
-
-  const position = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findPositionById(data.positionId, tx)
-  );
-
-  if (!position) {
-    throw new AppError("Position not found.", 404);
-  }
-
-  if (position.organizationId !== organizationId) {
-    throw new AppError("Position not found.", 404);
-  }
-
+  // Global pre-auth duplicate check (SECURITY DEFINER).
   const existingUser = await findUserByEmail(data.email);
 
   if (existingUser) {
@@ -79,13 +52,34 @@ export async function createNewStaff(data, user) {
   // Retry on the unique staffNumber constraint so concurrent creates
   // get distinct numbers instead of a generic 409.
   for (let attempt = 0; attempt < 5; attempt++) {
-    const { total } = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-      findStaffByOrganization(organizationId, { skip: 0, limit: 1 }, tx)
-    );
-    staffNumber = `RUN-STF-${String(total + 1).padStart(6, "0")}`;
-
     try {
-      result = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
+      result = await withTenant(organizationId, async (tx) => {
+        const department = await findDepartmentById(data.departmentId, tx);
+
+        if (!department) {
+          throw new AppError("Department not found.", 404);
+        }
+
+        if (department.organizationId !== organizationId) {
+          throw new AppError("Department not found.", 404);
+        }
+
+        const position = await findPositionById(data.positionId, tx);
+
+        if (!position) {
+          throw new AppError("Position not found.", 404);
+        }
+
+        if (position.organizationId !== organizationId) {
+          throw new AppError("Position not found.", 404);
+        }
+
+        const { total } = await findStaffByOrganization(organizationId, {
+          skip: 0,
+          limit: 1,
+        }, tx);
+        staffNumber = `RUN-STF-${String(total + 1).padStart(6, "0")}`;
+
         const newUser = await createUser(
           {
             organizationId,
@@ -138,15 +132,25 @@ export async function createNewStaff(data, user) {
 }
 
 export async function getOrganizationStaff(organizationId, user, query = {}) {
-  const resolvedOrgId = resolveOrganizationId(organizationId, user);
+  if (user.role !== "super_admin" && organizationId && organizationId !== user.organizationId) {
+    throw new AppError("Access denied. You can only access your own organization's data.", 403);
+  }
+  // null means "all organizations" for super_admin; the repository
+  // only filters by organizationId when it is provided.
+  const resolvedOrgId =
+    user.role === "super_admin"
+      ? organizationId ?? null
+      : user.organizationId;
 
-  const isSuperAdmin = user.role === "super_admin";
+  const runner = resolvedOrgId
+    ? (callback) => withTenant(resolvedOrgId, callback)
+    : withSuperAdmin;
 
-  const { page, limit, skip } = getPagination(query);
+  const { page, limit } = getPagination(query);
 
-  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
-    findStaffByOrganization(resolvedOrgId, query, tx)
-  );
+  const { items, total } = await runner(async (tx) => {
+    return await findStaffByOrganization(resolvedOrgId, query, tx);
+  });
 
   if (user.role === "student") {
     const safeItems = items.map((staff) => ({
@@ -173,9 +177,11 @@ export async function getOrganizationStaff(organizationId, user, query = {}) {
 }
 
 export async function getStaffById(id, user) {
-  const staff = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
-    findStaffById(id, tx)
-  );
+  const scoped = resolveUserScope(user);
+
+  const staff = await scoped(async (tx) => {
+    return await findStaffById(id, tx);
+  });
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -189,11 +195,11 @@ export async function getStaffById(id, user) {
 }
 
 export async function updateExistingStaff(id, data, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const staff = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findStaffById(id, tx)
-  );
+  const staff = await scoped(async (tx) => {
+    return await findStaffById(id, tx);
+  });
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -208,43 +214,39 @@ export async function updateExistingStaff(id, data, user) {
     throw new AppError("Staff not found.", 404);
   }
 
-  if (data.departmentId) {
-    const department = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-      findDepartmentById(data.departmentId, tx)
-    );
-    if (!department || department.organizationId !== organizationId) {
-      throw new AppError("Department not found.", 404);
+  const updated = await withTenant(organizationId, async (tx) => {
+    if (data.departmentId) {
+      const department = await findDepartmentById(data.departmentId, tx);
+      if (!department || department.organizationId !== organizationId) {
+        throw new AppError("Department not found.", 404);
+      }
     }
-  }
 
-  if (data.positionId) {
-    const position = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-      findPositionById(data.positionId, tx)
-    );
-    if (!position || position.organizationId !== organizationId) {
-      throw new AppError("Position not found.", 404);
+    if (data.positionId) {
+      const position = await findPositionById(data.positionId, tx);
+      if (!position || position.organizationId !== organizationId) {
+        throw new AppError("Position not found.", 404);
+      }
     }
-  }
 
-  const updateData = {};
-  const allowedFields = [
-    "firstName", "middleName", "lastName", "gender", "dateOfBirth",
-    "phone", "departmentId", "positionId", "qualification",
-    "licenseNumber", "profilePhotoUrl", "employmentStatus",
-    "employmentDate",
-  ];
+    const updateData = {};
+    const allowedFields = [
+      "firstName", "middleName", "lastName", "gender", "dateOfBirth",
+      "phone", "departmentId", "positionId", "qualification",
+      "licenseNumber", "profilePhotoUrl", "employmentStatus",
+      "employmentDate",
+    ];
 
-  for (const field of allowedFields) {
-    if (data[field] !== undefined) {
-      updateData[field] = field === "dateOfBirth" || field === "employmentDate"
-        ? new Date(data[field])
-        : data[field];
+    for (const field of allowedFields) {
+      if (data[field] !== undefined) {
+        updateData[field] = field === "dateOfBirth" || field === "employmentDate"
+          ? new Date(data[field])
+          : data[field];
+      }
     }
-  }
 
-  const updated = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    updateStaff(id, updateData, tx)
-  );
+    return await updateStaff(id, updateData, tx);
+  });
 
   await auditLogger({
     organizationId: staff.user.organizationId,
@@ -259,11 +261,11 @@ export async function updateExistingStaff(id, data, user) {
 }
 
 export async function removeStaff(id, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const staff = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findStaffById(id, tx)
-  );
+  const staff = await scoped(async (tx) => {
+    return await findStaffById(id, tx);
+  });
 
   if (!staff) {
     throw new AppError("Staff not found.", 404);
@@ -273,10 +275,8 @@ export async function removeStaff(id, user) {
     throw new AppError("Staff not found.", 404);
   }
 
-  const organizationId = staff.user.organizationId;
-
   try {
-    await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
+    await withTenant(staff.user.organizationId, async (tx) => {
       await deleteStaff(id, tx);
       await tx.user.update({
         where: { id: staff.userId },

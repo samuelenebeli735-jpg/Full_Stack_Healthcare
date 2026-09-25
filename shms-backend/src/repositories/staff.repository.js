@@ -1,8 +1,7 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
-export async function findStaffById(id, db = getTenantClient()) {
+export async function findStaffById(id, db = prisma) {
   return await db.staff.findUnique({
     where: { id },
     include: {
@@ -21,13 +20,13 @@ export async function findStaffById(id, db = getTenantClient()) {
   });
 }
 
-export async function findStaffByStaffNumber(staffNumber, db = getTenantClient()) {
+export async function findStaffByStaffNumber(staffNumber, db = prisma) {
   return await db.staff.findUnique({
     where: { staffNumber },
   });
 }
 
-export async function findStaffByUserId(userId, db = getTenantClient()) {
+export async function findStaffByUserId(userId, db = prisma) {
   return await db.staff.findUnique({
     where: { userId },
     include: {
@@ -49,7 +48,7 @@ export async function findStaffByUserId(userId, db = getTenantClient()) {
 export async function findStaffByOrganization(
   organizationId = null,
   query = {},
-  db = getTenantClient()
+  db = prisma
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["firstName", "lastName", "staffNumber", "employmentStatus", "createdAt", "updatedAt"],
@@ -93,7 +92,7 @@ export async function findStaffByOrganization(
   return { items, total };
 }
 
-export async function createStaff(data, db = getTenantClient()) {
+export async function createStaff(data, db = prisma) {
   return await db.staff.create({
     data,
     include: {
@@ -112,7 +111,7 @@ export async function createStaff(data, db = getTenantClient()) {
   });
 }
 
-export async function updateStaff(id, data, db = getTenantClient()) {
+export async function updateStaff(id, data, db = prisma) {
   return await db.staff.update({
     where: { id },
     data,
@@ -124,6 +123,6 @@ export async function updateStaff(id, data, db = getTenantClient()) {
   });
 }
 
-export async function deleteStaff(id, db = getTenantClient()) {
+export async function deleteStaff(id, db = prisma) {
   return await db.staff.delete({ where: { id } });
 }

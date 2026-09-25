@@ -34,3 +34,31 @@ export const updateAppointmentSchema = z.object({
 export const idParamSchema = z.object({
   id: z.string().cuid("Invalid appointment ID."),
 });
+
+export const staffSlotsParamsSchema = z.object({
+  staffId: z.string().cuid("Invalid staff ID."),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date."),
+});
+
+export const slotsQuerySchema = z.object({
+  serviceId: z.string().cuid("Invalid service ID.").optional(),
+});
+
+export const cancelAppointmentSchema = z.object({
+  reason: z
+    .string()
+    .trim("Cancellation reason is required.")
+    .min(1, "Cancellation reason is required.")
+    .max(500, "Cancellation reason cannot exceed 500 characters."),
+});
+
+export const rescheduleAppointmentSchema = z.object({
+  appointmentDate: z
+    .string()
+    .datetime("Invalid appointment date."),
+  staffId: z
+    .string()
+    .cuid("Invalid staff ID.")
+    .nullable()
+    .optional(),
+});

@@ -1,8 +1,7 @@
 import AppError from "../utils/AppError.js";
-import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import { getPagination, buildPaginationMeta } from "../utils/pagination.js";
-import { resolveOrganizationId } from "../utils/tenantAccess.js";
+import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
 
 import {
   findDepartmentById,
@@ -22,29 +21,28 @@ export async function createNewDepartment(data, user) {
     user.role === "super_admin"
       ? data.organizationId
       : user.organizationId;
-  const isSuperAdmin = user.role === "super_admin";
 
-  const organization = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findOrganizationById(organizationId, tx)
-  );
+  const organization = await findOrganizationById(organizationId);
 
   if (!organization) {
     throw new AppError("Organization not found.", 404);
   }
 
-  const existingDepartment = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findDepartmentByCode(organizationId, data.code, tx)
-  );
-
-  if (existingDepartment) {
-    throw new AppError(
-      "A department with this code already exists in this organization.",
-      409
+  const department = await withTenant(organizationId, async (tx) => {
+    const existingDepartment = await findDepartmentByCode(
+      organizationId,
+      data.code,
+      tx
     );
-  }
 
-  const department = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    createDepartment({
+    if (existingDepartment) {
+      throw new AppError(
+        "A department with this code already exists in this organization.",
+        409
+      );
+    }
+
+    return await createDepartment({
       organizationId,
       name: data.name,
       code: data.code,
@@ -52,8 +50,8 @@ export async function createNewDepartment(data, user) {
       location: data.location,
       phone: data.phone,
       email: data.email,
-    }, tx)
-  );
+    }, tx);
+  });
 
   await auditLogger({
     organizationId,
@@ -68,15 +66,23 @@ export async function createNewDepartment(data, user) {
 }
 
 export async function getOrganizationDepartments(organizationId, user, query = {}) {
-  const resolvedOrgId = resolveOrganizationId(organizationId, user);
+  if (user.role !== "super_admin" && organizationId && organizationId !== user.organizationId) {
+    throw new AppError("Access denied. You can only access your own organization's data.", 403);
+  }
+  const resolvedOrgId =
+    user.role === "super_admin"
+      ? organizationId ?? null
+      : user.organizationId;
 
-  const isSuperAdmin = user.role === "super_admin";
+  const runner = resolvedOrgId
+    ? (callback) => withTenant(resolvedOrgId, callback)
+    : withSuperAdmin;
 
-  const { page, limit, skip } = getPagination(query);
+  const { page, limit } = getPagination(query);
 
-  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
-    findDepartmentsByOrganization(resolvedOrgId, query, tx)
-  );
+  const { items, total } = await runner(async (tx) => {
+    return await findDepartmentsByOrganization(resolvedOrgId, query, tx);
+  });
 
   return {
     items,
@@ -85,9 +91,11 @@ export async function getOrganizationDepartments(organizationId, user, query = {
 }
 
 export async function getDepartmentById(id, user) {
-  const department = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
-    findDepartmentById(id, tx)
-  );
+  const scoped = resolveUserScope(user);
+
+  const department = await scoped(async (tx) => {
+    return await findDepartmentById(id, tx);
+  });
 
   if (!department) {
     throw new AppError("Department not found.", 404);
@@ -101,11 +109,11 @@ export async function getDepartmentById(id, user) {
 }
 
 export async function updateExistingDepartment(id, data, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const department = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findDepartmentById(id, tx)
-  );
+  const department = await scoped(async (tx) => {
+    return await findDepartmentById(id, tx);
+  });
 
   if (!department) {
     throw new AppError("Department not found.", 404);
@@ -120,34 +128,32 @@ export async function updateExistingDepartment(id, data, user) {
     throw new AppError("Department not found.", 404);
   }
 
-  if (data.code && data.code !== department.code) {
-    const existing = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-      findDepartmentByCode(organizationId, data.code, tx)
-    );
+  const updated = await withTenant(organizationId, async (tx) => {
+    if (data.code && data.code !== department.code) {
+      const existing = await findDepartmentByCode(organizationId, data.code, tx);
 
-    if (existing && existing.id !== id) {
-      throw new AppError(
-        "A department with this code already exists in this organization.",
-        409
-      );
+      if (existing && existing.id !== id) {
+        throw new AppError(
+          "A department with this code already exists in this organization.",
+          409
+        );
+      }
     }
-  }
 
-  const updateData = {};
+    const updateData = {};
 
-  if (data.name !== undefined) updateData.name = data.name;
-  if (data.code !== undefined) updateData.code = data.code;
-  if (data.description !== undefined) updateData.description = data.description;
-  if (data.location !== undefined) updateData.location = data.location;
-  if (data.phone !== undefined) updateData.phone = data.phone;
-  if (data.email !== undefined) updateData.email = data.email;
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.code !== undefined) updateData.code = data.code;
+    if (data.description !== undefined) updateData.description = data.description;
+    if (data.location !== undefined) updateData.location = data.location;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.email !== undefined) updateData.email = data.email;
 
-  const updated = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    updateDepartment(id, updateData, tx)
-  );
+    return await updateDepartment(id, updateData, tx);
+  });
 
   await auditLogger({
-    organizationId,
+    organizationId: department.organizationId,
     userId: user.id,
     action: "UPDATE",
     entity: "Department",
@@ -159,11 +165,11 @@ export async function updateExistingDepartment(id, data, user) {
 }
 
 export async function removeDepartment(id, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const department = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findDepartmentById(id, tx)
-  );
+  const department = await scoped(async (tx) => {
+    return await findDepartmentById(id, tx);
+  });
 
   if (!department) {
     throw new AppError("Department not found.", 404);
@@ -173,12 +179,10 @@ export async function removeDepartment(id, user) {
     throw new AppError("Department not found.", 404);
   }
 
-  const organizationId = department.organizationId;
-
   try {
-    await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-      deleteDepartment(id, tx)
-    );
+    await withTenant(department.organizationId, async (tx) => {
+      await deleteDepartment(id, tx);
+    });
   } catch (error) {
     if (error.code === "P2003") {
       throw new AppError(

@@ -1,6 +1,6 @@
 import AppError from "../utils/AppError.js";
-import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
+import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
 import {
   getPagination,
   buildPaginationMeta,
@@ -22,11 +22,11 @@ import {
 } from "../repositories/consultation.repository.js";
 
 export async function createNewPrescription(data, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const consultation = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findConsultationById(data.consultationId, tx)
-  );
+  const consultation = await scoped(async (tx) => {
+    return await findConsultationById(data.consultationId, tx);
+  });
 
   if (!consultation) {
     throw new AppError("Consultation not found.", 404);
@@ -37,19 +37,6 @@ export async function createNewPrescription(data, user) {
     consultation.queue.organizationId !== user.organizationId
   ) {
     throw new AppError("Consultation not found.", 404);
-  }
-
-  const organizationId = consultation.queue.organizationId;
-
-  const existingPrescription = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findPrescriptionByConsultation(data.consultationId, tx)
-  );
-
-  if (existingPrescription) {
-    throw new AppError(
-      "Prescription already exists for this consultation.",
-      409
-    );
   }
 
   if (
@@ -63,7 +50,19 @@ export async function createNewPrescription(data, user) {
     );
   }
 
-  const prescription = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
+  const prescription = await withTenant(consultation.queue.organizationId, async (tx) => {
+    const existingPrescription = await findPrescriptionByConsultation(
+      data.consultationId,
+      tx
+    );
+
+    if (existingPrescription) {
+      throw new AppError(
+        "Prescription already exists for this consultation.",
+        409
+      );
+    }
+
     const createdPrescription = await createPrescription(
       { consultationId: data.consultationId },
       tx
@@ -98,22 +97,27 @@ export async function createNewPrescription(data, user) {
 }
 
 export async function getAllPrescriptions(user, query = {}) {
-  const { page, limit, skip } = getPagination(query);
+  const { page, limit } = getPagination(query);
   const organizationId =
     user.role === "super_admin" ? null : user.organizationId;
-  const isSuperAdmin = user.role === "super_admin";
 
-  const { items, total } = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findPrescriptions(organizationId, query, tx)
-  );
+  const runner = organizationId
+    ? (callback) => withTenant(organizationId, callback)
+    : withSuperAdmin;
+
+  const { items, total } = await runner(async (tx) => {
+    return await findPrescriptions(organizationId, query, tx);
+  });
 
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
 }
 
 export async function getPrescriptionById(id, user) {
-  const prescription = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
-    findPrescriptionById(id, tx)
-  );
+  const scoped = resolveUserScope(user);
+
+  const prescription = await scoped(async (tx) => {
+    return await findPrescriptionById(id, tx);
+  });
 
   if (!prescription) {
     throw new AppError("Prescription not found.", 404);
@@ -130,11 +134,11 @@ export async function getPrescriptionById(id, user) {
 }
 
 export async function updateExistingPrescription(id, data, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const prescription = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findPrescriptionById(id, tx)
-  );
+  const prescription = await scoped(async (tx) => {
+    return await findPrescriptionById(id, tx);
+  });
 
   if (!prescription) {
     throw new AppError("Prescription not found.", 404);
@@ -147,8 +151,6 @@ export async function updateExistingPrescription(id, data, user) {
     throw new AppError("Prescription not found.", 404);
   }
 
-  const organizationId = prescription.consultation.queue.organizationId;
-
   if (
     !data.items ||
     !Array.isArray(data.items) ||
@@ -160,24 +162,27 @@ export async function updateExistingPrescription(id, data, user) {
     );
   }
 
-  const updatedPrescription = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
-    await updatePrescription(id, {}, tx);
-    await deletePrescriptionItems(id, tx);
-    await createPrescriptionItems(
-      data.items.map((item) => ({
-        prescriptionId: id,
-        medicationName: item.medicationName,
-        dosage: item.dosage,
-        frequency: item.frequency,
-        duration: item.duration,
-        quantity: item.quantity,
-        instructions: item.instructions,
-      })),
-      tx
-    );
+  const updatedPrescription = await withTenant(
+    prescription.consultation.queue.organizationId,
+    async (tx) => {
+      await updatePrescription(id, {}, tx);
+      await deletePrescriptionItems(id, tx);
+      await createPrescriptionItems(
+        data.items.map((item) => ({
+          prescriptionId: id,
+          medicationName: item.medicationName,
+          dosage: item.dosage,
+          frequency: item.frequency,
+          duration: item.duration,
+          quantity: item.quantity,
+          instructions: item.instructions,
+        })),
+        tx
+      );
 
-    return await findPrescriptionById(id, tx);
-  });
+      return await findPrescriptionById(id, tx);
+    }
+  );
 
   await auditLogger({
     organizationId:
@@ -193,11 +198,11 @@ export async function updateExistingPrescription(id, data, user) {
 }
 
 export async function removePrescription(id, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const prescription = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findPrescriptionById(id, tx)
-  );
+  const prescription = await scoped(async (tx) => {
+    return await findPrescriptionById(id, tx);
+  });
 
   if (!prescription) {
     throw new AppError("Prescription not found.", 404);
@@ -210,11 +215,9 @@ export async function removePrescription(id, user) {
     throw new AppError("Prescription not found.", 404);
   }
 
-  const organizationId = prescription.consultation.queue.organizationId;
-
-  await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    deletePrescription(id, tx)
-  );
+  await withTenant(prescription.consultation.queue.organizationId, async (tx) => {
+    await deletePrescription(id, tx);
+  });
 
   await auditLogger({
     organizationId:

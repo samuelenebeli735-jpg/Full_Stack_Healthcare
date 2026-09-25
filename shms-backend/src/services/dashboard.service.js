@@ -1,5 +1,5 @@
 import { resolveOrganizationId } from "../utils/tenantAccess.js";
-import { withTenant } from "../utils/tenantContext.js";
+import { withTenant, withSuperAdmin } from "../utils/tenantContext.js";
 
 import {
   countProfiles,
@@ -44,10 +44,6 @@ const DIAGNOSIS_CATEGORIES = [
   },
 ];
 
-function roundToMonth(date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
 function categorizeDiagnosis(diagnosis) {
   const text = (diagnosis || "").toLowerCase();
   if (!text) return "Unspecified";
@@ -67,54 +63,57 @@ function buildDiagnosisColors() {
 
 export async function getHealthAnalytics(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
 
-  const trendStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+  return await runner(async (tx) => {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-  const [monthDiagnoses, trendDiagnoses] = await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    Promise.all([
+    const trendStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+    const [monthDiagnoses, trendDiagnoses] = await Promise.all([
       findDiagnoses(orgId, { from: monthStart, to: monthEnd }, tx),
       findDiagnoses(orgId, { from: trendStart, to: monthEnd }, tx),
-    ])
-  );
+    ]);
 
-  const breakdownMap = {};
-  const colors = buildDiagnosisColors();
-  monthDiagnoses.forEach((c) => {
-    const name = categorizeDiagnosis(c.diagnosis);
-    breakdownMap[name] = (breakdownMap[name] || 0) + 1;
-  });
-
-  const breakdown = Object.entries(breakdownMap)
-    .map(([name, count]) => ({ name, count, color: colors[name] || "#94a3b8" }))
-    .sort((a, b) => b.count - a.count);
-
-  const totalCases = breakdown.reduce((sum, b) => sum + b.count, 0);
-
-  const monthBuckets = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    monthBuckets.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-      label: d.toLocaleString("en-US", { month: "short" }),
-      count: 0,
+    const breakdownMap = {};
+    const colors = buildDiagnosisColors();
+    monthDiagnoses.forEach((c) => {
+      const name = categorizeDiagnosis(c.diagnosis);
+      breakdownMap[name] = (breakdownMap[name] || 0) + 1;
     });
-  }
-  const bucketMap = Object.fromEntries(monthBuckets.map((b) => [b.key, b]));
-  trendDiagnoses.forEach((c) => {
-    const key = `${c.consultationDate.getFullYear()}-${String(c.consultationDate.getMonth() + 1).padStart(2, "0")}`;
-    if (bucketMap[key]) bucketMap[key].count += 1;
-  });
 
-  return {
-    breakdown,
-    totalCases,
-    monthlyTrend: monthBuckets,
-  };
+    const breakdown = Object.entries(breakdownMap)
+      .map(([name, count]) => ({ name, count, color: colors[name] || "#94a3b8" }))
+      .sort((a, b) => b.count - a.count);
+
+    const totalCases = breakdown.reduce((sum, b) => sum + b.count, 0);
+
+    const monthBuckets = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      monthBuckets.push({
+        key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        label: d.toLocaleString("en-US", { month: "short" }),
+        count: 0,
+      });
+    }
+    const bucketMap = Object.fromEntries(monthBuckets.map((b) => [b.key, b]));
+    trendDiagnoses.forEach((c) => {
+      const key = `${c.consultationDate.getFullYear()}-${String(c.consultationDate.getMonth() + 1).padStart(2, "0")}`;
+      if (bucketMap[key]) bucketMap[key].count += 1;
+    });
+
+    return {
+      breakdown,
+      totalCases,
+      monthlyTrend: monthBuckets,
+    };
+  });
 }
 
 function resolveScope(organizationId, user) {
@@ -123,21 +122,24 @@ function resolveScope(organizationId, user) {
 
 export async function getDashboardSummary(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  const [
-    profiles,
-    staff,
-    departments,
-    positions,
-    services,
-    appointments,
-    appointmentsToday,
-    consultations,
-    appointmentStatusCounts,
-    queueStatusCounts,
-  ] = await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    Promise.all([
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
+
+  return await runner(async (tx) => {
+    const [
+      profiles,
+      staff,
+      departments,
+      positions,
+      services,
+      appointments,
+      appointmentsToday,
+      consultations,
+      appointmentStatusCounts,
+      queueStatusCounts,
+    ] = await Promise.all([
       countProfiles(orgId, tx),
       countStaff(orgId, tx),
       countDepartments(orgId, tx),
@@ -148,63 +150,69 @@ export async function getDashboardSummary(user, query = {}) {
       countConsultations(orgId, tx),
       findAppointmentStatusCounts(orgId, tx),
       findQueueStatusCounts(orgId, tx),
-    ])
-  );
+    ]);
 
-  return {
-    counts: {
-      profiles,
-      staff,
-      departments,
-      positions,
-      services,
-      appointments,
-      appointmentsToday,
-      consultations,
-    },
-    appointmentStatusCounts: appointmentStatusCounts.map((g) => ({
-      status: g.status,
-      count: g._count._all,
-    })),
-    queueStatusCounts: queueStatusCounts.map((g) => ({
-      status: g.status,
-      count: g._count._all,
-    })),
-  };
+    return {
+      counts: {
+        profiles,
+        staff,
+        departments,
+        positions,
+        services,
+        appointments,
+        appointmentsToday,
+        consultations,
+      },
+      appointmentStatusCounts: appointmentStatusCounts.map((g) => ({
+        status: g.status,
+        count: g._count._all,
+      })),
+      queueStatusCounts: queueStatusCounts.map((g) => ({
+        status: g.status,
+        count: g._count._all,
+      })),
+    };
+  });
 }
 
 export async function getAppointmentOverview(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  const [statusCounts, recentAppointments] = await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    Promise.all([
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
+
+  return await runner(async (tx) => {
+    const [statusCounts, recentAppointments] = await Promise.all([
       findAppointmentStatusCounts(orgId, tx),
       findRecentAppointments(orgId, 10, tx),
-    ])
-  );
+    ]);
 
-  return {
-    statusCounts: statusCounts.map((g) => ({
-      status: g.status,
-      count: g._count._all,
-    })),
-    recentAppointments,
-  };
+    return {
+      statusCounts: statusCounts.map((g) => ({
+        status: g.status,
+        count: g._count._all,
+      })),
+      recentAppointments,
+    };
+  });
 }
 
 export async function getQueueOverview(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  const statusCounts = await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    findQueueStatusCounts(orgId, tx)
-  );
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
 
-  return {
-    statusCounts: statusCounts.map((g) => ({
-      status: g.status,
-      count: g._count._all,
-    })),
-  };
+  return await runner(async (tx) => {
+    const statusCounts = await findQueueStatusCounts(orgId, tx);
+
+    return {
+      statusCounts: statusCounts.map((g) => ({
+        status: g.status,
+        count: g._count._all,
+      })),
+    };
+  });
 }

@@ -9,10 +9,11 @@ import {
 import {
   findAuthUserByIdentifier,
   findUserByEmail,
-  findUserByResetToken,
   createUser,
   updateResetToken,
+  findUserByResetToken,
   updatePassword,
+  findUserWithProfileById,
 } from "../repositories/user.repository.js";
 
 import {
@@ -26,20 +27,10 @@ import {
 
 import generateToken from "../utils/generateToken.js";
 import { sendPasswordResetEmail } from "../utils/email.js";
-import {
-  recordLoginFailure,
-  recordLoginSuccess,
-} from "../authorization/risk.js";
-import { securityAudit } from "../utils/securityAudit.js";
 import crypto from "crypto";
 
 /**
  * Register a new student.
- *
- * The pre-registration duplicate checks (email / matric number) are
- * intentionally cross-tenant and therefore run through the SECURITY
- * DEFINER authentication helper. Account creation itself runs under a
- * tenant transaction scoped to the target organization.
  */
 export async function registerStudent(data) {
   const organization = await findOrganizationById(data.organizationId);
@@ -52,20 +43,26 @@ export async function registerStudent(data) {
     throw new AppError("Organization not found.", 404);
   }
 
-  const existingUser = await findAuthUserByIdentifier(data.email);
+  // Pre-auth global uniqueness checks (SECURITY DEFINER) so a duplicate is a
+  // 409 before any tenant-scoped write is attempted.
+  const existingUser = await findUserByEmail(data.email);
 
   if (existingUser) {
-    throw new AppError("Email already exists.", 409);
-  }
+  throw new AppError("Email already exists.", 409);
+}
 
-  const existingProfile = await findAuthUserByIdentifier(data.matricNumber);
+  const existingProfileUser = await findAuthUserByIdentifier(
+    String(data.matricNumber ?? "").trim()
+  );
 
-  if (existingProfile) {
+  if (existingProfileUser?.matricNumber) {
     throw new AppError("Matric number already exists.", 409);
   }
 
   const hashedPassword = await hashPassword(data.password);
 
+  // Registration is a pre-auth flow: the target organization comes from the
+  // request, and the whole write runs with that tenant context.
   const result = await withTenant(data.organizationId, async (tx) => {
     const user = await createUser(
       {
@@ -106,60 +103,43 @@ export async function registerStudent(data) {
 
   const token = generateToken({ userId: safeUser.id, organizationId: safeUser.organizationId, role: safeUser.role });
 
-  await auditLogger({
-    organizationId: safeUser.organizationId,
-    userId: safeUser.id,
-    action: "REGISTER",
-    entity: "User",
-    entityId: safeUser.id,
-    description: `Student ${result.profile.firstName} ${result.profile.lastName} registered.`,
-  });
+await auditLogger({
+  organizationId: safeUser.organizationId,
+  userId: safeUser.id,
+  action: "REGISTER",
+  entity: "User",
+  entityId: safeUser.id,
+  description: `Student ${result.profile.firstName} ${result.profile.lastName} registered.`,
+});
 
-  return {
-    user: safeUser,
-    profile: result.profile,
-    token,
-  };
+return {
+  user: safeUser,
+  profile: result.profile,
+  token,
+};
 }
 
 /**
  * Login a student.
- *
- * The user is resolved BEFORE any tenant context exists (identifier can
- * be email, matric number, or staff number), so this lookup uses the
- * SECURITY DEFINER authentication helper rather than a tenant-scoped
- * query.
  */
-export async function loginStudent(data, context = {}) {
+export async function loginStudent(data) {
   const identifier = String(data.identifier ?? "").trim();
   const password = String(data.password ?? "");
-  const ip = context.ipAddress || null;
 
   if (!identifier || !password) {
     throw new AppError("Email or password is required.", 401);
   }
 
+  // Pre-auth identity resolution (SECURITY DEFINER) across all organizations.
   const user = await findAuthUserByIdentifier(identifier);
 
   if (!user) {
-    await recordLoginFailure(identifier, ip);
     throw new AppError("Invalid email or password.", 401);
   }
 
   const passwordMatches = await comparePassword(password, user.password);
 
   if (!passwordMatches) {
-    await recordLoginFailure(identifier, ip);
-    securityAudit({
-      organizationId: user.organizationId,
-      userId: user.id,
-      action: "AUTH_FAILURE",
-      entity: "User",
-      entityId: user.id,
-      description: `Failed login attempt for ${user.email}.`,
-      ipAddress: ip,
-      userAgent: context.userAgent || null,
-    });
     throw new AppError("Invalid email or password.", 401);
   }
 
@@ -167,32 +147,33 @@ export async function loginStudent(data, context = {}) {
     throw new AppError("Your account has been deactivated.", 403);
   }
 
-  await recordLoginSuccess(identifier, ip);
-
-  const { password: _password, resetToken, resetTokenExpiry, ...safeUser } = user;
-
   const token = generateToken({
-    userId: safeUser.id,
-    organizationId: safeUser.organizationId,
-    role: safeUser.role,
+    userId: user.id,
+    organizationId: user.organizationId,
+    role: user.role,
   });
 
+  // Preserve the historic login response shape (user + profile + organization).
+  const fullUser = (await findUserWithProfileById(user.id)) || null;
+
   await auditLogger({
-    organizationId: safeUser.organizationId,
-    userId: safeUser.id,
+    organizationId: user.organizationId,
+    userId: user.id,
     action: "LOGIN",
     entity: "User",
-    entityId: safeUser.id,
-    description: `${safeUser.email} logged in.`,
+    entityId: user.id,
+    description: `${user.email} logged in.`,
   });
 
   return {
-    user: safeUser,
+    user: fullUser,
     token,
   };
 }
 
 export async function forgotPassword(email) {
+  // Pre-auth global lookup so the reset token can be written even though the
+  // tenant context is unknown at this point.
   const user = await findUserByEmail(email);
 
   if (!user) {
@@ -205,14 +186,11 @@ export async function forgotPassword(email) {
 
   const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000);
 
-  await withTenant(user.organizationId, (tx) =>
-    updateResetToken(user.id, hashedToken, resetTokenExpiry, tx)
-  );
+  await withTenant(user.organizationId, async (tx) => {
+    await updateResetToken(user.id, hashedToken, resetTokenExpiry, tx);
+  });
 
-  await sendPasswordResetEmail(
-    { email: user.email },
-    resetToken
-  );
+  await sendPasswordResetEmail(user, resetToken);
 
   return { success: true };
 }
@@ -220,6 +198,7 @@ export async function forgotPassword(email) {
 export async function resetPassword(resetToken, newPassword) {
   const hashedToken = crypto.createHash("sha256").update(resetToken).digest("hex");
 
+  // Pre-auth global lookup by unexpired reset token.
   const user = await findUserByResetToken(hashedToken);
 
   if (!user) {
@@ -228,9 +207,9 @@ export async function resetPassword(resetToken, newPassword) {
 
   const hashedPassword = await hashPassword(newPassword);
 
-  await withTenant(user.organizationId, (tx) =>
-    updatePassword(user.id, hashedPassword, tx)
-  );
+  await withTenant(user.organizationId, async (tx) => {
+    await updatePassword(user.id, hashedPassword, tx);
+  });
 
   return { success: true, message: "Password reset successfully." };
 }

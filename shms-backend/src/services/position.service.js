@@ -1,7 +1,7 @@
 import AppError from "../utils/AppError.js";
-import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import { getPagination, buildPaginationMeta } from "../utils/pagination.js";
+import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
 
 import {
   findPositionById,
@@ -19,35 +19,34 @@ export async function createNewPosition(data, user) {
     user.role === "super_admin"
       ? data.organizationId
       : user.organizationId;
-  const isSuperAdmin = user.role === "super_admin";
 
-  const organization = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findOrganizationById(organizationId, tx)
-  );
+  const organization = await findOrganizationById(organizationId);
 
   if (!organization) {
     throw new AppError("Organization not found.", 404);
   }
 
-  const existingPosition = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    findPositionByCode(organizationId, data.code, tx)
-  );
-
-  if (existingPosition) {
-    throw new AppError(
-      "A position with this code already exists in this organization.",
-      409
+  const position = await withTenant(organizationId, async (tx) => {
+    const existingPosition = await findPositionByCode(
+      organizationId,
+      data.code,
+      tx
     );
-  }
 
-  const position = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    createPosition({
+    if (existingPosition) {
+      throw new AppError(
+        "A position with this code already exists in this organization.",
+        409
+      );
+    }
+
+    return await createPosition({
       organizationId,
       name: data.name,
       code: data.code,
       description: data.description,
-    }, tx)
-  );
+    }, tx);
+  });
 
   await auditLogger({
     organizationId,
@@ -68,21 +67,26 @@ export async function getOrganizationPositions(organizationId, user, query = {})
     user.role === "super_admin"
       ? organizationId ?? null
       : user.organizationId;
-  const isSuperAdmin = user.role === "super_admin";
 
-  const { page, limit, skip } = getPagination(query);
+  const runner = resolvedOrgId
+    ? (callback) => withTenant(resolvedOrgId, callback)
+    : withSuperAdmin;
 
-  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
-    findPositionsByOrganization(resolvedOrgId, query, tx)
-  );
+  const { page, limit } = getPagination(query);
+
+  const { items, total } = await runner(async (tx) => {
+    return await findPositionsByOrganization(resolvedOrgId, query, tx);
+  });
 
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
 }
 
 export async function getPositionById(id, user) {
-  const position = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
-    findPositionById(id, tx)
-  );
+  const scoped = resolveUserScope(user);
+
+  const position = await scoped(async (tx) => {
+    return await findPositionById(id, tx);
+  });
 
   if (!position) {
     throw new AppError("Position not found.", 404);
@@ -96,11 +100,11 @@ export async function getPositionById(id, user) {
 }
 
 export async function updateExistingPosition(id, data, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const position = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findPositionById(id, tx)
-  );
+  const position = await scoped(async (tx) => {
+    return await findPositionById(id, tx);
+  });
 
   if (!position) {
     throw new AppError("Position not found.", 404);
@@ -115,31 +119,29 @@ export async function updateExistingPosition(id, data, user) {
     throw new AppError("Position not found.", 404);
   }
 
-  if (data.code && data.code !== position.code) {
-    const existing = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-      findPositionByCode(organizationId, data.code, tx)
-    );
+  const updated = await withTenant(organizationId, async (tx) => {
+    if (data.code && data.code !== position.code) {
+      const existing = await findPositionByCode(organizationId, data.code, tx);
 
-    if (existing && existing.id !== id) {
-      throw new AppError(
-        "A position with this code already exists in this organization.",
-        409
-      );
+      if (existing && existing.id !== id) {
+        throw new AppError(
+          "A position with this code already exists in this organization.",
+          409
+        );
+      }
     }
-  }
 
-  const updateData = {};
+    const updateData = {};
 
-  if (data.name !== undefined) updateData.name = data.name;
-  if (data.code !== undefined) updateData.code = data.code;
-  if (data.description !== undefined) updateData.description = data.description;
+    if (data.name !== undefined) updateData.name = data.name;
+    if (data.code !== undefined) updateData.code = data.code;
+    if (data.description !== undefined) updateData.description = data.description;
 
-  const updated = await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-    updatePosition(id, updateData, tx)
-  );
+    return await updatePosition(id, updateData, tx);
+  });
 
   await auditLogger({
-    organizationId,
+    organizationId: position.organizationId,
     userId: user.id,
     action: "UPDATE",
     entity: "Position",
@@ -151,11 +153,11 @@ export async function updateExistingPosition(id, data, user) {
 }
 
 export async function removePosition(id, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const position = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findPositionById(id, tx)
-  );
+  const position = await scoped(async (tx) => {
+    return await findPositionById(id, tx);
+  });
 
   if (!position) {
     throw new AppError("Position not found.", 404);
@@ -165,12 +167,10 @@ export async function removePosition(id, user) {
     throw new AppError("Position not found.", 404);
   }
 
-  const organizationId = position.organizationId;
-
   try {
-    await withTenant(organizationId, { isSuperAdmin }, (tx) =>
-      deletePosition(id, tx)
-    );
+    await withTenant(position.organizationId, async (tx) => {
+      await deletePosition(id, tx);
+    });
   } catch (error) {
     if (error.code === "P2003") {
       throw new AppError(
@@ -182,7 +182,7 @@ export async function removePosition(id, user) {
   }
 
   await auditLogger({
-    organizationId,
+    organizationId: position.organizationId,
     userId: user.id,
     action: "DELETE",
     entity: "Position",

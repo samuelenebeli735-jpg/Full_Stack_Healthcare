@@ -1,14 +1,13 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
-export async function findServiceById(id, db = getTenantClient()) {
+export async function findServiceById(id, db = prisma) {
   return await db.service.findUnique({
     where: { id },
   });
 }
 
-export async function findServiceByCode(organizationId, code, db = getTenantClient()) {
+export async function findServiceByCode(organizationId, code, db = prisma) {
   return await db.service.findUnique({
     where: {
       organizationId_code: { organizationId, code },
@@ -19,7 +18,7 @@ export async function findServiceByCode(organizationId, code, db = getTenantClie
 export async function findServicesByOrganization(
   organizationId = null,
   query = {},
-  db = getTenantClient()
+  db = prisma
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["name", "code", "estimatedDuration", "createdAt", "updatedAt"],
@@ -45,14 +44,14 @@ export async function findServicesByOrganization(
   return { items, total };
 }
 
-export async function createService(data, db = getTenantClient()) {
+export async function createService(data, db = prisma) {
   return await db.service.create({ data });
 }
 
-export async function updateService(id, data, db = getTenantClient()) {
+export async function updateService(id, data, db = prisma) {
   return await db.service.update({ where: { id }, data });
 }
 
-export async function deleteService(id, db = getTenantClient()) {
+export async function deleteService(id, db = prisma) {
   return await db.service.delete({ where: { id } });
 }

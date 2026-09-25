@@ -9,6 +9,9 @@ import {
   getAppointmentById,
   updateExistingAppointment,
   removeAppointment,
+  getStaffAvailableSlots,
+  cancelAppointment as cancelAppointmentService,
+  rescheduleAppointment as rescheduleAppointmentService,
 } from "../services/appointment.service.js";
 
 /**
@@ -76,3 +79,48 @@ export const getAppointments = asyncHandler(
     );
   }
 );
+
+export const getAvailableSlots = asyncHandler(
+  async (req, res) => {
+    const result = await getStaffAvailableSlots(
+      req.params.staffId,
+      req.params.date,
+      req.user,
+      req.query
+    );
+
+    return successResponse(
+      res,
+      result,
+      "Available slots retrieved successfully."
+    );
+  }
+);
+
+export const cancelAppointment = asyncHandler(async (req, res) => {
+  const appointment = await cancelAppointmentService(
+    req.params.id,
+    req.body,
+    req.user
+  );
+
+  return successResponse(
+    res,
+    appointment,
+    "Appointment cancelled successfully."
+  );
+});
+
+export const rescheduleAppointment = asyncHandler(async (req, res) => {
+  const appointment = await rescheduleAppointmentService(
+    req.params.id,
+    req.body,
+    req.user
+  );
+
+  return successResponse(
+    res,
+    appointment,
+    "Appointment rescheduled successfully."
+  );
+});

@@ -1,11 +1,10 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
 /**
  * Find an organization by its ID.
  */
-export async function findOrganizationById(id, db = getTenantClient()) {
+export async function findOrganizationById(id, db = prisma) {
   return await db.organization.findUnique({
     where: {
       id,
@@ -16,7 +15,7 @@ export async function findOrganizationById(id, db = getTenantClient()) {
 /**
  * Find an organization by its slug.
  */
-export async function findOrganizationBySlug(slug, db = getTenantClient()) {
+export async function findOrganizationBySlug(slug, db = prisma) {
   return await db.organization.findUnique({
     where: {
       slug,
@@ -29,7 +28,7 @@ export async function findOrganizationBySlug(slug, db = getTenantClient()) {
  */
 export async function findOrganizationByEmail(
   email,
-  db = getTenantClient()
+  db = prisma
 ) {
   return await db.organization.findUnique({
     where: {
@@ -41,13 +40,13 @@ export async function findOrganizationByEmail(
 /**
  * Create a new organization.
  */
-export async function createOrganization(data, db = getTenantClient()) {
+export async function createOrganization(data, db = prisma) {
   return await db.organization.create({
     data,
   });
 }
 
-export async function findAllOrganizations(query = {}, db = getTenantClient()) {
+export async function findAllOrganizations(query = {}, db = prisma) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["name", "createdAt", "updatedAt"],
     defaultSort: { name: "asc" },
@@ -67,7 +66,7 @@ export async function findAllOrganizations(query = {}, db = getTenantClient()) {
   return { items, total };
 }
 
-export async function updateOrganization(id, data, db = getTenantClient()) {
+export async function updateOrganization(id, data, db = prisma) {
   return await db.organization.update({
     where: { id },
     data,
@@ -77,7 +76,7 @@ export async function updateOrganization(id, data, db = getTenantClient()) {
 /**
  * Find active organizations (public registration listing).
  */
-export async function findActiveOrganizations(db = getTenantClient()) {
+export async function findActiveOrganizations(db = prisma) {
   return await db.organization.findMany({
     where: { isActive: true },
     select: {

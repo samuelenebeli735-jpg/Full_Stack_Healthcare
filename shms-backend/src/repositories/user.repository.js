@@ -1,84 +1,66 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 
-function toUserWithProfile(row) {
-  if (!row) return null;
+async function globalAuthUser(identifier, db = prisma) {
+  const rows = await db.$queryRaw`
+    SELECT *
+    FROM public.shms_auth_user(${identifier})
+  `;
 
-  const id = row.id ?? row.Id;
-  const organizationId = row.organizationId ?? row.organizationid;
-  const email = row.email ?? row.Email;
-  const password = row.password ?? row.Password;
-  const role = row.role ?? row.Role;
-  const isActive = row.isActive ?? row.isactive;
-  const resetToken = row.resetToken ?? row.resettoken;
-  const resetTokenExpiry = row.resetTokenExpiry ?? row.resettokenexpiry;
-  const firstName = row.firstName ?? row.firstname;
-  const middleName = row.middleName ?? row.middlename;
-  const lastName = row.lastName ?? row.lastname;
-  const matricNumber = row.matricNumber ?? row.matricnumber;
-  const staffNumber = row.staffNumber ?? row.staffnumber;
+  if (!rows || rows.length === 0) {
+    return null;
+  }
 
+  const row = rows[0];
+
+  // The Postgres raw adapter lowercases column labels, so map the
+  // lowercase keys back to the model's camelCase field names.
   return {
-    id,
-    organizationId,
-    email,
-    password,
-    role,
-    isActive,
-    resetToken,
-    resetTokenExpiry,
-    profile: firstName || matricNumber
-      ? { firstName, middleName, lastName, matricNumber }
-      : null,
-    staff: staffNumber ? { staffNumber } : null,
-  };
-}
-
-function toUserRow(row) {
-  if (!row) return null;
-
-  return {
-    id: row.id ?? row.Id,
-    organizationId: row.organizationId ?? row.organizationid,
-    email: row.email ?? row.Email,
-    role: row.role ?? row.Role,
-    isActive: row.isActive ?? row.isactive,
-    resetToken: row.resetToken ?? row.resettoken,
-    resetTokenExpiry: row.resetTokenExpiry ?? row.resettokenexpiry,
+    id: row.id,
+    organizationId: row.organizationid,
+    email: row.email,
+    password: row.password,
+    role: row.role,
+    isActive: row.isactive,
+    resetToken: row.resettoken,
+    resetTokenExpiry: row.resettokenexpiry,
+    firstName: row.firstname,
+    middleName: row.middlename,
+    lastName: row.lastname,
+    matricNumber: row.matricnumber,
+    staffNumber: row.staffnumber,
   };
 }
 
 /**
- * Global authentication lookup by email, matric number, or staff number.
- * Runs through the SECURITY DEFINER function shms_auth_user so the
- * pre-authentication lookup can cross tenant boundaries without
- * weakening tenant RLS on the User table.
+ * Global pre-auth lookup by email | matric number | staff number.
+ * Resolved through the shms_auth_user SECURITY DEFINER function so identity
+ * can be established before an organization context exists (login, duplicate
+ * checks, password reset). Returns null when no user matches.
  */
-export async function findAuthUserByIdentifier(identifier, db = getTenantClient()) {
-  const [row] = await db.$queryRaw`SELECT * FROM public.shms_auth_user(${identifier})`;
-  return toUserWithProfile(row);
+export async function findAuthUserByIdentifier(identifier, db = prisma) {
+  return await globalAuthUser(identifier, db);
 }
 
 /**
- * Find a user by email (global existence check via SECURITY DEFINER).
+ * Find a user by email (global, pre-auth).
  */
-export async function findUserByEmail(email, db = getTenantClient()) {
-  const [row] = await db.$queryRaw`SELECT * FROM public.shms_auth_user(${email})`;
-  return toUserRow(row);
+export async function findUserByEmail(email, db = prisma) {
+  return await globalAuthUser(email, db);
 }
 
 /**
- * Find a user by email including their profile (authentication lookup).
+ * Find a user by email including their profile.
  */
-export async function findUserWithProfileByEmail(email, db = getTenantClient()) {
-  const [row] = await db.$queryRaw`SELECT * FROM public.shms_auth_user(${email})`;
-  return toUserWithProfile(row);
+export async function findUserWithProfileByEmail(email, db = prisma) {
+  return await globalAuthUser(email, db);
 }
 
 /**
- * Find a user by ID.
+ * Find a user by ID. RLS-scoped: callers must pass a transaction from a
+ * tenant/super-admin context, otherwise a row in another organization (or no
+ * context) is invisible.
  */
-export async function findUserById(id, db = getTenantClient()) {
+export async function findUserById(id, db = prisma) {
   return await db.user.findUnique({
     where: {
       id,
@@ -89,7 +71,7 @@ export async function findUserById(id, db = getTenantClient()) {
 /**
  * Create a new user.
  */
-export async function createUser(data, db = getTenantClient()) {
+export async function createUser(data, db = prisma) {
   return await db.user.create({
     data,
   });
@@ -98,43 +80,18 @@ export async function createUser(data, db = getTenantClient()) {
 /**
  * Find a user by profile matric number including profile and organization.
  */
-export async function findUserWithProfileByMatricNumber(matricNumber, db = getTenantClient()) {
-  const [row] = await db.$queryRaw`SELECT * FROM public.shms_auth_user(${matricNumber})`;
-  return toUserWithProfile(row);
+export async function findUserWithProfileByMatricNumber(matricNumber, db = prisma) {
+  return await globalAuthUser(matricNumber, db);
 }
 
-export async function findUserWithProfileByStaffNumber(staffNumber, db = getTenantClient()) {
-  const [row] = await db.$queryRaw`SELECT * FROM public.shms_auth_user(${staffNumber})`;
-  return toUserWithProfile(row);
-}
-
-/**
- * Global reset-token lookup via SECURITY DEFINER.
- */
-export async function findUserByResetToken(resetToken, db = getTenantClient()) {
-  const [row] = await db.$queryRaw`SELECT * FROM public.shms_user_by_reset_token(${resetToken})`;
-  return toUserRow(row);
-}
-
-/**
- * Read the organization hint for a user ID (used to establish tenant
- * context for user-scoped operations). Runs via SECURITY DEFINER.
- */
-export async function findUserOrgHint(userId, db = getTenantClient()) {
-  const [row] = await db.$queryRaw`SELECT * FROM public.shms_user_org(${userId})`;
-  return row
-    ? {
-        organizationId: row.organizationId ?? row.organizationid,
-        role: row.role ?? row.Role,
-        isActive: row.isActive ?? row.isactive,
-      }
-    : null;
+export async function findUserWithProfileByStaffNumber(staffNumber, db = prisma) {
+  return await globalAuthUser(staffNumber, db);
 }
 
 /**
  * Store a hashed reset token for a user.
  */
-export async function updateResetToken(userId, resetToken, resetTokenExpiry, db = getTenantClient()) {
+export async function updateResetToken(userId, resetToken, resetTokenExpiry, db = prisma) {
   return await db.user.update({
     where: { id: userId },
     data: { resetToken, resetTokenExpiry },
@@ -142,9 +99,36 @@ export async function updateResetToken(userId, resetToken, resetTokenExpiry, db 
 }
 
 /**
- * Find a user by a hashed reset token that hasn't expired (global lookup).
+ * Global pre-auth lookup of a user by a hashed, unexpired reset token.
+ * Resolved through the shms_user_by_reset_token SECURITY DEFINER function.
  */
-export async function updatePassword(userId, hashedPassword, db = getTenantClient()) {
+export async function findUserByResetToken(resetToken, db = prisma) {
+  const rows = await db.$queryRaw`
+    SELECT *
+    FROM public.shms_user_by_reset_token(${resetToken})
+  `;
+
+  if (!rows || rows.length === 0) {
+    return null;
+  }
+
+  const row = rows[0];
+
+  return {
+    id: row.id,
+    organizationId: row.organizationid,
+    email: row.email,
+    role: row.role,
+    isActive: row.isactive,
+    resetToken: row.resettoken,
+    resetTokenExpiry: row.resettokenexpiry,
+  };
+}
+
+/**
+ * Update a user's password and clear the reset token.
+ */
+export async function updatePassword(userId, hashedPassword, db = prisma) {
   return await db.user.update({
     where: { id: userId },
     data: {
@@ -157,8 +141,9 @@ export async function updatePassword(userId, hashedPassword, db = getTenantClien
 
 /**
  * Find a user by ID including their password (used for credential checks).
+ * RLS-scoped: must run inside a tenant/super-admin transaction.
  */
-export async function findUserWithPasswordById(id, db = getTenantClient()) {
+export async function findUserWithPasswordById(id, db = prisma) {
   return await db.user.findUnique({
     where: {
       id,
@@ -174,25 +159,69 @@ export async function findUserWithPasswordById(id, db = getTenantClient()) {
   });
 }
 
-/**
- * Find a user by ID including profile and organization.
- */
-export async function findUserWithProfileById(id, db = getTenantClient()) {
-  return await db.user.findUnique({
-    where: {
-      id,
-    },
-    select: {
-      id: true,
-      organizationId: true,
-      email: true,
-      role: true,
-      isActive: true,
-      createdAt: true,
-      updatedAt: true,
+function parseStoredObject(value) {
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  }
+  return value ?? null;
+}
 
-      profile: true,
-      organization: true,
-    },
-  });
+/**
+ * Global route-context lookup of a user by ID including profile and
+ * organization. Resolved through the shms_user_route SECURITY DEFINER
+ * function; used by the auth middleware and profile service before a tenant
+ * scope exists.
+ */
+export async function findUserWithProfileById(id, db = prisma) {
+  const rows = await db.$queryRaw`
+    SELECT *
+    FROM public.shms_user_route(${id})
+  `;
+
+  if (!rows || rows.length === 0) {
+    return null;
+  }
+
+  const row = rows[0];
+
+  return {
+    id: row.id,
+    organizationId: row.organizationid,
+    email: row.email,
+    role: row.role,
+    isActive: row.isactive,
+    createdAt: row.createdat,
+    updatedAt: row.updatedat,
+    profile: parseStoredObject(row.profile),
+    organization: parseStoredObject(row.organization),
+  };
+}
+
+/**
+ * Minimal global lookup of a user's organization used when a service only has
+ * a userId (notifications, student medical-record helpers). Resolved through
+ * the shms_user_org SECURITY DEFINER function.
+ */
+export async function findUserOrgHint(userId, db = prisma) {
+  const rows = await db.$queryRaw`
+    SELECT *
+    FROM public.shms_user_org(${userId})
+  `;
+
+  if (!rows || rows.length === 0) {
+    return null;
+  }
+
+  const row = rows[0];
+
+  return {
+    id: row.id,
+    organizationId: row.organizationid,
+    role: row.role,
+    isActive: row.isactive,
+  };
 }

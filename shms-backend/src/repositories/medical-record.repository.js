@@ -1,8 +1,7 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
-export async function findMedicalRecordByProfileId(profileId, db = getTenantClient()) {
+export async function findMedicalRecordByProfileId(profileId, db = prisma) {
   return await db.medicalRecord.findUnique({
     where: { profileId },
     include: {
@@ -23,7 +22,7 @@ export async function findMedicalRecordByProfileId(profileId, db = getTenantClie
   });
 }
 
-export async function findMedicalRecordById(id, db = getTenantClient()) {
+export async function findMedicalRecordById(id, db = prisma) {
   return await db.medicalRecord.findUnique({
     where: { id },
     include: {
@@ -44,8 +43,11 @@ export async function findMedicalRecordById(id, db = getTenantClient()) {
   });
 }
 
-export async function findMedicalRecordByRecordNumber(recordNumber, db = getTenantClient()) {
-  return await db.medicalRecord.findUnique({
+// recordNumber is no longer globally unique (uniqueness is enforced per
+// organization + recordYear via the recordSeq), so use findFirst scoped by
+// the tenant context provided by the caller.
+export async function findMedicalRecordByRecordNumber(recordNumber, db = prisma) {
+  return await db.medicalRecord.findFirst({
     where: { recordNumber },
     include: {
       profile: {
@@ -65,16 +67,40 @@ export async function findMedicalRecordByRecordNumber(recordNumber, db = getTena
   });
 }
 
-export async function countMedicalRecordsByYear(recordYear, db = getTenantClient()) {
-  return await db.medicalRecord.count({
-    where: { recordYear },
-  });
+/**
+ * Atomically reserve the next record sequence for (organizationId, recordYear).
+ *
+ * Uses an INSERT ... ON CONFLICT DO UPDATE so concurrent creators inside the
+ * same organization + year are serialized on the counter's unique index row
+ * lock; each request reliably receives a distinct sequence. The upsert runs in
+ * the caller's tenant context (the MedicalRecordCounter table enforces RLS on
+ * organizationId), so counters for different organizations are invisible to
+ * each other and cannot leak.
+ */
+export async function nextMedicalRecordSeq(
+  organizationId,
+  recordYear,
+  db = prisma
+) {
+  const rows = await db.$queryRawUnsafe(
+    `INSERT INTO "MedicalRecordCounter" ("id", "organizationId", "recordYear", "nextSeq", "createdAt", "updatedAt")
+     VALUES (gen_random_uuid()::text, $1, $2, 1, now(), now())
+     ON CONFLICT ("organizationId", "recordYear")
+     DO UPDATE SET "nextSeq" = "MedicalRecordCounter"."nextSeq" + 1, "updatedAt" = now()
+     RETURNING "nextSeq"`,
+    organizationId,
+    recordYear
+  );
+  if (!rows || rows.length !== 1) {
+    throw new Error("Failed to reserve a medical record sequence.");
+  }
+  return Number(rows[0].nextSeq);
 }
 
 export async function findMedicalRecords(
   organizationId = null,
   query = {},
-  db = getTenantClient()
+  db = prisma
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["recordNumber", "recordYear", "status", "createdAt"],
@@ -119,7 +145,7 @@ export async function findMedicalRecords(
   return { items, total };
 }
 
-export async function createMedicalRecord(data, db = getTenantClient()) {
+export async function createMedicalRecord(data, db = prisma) {
   return await db.medicalRecord.create({
     data,
     include: {
@@ -143,7 +169,7 @@ export async function createMedicalRecord(data, db = getTenantClient()) {
   });
 }
 
-export async function updateMedicalRecord(id, data, db = getTenantClient()) {
+export async function updateMedicalRecord(id, data, db = prisma) {
   return await db.medicalRecord.update({
     where: { id },
     data,

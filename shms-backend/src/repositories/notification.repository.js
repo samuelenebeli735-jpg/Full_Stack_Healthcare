@@ -1,11 +1,10 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
 export async function findNotificationsByUserId(
   userId,
   query = {},
-  db = getTenantClient()
+  db = prisma
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["createdAt"],
@@ -39,48 +38,48 @@ export async function findNotificationsByUserId(
   return { items, total };
 }
 
-export async function findUnreadNotificationCount(userId, db = getTenantClient()) {
+export async function findUnreadNotificationCount(userId, db = prisma) {
   return await db.notification.count({
     where: { userId, read: false },
   });
 }
 
-export async function findUsersByOrganization(organizationId, db = getTenantClient()) {
+export async function findUsersByOrganization(organizationId, db = prisma) {
   return await db.user.findMany({
     where: { organizationId },
     select: { id: true, organizationId: true },
   });
 }
 
-export async function createManyNotifications(data, db = getTenantClient()) {
+export async function createManyNotifications(data, db = prisma) {
   return await db.notification.createMany({ data });
 }
 
-export async function createNotification(data, db = getTenantClient()) {
+export async function createNotification(data, db = prisma) {
   return await db.notification.create({ data });
 }
 
-export async function markNotificationRead(id, userId, db = getTenantClient()) {
+export async function markNotificationRead(id, userId, db = prisma) {
   return await db.notification.updateMany({
     where: { id, userId },
     data: { read: true },
   });
 }
 
-export async function markAllNotificationsRead(userId, db = getTenantClient()) {
+export async function markAllNotificationsRead(userId, db = prisma) {
   return await db.notification.updateMany({
     where: { userId, read: false },
     data: { read: true },
   });
 }
 
-export async function findPreferenceByUserId(userId, db = getTenantClient()) {
+export async function findPreferenceByUserId(userId, db = prisma) {
   return await db.notificationPreference.findUnique({
     where: { userId },
   });
 }
 
-export async function upsertPreference(userId, data, db = getTenantClient()) {
+export async function upsertPreference(userId, data, db = prisma) {
   return await db.notificationPreference.upsert({
     where: { userId },
     create: { userId, ...data },

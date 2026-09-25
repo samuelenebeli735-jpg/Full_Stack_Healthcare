@@ -1,14 +1,13 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 import { buildPrismaQuery } from "../utils/query.js";
 
-export async function findDepartmentById(id, db = getTenantClient()) {
+export async function findDepartmentById(id, db = prisma) {
   return await db.department.findUnique({
     where: { id },
   });
 }
 
-export async function findDepartmentByCode(organizationId, code, db = getTenantClient()) {
+export async function findDepartmentByCode(organizationId, code, db = prisma) {
   return await db.department.findUnique({
     where: {
       organizationId_code: { organizationId, code },
@@ -19,7 +18,7 @@ export async function findDepartmentByCode(organizationId, code, db = getTenantC
 export async function findDepartmentsByOrganization(
   organizationId = null,
   query = {},
-  db = getTenantClient()
+  db = prisma
 ) {
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["name", "code", "createdAt", "updatedAt"],
@@ -47,14 +46,14 @@ export async function findDepartmentsByOrganization(
   return { items, total };
 }
 
-export async function createDepartment(data, db = getTenantClient()) {
+export async function createDepartment(data, db = prisma) {
   return await db.department.create({ data });
 }
 
-export async function updateDepartment(id, data, db = getTenantClient()) {
+export async function updateDepartment(id, data, db = prisma) {
   return await db.department.update({ where: { id }, data });
 }
 
-export async function deleteDepartment(id, db = getTenantClient()) {
+export async function deleteDepartment(id, db = prisma) {
   return await db.department.delete({ where: { id } });
 }

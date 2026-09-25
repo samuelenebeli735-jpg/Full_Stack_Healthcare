@@ -1,5 +1,5 @@
 import { resolveOrganizationId } from "../utils/tenantAccess.js";
-import { withTenant } from "../utils/tenantContext.js";
+import { withTenant, withSuperAdmin } from "../utils/tenantContext.js";
 
 import {
   findAppointmentsForReport,
@@ -40,62 +40,84 @@ function groupByDay(rows, dateField, statusField = null) {
 
 export async function getAppointmentReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  const { statusCounts, rows } = await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    findAppointmentsForReport(orgId, query.from, query.to, tx)
-  );
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
 
-  return {
-    total: rows.length,
-    statusCounts: statusCounts.map((g) => ({
-      status: g.status,
-      count: g._count._all,
-    })),
-    byDay: groupByDay(rows, "appointmentDate", "status"),
-  };
+  return await runner(async (tx) => {
+    const { statusCounts, rows } = await findAppointmentsForReport(
+      orgId,
+      query.from,
+      query.to,
+      tx
+    );
+
+    return {
+      total: rows.length,
+      statusCounts: statusCounts.map((g) => ({
+        status: g.status,
+        count: g._count._all,
+      })),
+      byDay: groupByDay(rows, "appointmentDate", "status"),
+    };
+  });
 }
 
 export async function getConsultationReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  const rows = await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    findConsultationsForReport(orgId, query.from, query.to, tx)
-  );
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
 
-  return {
-    total: rows.length,
-    byDay: groupByDay(rows, "consultationDate"),
-  };
+  return await runner(async (tx) => {
+    const rows = await findConsultationsForReport(
+      orgId,
+      query.from,
+      query.to,
+      tx
+    );
+
+    return {
+      total: rows.length,
+      byDay: groupByDay(rows, "consultationDate"),
+    };
+  });
 }
 
 export async function getPatientReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  const stats = await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    findPatientStats(orgId, tx)
-  );
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
 
-  return {
-    total: stats.total,
-    byGender: stats.byGender.map((g) => ({
-      gender: g.gender,
-      count: g._count._all,
-    })),
-    byLevel: stats.byLevel.map((g) => ({
-      level: g.level,
-      count: g._count._all,
-    })),
-  };
+  return await runner(async (tx) => {
+    const stats = await findPatientStats(orgId, tx);
+
+    return {
+      total: stats.total,
+      byGender: stats.byGender.map((g) => ({
+        gender: g.gender,
+        count: g._count._all,
+      })),
+      byLevel: stats.byLevel.map((g) => ({
+        level: g.level,
+        count: g._count._all,
+      })),
+    };
+  });
 }
 
 export async function getStaffReport(user, query = {}) {
   const orgId = resolveScope(query.organizationId, user);
-  const isSuperAdmin = user.role === "super_admin";
 
-  return await withTenant(orgId, { isSuperAdmin }, (tx) =>
-    findStaffStats(orgId, tx)
-  );
+  const runner = orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
+
+  return await runner(async (tx) => {
+    return await findStaffStats(orgId, tx);
+  });
 }

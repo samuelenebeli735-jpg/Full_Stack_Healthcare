@@ -1,7 +1,7 @@
 import AppError from "../utils/AppError.js";
 import { resolveOrganizationId } from "../utils/tenantAccess.js";
-import { withTenant } from "../utils/tenantContext.js";
 import { auditLogger } from "../utils/auditLogger.js";
+import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
 import {
   getPagination,
   buildPaginationMeta,
@@ -24,6 +24,38 @@ import {
 
 import calculateQueueEstimate from "../utils/calculateQueueEstimate.js";
 
+/**
+ * Deterministic 32-bit FNV-1a hash. Stable across processes, so every
+ * request derives the same advisory-lock key for the same
+ * (organizationId, queueDate) pair.
+ */
+function fnv1a32(value) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash | 0;
+}
+
+/**
+ * Serialize queue-number allocation for one organization on one queue date.
+ *
+ * Allocations use a read-then-insert (last queueNumber + 1); to make that
+ * race-safe the whole allocation runs inside a transaction-scoped advisory
+ * lock keyed by (organizationId, queueDate). Only check-ins for the same
+ * organization on the same queue date contend; other organizations, other
+ * dates and unrelated queue activity are never blocked. The lock is acquired
+ * on and released with the check-in transaction (pg_advisory_xact_lock).
+ */
+async function lockQueueDate(tx, organizationId, queueDate) {
+  await tx.$executeRawUnsafe(
+    "SELECT pg_catalog.pg_advisory_xact_lock($1::int, $2::int)",
+    fnv1a32(organizationId),
+    fnv1a32(queueDate)
+  );
+}
+
 function getTodayRange() {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
@@ -42,12 +74,18 @@ function getLocalDateString(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-export async function checkInPatient(data, user) {
-  const isSuperAdmin = user.role === "super_admin";
+function runnable(orgId) {
+  return orgId
+    ? (callback) => withTenant(orgId, callback)
+    : withSuperAdmin;
+}
 
-  const appointment = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findAppointmentById(data.appointmentId, tx)
-  );
+export async function checkInPatient(data, user) {
+  const scoped = resolveUserScope(user);
+
+  const appointment = await scoped(async (tx) => {
+    return await findAppointmentById(data.appointmentId, tx);
+  });
 
   if (!appointment) {
     throw new AppError("Appointment not found.", 404);
@@ -87,27 +125,32 @@ export async function checkInPatient(data, user) {
     );
   }
 
-  const existingQueue = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findQueueByAppointmentId(data.appointmentId, tx)
-  );
+  const queueDate = getLocalDateString();
+
+  const organizationId = appointment.organizationId;
+
+  const existingQueue = await withTenant(organizationId, async (tx) => {
+    return await findQueueByAppointmentId(data.appointmentId, tx);
+  });
 
   if (existingQueue) {
     throw new AppError("Patient has already checked in.", 409);
   }
 
-  const queueDate = getLocalDateString();
-
-  const organizationId = appointment.organizationId;
-
   let result;
 
-  // Retry on the unique (organizationId, queueDate, queueNumber) constraint
-  // so concurrent check-ins receive distinct sequential numbers.
+  // Allocate the queue number inside a per-(organizationId, queueDate)
+  // transaction-scoped advisory lock so concurrent check-ins receive
+  // distinct numbers deterministically. The (organizationId, queueDate,
+  // queueNumber) and appointmentId unique constraints remain as final
+  // guards; a stale retry is absorbed by re-running the allocation.
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
-      result = await withTenant(organizationId, { isSuperAdmin }, async (tx) => {
+      result = await withTenant(organizationId, async (tx) => {
+        await lockQueueDate(tx, organizationId, queueDate);
+
         const lastQueue = await findLastQueueByDate(
-          appointment.organizationId,
+          organizationId,
           queueDate,
           tx
         );
@@ -121,7 +164,7 @@ export async function checkInPatient(data, user) {
 
         const queue = await createQueue(
           {
-            organizationId: appointment.organizationId,
+            organizationId,
             appointmentId: appointment.id,
             queueNumber,
             queueDate,
@@ -140,15 +183,28 @@ export async function checkInPatient(data, user) {
       });
       break;
     } catch (error) {
-      if (error.code === "P2002" && attempt < 4) {
-        continue;
+      if (error.code === "P2002") {
+        // Two concurrent check-ins raced for the same appointment: only one
+        // can hold the 1:1 (appointmentId) queue row. Re-check and report
+        // the controlled conflict instead of surfacing the constraint error.
+        const already = await withTenant(organizationId, async (tx) => {
+          return await findQueueByAppointmentId(data.appointmentId, tx);
+        });
+
+        if (already) {
+          throw new AppError("Patient has already checked in.", 409);
+        }
+
+        if (attempt < 4) {
+          continue;
+        }
       }
       throw error;
     }
   }
 
   await auditLogger({
-    organizationId: appointment.organizationId,
+    organizationId,
     userId: user.id,
     action: "CHECKIN",
     entity: "Queue",
@@ -162,20 +218,18 @@ export async function checkInPatient(data, user) {
 export async function getTodayQueue(organizationId, user, query = {}) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
-  const isSuperAdmin = user.role === "super_admin";
-
   const { startOfDay, endOfDay } = getTodayRange();
   const { page, limit, skip } = getPagination(query);
 
-  const { items, total } = await withTenant(resolvedOrgId, { isSuperAdmin }, (tx) =>
-    findTodayQueue(
+  const { items, total } = await runnable(resolvedOrgId)(async (tx) => {
+    return await findTodayQueue(
       resolvedOrgId,
       startOfDay,
       endOfDay,
       { skip, limit },
       tx
-    )
-  );
+    );
+  });
 
   return { items, pagination: buildPaginationMeta({ page, limit, total }) };
 }
@@ -184,57 +238,57 @@ export async function getMyQueue(user) {
   const queueDate = getLocalDateString();
   const { startOfDay, endOfDay } = getTodayRange();
 
-  const queue = await withTenant(user.organizationId, (tx) =>
-    findQueueByUserIdAndDate(user.id, queueDate, tx)
-  );
+  return await withTenant(user.organizationId, async (tx) => {
+    const queue = await findQueueByUserIdAndDate(user.id, queueDate, tx);
 
-  if (!queue) {
-    return null;
-  }
+    if (!queue) {
+      return null;
+    }
 
-  const { items: todayQueue } = await withTenant(queue.organizationId, (tx) =>
-    findTodayQueue(
+    const { items: todayQueue } = await findTodayQueue(
       queue.organizationId,
       startOfDay,
       endOfDay,
       { skip: 0, limit: 500 },
       tx
-    )
-  );
+    );
 
-  const active = todayQueue
-    .filter((q) => q.status !== "completed" && q.status !== "cancelled")
-    .sort((a, b) => a.queueNumber - b.queueNumber);
+    const active = todayQueue
+      .filter((q) => q.status !== "completed" && q.status !== "cancelled")
+      .sort((a, b) => a.queueNumber - b.queueNumber);
 
-  const myIndex = active.findIndex((q) => q.id === queue.id);
-  const patientsAhead = myIndex >= 0 ? myIndex : 0;
+    const myIndex = active.findIndex((q) => q.id === queue.id);
+    const patientsAhead = myIndex >= 0 ? myIndex : 0;
 
-  const currentServing =
-    active.find((q) => q.status === "in_progress" || q.status === "called") ||
-    active[0] ||
-    null;
+    const currentServing =
+      active.find((q) => q.status === "in_progress" || q.status === "called") ||
+      active[0] ||
+      null;
 
-  return {
-    id: queue.id,
-    queueNumber: queue.queueNumber,
-    status: queue.status,
-    estimatedWaitMinutes: queue.estimatedWaitMinutes,
-    appointmentId: queue.appointmentId,
-    appointmentStatus: queue.appointment?.status || null,
-    patientsAhead,
-    currentServing: currentServing
-      ? {
-          queueNumber: currentServing.queueNumber,
-          status: currentServing.status,
-        }
-      : null,
-  };
+    return {
+      id: queue.id,
+      queueNumber: queue.queueNumber,
+      status: queue.status,
+      estimatedWaitMinutes: queue.estimatedWaitMinutes,
+      appointmentId: queue.appointmentId,
+      appointmentStatus: queue.appointment?.status || null,
+      patientsAhead,
+      currentServing: currentServing
+        ? {
+            queueNumber: currentServing.queueNumber,
+            status: currentServing.status,
+          }
+        : null,
+    };
+  });
 }
 
 export async function getQueueById(id, user) {
-  const queue = await withTenant(user.organizationId, { isSuperAdmin: user.role === "super_admin" }, (tx) =>
-    findQueueById(id, tx)
-  );
+  const scoped = resolveUserScope(user);
+
+  const queue = await scoped(async (tx) => {
+    return await findQueueById(id, tx);
+  });
 
   if (!queue) {
     throw new AppError("Queue entry not found.", 404);
@@ -256,11 +310,9 @@ export async function getQueueById(id, user) {
 export async function callNextPatient(organizationId, user) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
-  const isSuperAdmin = user.role === "super_admin";
-
   const { startOfDay, endOfDay } = getTodayRange();
 
-  return await withTenant(resolvedOrgId, { isSuperAdmin }, async (tx) => {
+  const updatedQueue = await runnable(resolvedOrgId)(async (tx) => {
     const { items: queue } = await findTodayQueue(
       resolvedOrgId,
       startOfDay,
@@ -291,11 +343,6 @@ export async function callNextPatient(organizationId, user) {
       );
     }
 
-    const updatedQueue = await updateQueue(nextPatient.id, {
-      status: "called",
-      calledAt: new Date(),
-    }, tx);
-
     await auditLogger({
       organizationId: resolvedOrgId,
       userId: user.id,
@@ -305,18 +352,21 @@ export async function callNextPatient(organizationId, user) {
       description: `Called queue number ${nextPatient.queueNumber}.`,
     });
 
-    return updatedQueue;
+    return await updateQueue(nextPatient.id, {
+      status: "called",
+      calledAt: new Date(),
+    }, tx);
   });
+
+  return updatedQueue;
 }
 
 export async function skipPatient(organizationId, user) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
-  const isSuperAdmin = user.role === "super_admin";
-
   const { startOfDay, endOfDay } = getTodayRange();
 
-  return await withTenant(resolvedOrgId, { isSuperAdmin }, async (tx) => {
+  const result = await runnable(resolvedOrgId)(async (tx) => {
     const { items: queue } = await findTodayQueue(
       resolvedOrgId,
       startOfDay,
@@ -336,16 +386,17 @@ export async function skipPatient(organizationId, user) {
       );
     }
 
-    const result = await updateQueue(currentPatient.id, {
-      status: "cancelled",
-      completedAt: new Date(),
-    }, tx);
+    const skipped = await tx.queue.updateMany({
+      where: { id: currentPatient.id, status: "called" },
+      data: { status: "cancelled", completedAt: new Date() },
+    });
 
-    await updateAppointment(
-      currentPatient.appointmentId,
-      { status: "cancelled" },
-      tx
-    );
+    if (skipped.count === 0) {
+      throw new AppError(
+        "There is no patient currently called to skip.",
+        404
+      );
+    }
 
     await auditLogger({
       organizationId: resolvedOrgId,
@@ -356,16 +407,29 @@ export async function skipPatient(organizationId, user) {
       description: `Skipped queue number ${currentPatient.queueNumber}.`,
     });
 
-    return result;
+    const updated = await updateQueue(currentPatient.id, {
+      status: "cancelled",
+      completedAt: new Date(),
+    }, tx);
+
+    await updateAppointment(
+      currentPatient.appointmentId,
+      { status: "cancelled" },
+      tx
+    );
+
+    return updated;
   });
+
+  return result;
 }
 
 export async function startConsultation(queueId, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const queue = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findQueueById(queueId, tx)
-  );
+  const queue = await scoped(async (tx) => {
+    return await findQueueById(queueId, tx);
+  });
 
   if (!queue) {
     throw new AppError("Queue entry not found.", 404);
@@ -385,7 +449,19 @@ export async function startConsultation(queueId, user) {
     throw new AppError("Patient has not been called yet.", 400);
   }
 
-  const updated = await withTenant(queue.organizationId, { isSuperAdmin }, async (tx) => {
+  const updated = await withTenant(queue.organizationId, async (tx) => {
+    // Atomic compare-and-set: only a "called" entry may start. Two
+    // concurrent START attempts (or a start racing a skip/cancel) cannot
+    // both succeed or move an already-advanced entry backwards.
+    const started = await tx.queue.updateMany({
+      where: { id: queueId, status: "called" },
+      data: { status: "in_progress", startedAt: new Date() },
+    });
+
+    if (started.count === 0) {
+      throw new AppError("Patient has not been called yet.", 400);
+    }
+
     const result = await updateQueue(queueId, {
       status: "in_progress",
       startedAt: new Date(),
@@ -413,11 +489,11 @@ export async function startConsultation(queueId, user) {
 }
 
 export async function completeConsultation(queueId, user) {
-  const isSuperAdmin = user.role === "super_admin";
+  const scoped = resolveUserScope(user);
 
-  const queue = await withTenant(user.organizationId, { isSuperAdmin }, (tx) =>
-    findQueueById(queueId, tx)
-  );
+  const queue = await scoped(async (tx) => {
+    return await findQueueById(queueId, tx);
+  });
 
   if (!queue) {
     throw new AppError("Queue entry not found.", 404);
@@ -437,7 +513,17 @@ export async function completeConsultation(queueId, user) {
     throw new AppError("Consultation has not started.", 400);
   }
 
-  const result = await withTenant(queue.organizationId, { isSuperAdmin }, async (tx) => {
+  const result = await withTenant(queue.organizationId, async (tx) => {
+    // Atomic compare-and-set: only an "in_progress" entry may complete.
+    const completed = await tx.queue.updateMany({
+      where: { id: queueId, status: "in_progress" },
+      data: { status: "completed", completedAt: new Date() },
+    });
+
+    if (completed.count === 0) {
+      throw new AppError("Consultation has not started.", 400);
+    }
+
     await updateAppointment(
       queue.appointmentId,
       { status: "completed" },

@@ -1,5 +1,7 @@
 import jwt from "jsonwebtoken";
 
+import env from "../config/env.js";
+
 /**
  * Generate a JWT for an authenticated user.
  *
@@ -13,9 +15,9 @@ export default function generateToken({ userId, organizationId, role }) {
       organizationId,
       role,
     },
-    process.env.JWT_SECRET,
+    env.JWT_SECRET,
     {
-      expiresIn: process.env.JWT_EXPIRES_IN,
+      expiresIn: env.JWT_EXPIRES_IN,
     }
   );
 }

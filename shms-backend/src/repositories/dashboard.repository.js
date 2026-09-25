@@ -1,38 +1,37 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 
 const scopeWhere = (organizationId) =>
   organizationId ? { organizationId } : {};
 
-export async function countProfiles(organizationId, db = getTenantClient()) {
+export async function countProfiles(organizationId, db = prisma) {
   return await db.profile.count({
     where: organizationId ? { user: { organizationId } } : {},
   });
 }
 
-export async function countStaff(organizationId, db = getTenantClient()) {
+export async function countStaff(organizationId, db = prisma) {
   return await db.staff.count({
     where: organizationId ? { user: { organizationId } } : {},
   });
 }
 
-export async function countDepartments(organizationId, db = getTenantClient()) {
+export async function countDepartments(organizationId, db = prisma) {
   return await db.department.count({ where: scopeWhere(organizationId) });
 }
 
-export async function countPositions(organizationId, db = getTenantClient()) {
+export async function countPositions(organizationId, db = prisma) {
   return await db.position.count({ where: scopeWhere(organizationId) });
 }
 
-export async function countServices(organizationId, db = getTenantClient()) {
+export async function countServices(organizationId, db = prisma) {
   return await db.service.count({ where: scopeWhere(organizationId) });
 }
 
-export async function countAppointments(organizationId, db = getTenantClient()) {
+export async function countAppointments(organizationId, db = prisma) {
   return await db.appointment.count({ where: scopeWhere(organizationId) });
 }
 
-export async function countAppointmentsToday(organizationId, db = getTenantClient()) {
+export async function countAppointmentsToday(organizationId, db = prisma) {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
 
@@ -47,13 +46,13 @@ export async function countAppointmentsToday(organizationId, db = getTenantClien
   });
 }
 
-export async function countConsultations(organizationId, db = getTenantClient()) {
+export async function countConsultations(organizationId, db = prisma) {
   return await db.consultation.count({
     where: organizationId ? { queue: { organizationId } } : {},
   });
 }
 
-export async function findAppointmentStatusCounts(organizationId, db = getTenantClient()) {
+export async function findAppointmentStatusCounts(organizationId, db = prisma) {
   return await db.appointment.groupBy({
     by: ["status"],
     where: scopeWhere(organizationId),
@@ -61,7 +60,7 @@ export async function findAppointmentStatusCounts(organizationId, db = getTenant
   });
 }
 
-export async function findQueueStatusCounts(organizationId, db = getTenantClient()) {
+export async function findQueueStatusCounts(organizationId, db = prisma) {
   return await db.queue.groupBy({
     by: ["status"],
     where: scopeWhere(organizationId),
@@ -72,7 +71,7 @@ export async function findQueueStatusCounts(organizationId, db = getTenantClient
 export async function findRecentAppointments(
   organizationId,
   limit = 10,
-  db = getTenantClient()
+  db = prisma
 ) {
   return await db.appointment.findMany({
     where: scopeWhere(organizationId),
@@ -93,7 +92,7 @@ export async function findRecentAppointments(
 export async function findDiagnoses(
   organizationId,
   { from, to },
-  db = getTenantClient()
+  db = prisma
 ) {
   return await db.consultation.findMany({
     where: {

@@ -2,7 +2,6 @@ import jwt from "jsonwebtoken";
 
 import AppError from "../utils/AppError.js";
 import env from "../config/env.js";
-import { withTenant } from "../utils/tenantContext.js";
 
 import { findUserWithProfileById } from "../repositories/user.repository.js";
 
@@ -32,16 +31,8 @@ const authenticate = async (req, res, next) => {
       env.JWT_SECRET
     );
 
-    // Find user within their organization's tenant context. If the token's
-    // organization claim does not match the user's real organization, RLS
-    // hides the row and the request is rejected (fail closed).
-    if (!decoded.organizationId) {
-      throw new AppError("Invalid authorization token.", 401);
-    }
-
-    const user = await withTenant(decoded.organizationId, (tx) =>
-      findUserWithProfileById(decoded.userId, tx)
-    );
+    // Find user
+    const user = await findUserWithProfileById(decoded.userId);
 
     if (!user) {
       throw new AppError("User not found.", 401);

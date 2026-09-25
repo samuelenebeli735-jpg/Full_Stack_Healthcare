@@ -1,7 +1,6 @@
 import prisma from "../config/db.js";
-import { getTenantClient } from "../utils/tenantContext.js";
 
-export async function findQueueById(id, db = getTenantClient()) {
+export async function findQueueById(id, db = prisma) {
   return await db.queue.findUnique({
     where: { id },
     include: {
@@ -32,7 +31,7 @@ export async function findQueueById(id, db = getTenantClient()) {
   });
 }
 
-export async function findQueueByAppointmentId(appointmentId, db = getTenantClient()) {
+export async function findQueueByAppointmentId(appointmentId, db = prisma) {
   return await db.queue.findUnique({
     where: { appointmentId },
   });
@@ -43,7 +42,7 @@ export async function findTodayQueue(
   startOfDay,
   endOfDay,
   pagination = {},
-  db = getTenantClient()
+  db = prisma
 ) {
   const { skip = 0, limit = 20 } = pagination;
   const where = {
@@ -92,7 +91,7 @@ export async function findTodayQueue(
   return { items, total };
 }
 
-export async function findLastQueueToday(organizationId, startOfDay, endOfDay, db = getTenantClient()) {
+export async function findLastQueueToday(organizationId, startOfDay, endOfDay, db = prisma) {
   return await db.queue.findFirst({
     where: {
       organizationId,
@@ -105,7 +104,7 @@ export async function findLastQueueToday(organizationId, startOfDay, endOfDay, d
   });
 }
 
-export async function findLastQueueByDate(organizationId, queueDate, db = getTenantClient()) {
+export async function findLastQueueByDate(organizationId, queueDate, db = prisma) {
   return await db.queue.findFirst({
     where: {
       organizationId,
@@ -115,7 +114,7 @@ export async function findLastQueueByDate(organizationId, queueDate, db = getTen
   });
 }
 
-export async function findQueueByUserIdAndDate(userId, queueDate, db = getTenantClient()) {
+export async function findQueueByUserIdAndDate(userId, queueDate, db = prisma) {
   return await db.queue.findFirst({
     where: {
       queueDate,
@@ -155,7 +154,7 @@ export async function findQueueByUserIdAndDate(userId, queueDate, db = getTenant
   });
 }
 
-export async function createQueue(data, db = getTenantClient()) {
+export async function createQueue(data, db = prisma) {
   return await db.queue.create({
     data,
     include: {
@@ -186,7 +185,7 @@ export async function createQueue(data, db = getTenantClient()) {
   });
 }
 
-export async function updateQueue(id, data, db = getTenantClient()) {
+export async function updateQueue(id, data, db = prisma) {
   return await db.queue.update({
     where: { id },
     data,

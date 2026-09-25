@@ -62,7 +62,7 @@ export async function createNewOrganization(data, user) {
 }
 
 export async function getAllOrganizations(query = {}) {
-  const { page, limit, skip } = getPagination(query);
+  const { page, limit } = getPagination(query);
 
   const { items, total } = await findAllOrganizations(query);
 
