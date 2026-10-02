@@ -29,7 +29,7 @@
                 <path d="M20 60 L35 60 L45 50 L55 70 L65 45 L75 60 L100 60" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>
               </svg>
             </div>
-            <h2 id="welcomeText">Good morning, John</h2>
+            <h2 id="welcomeText">Good morning</h2>
             <p>Your health is our priority. Manage your appointments and queue from here.</p>
             <div class="welcome-time" id="currentTime"></div>
           </div>
@@ -67,7 +67,7 @@
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                     Upcoming Appointment
                   </h3>
-                  <span class="badge badge-primary" id="apptStatusBadge">Confirmed</span>
+                  <span class="badge badge-primary" id="apptStatusBadge" style="display:none"></span>
                 </div>
                 <div id="upcomingApptBody">
                   <div class="upcoming-appointment-body">
@@ -75,13 +75,13 @@
                       <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                     </div>
                     <div class="appointment-info">
-                      <h4 id="apptDoctor">Dr. Olawale Adebayo</h4>
-                      <p id="apptService">General Consultation</p>
-                      <p id="apptDept">General Medicine</p>
+                      <h4 id="apptDoctor">Your next appointment</h4>
+                      <p id="apptService"></p>
+                      <p id="apptDept"></p>
                     </div>
                     <div class="appointment-time">
-                      <div class="time" id="apptTime">10:00 AM</div>
-                      <div class="date" id="apptDate">Jul 2, 2026</div>
+                      <div class="time" id="apptTime"></div>
+                      <div class="date" id="apptDate"></div>
                     </div>
                   </div>
                 </div>
@@ -94,8 +94,8 @@
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>
                     </div>
                   </div>
-                  <div class="stat-card-value" id="totalAppts">12</div>
-                  <div class="stat-card-change positive">+2 this month</div>
+                  <div class="stat-card-value" id="totalAppts">–</div>
+                  <div class="stat-card-change positive" id="apptMonthChange"></div>
                 </div>
                 <div class="stat-card blue">
                   <div class="stat-card-header">
@@ -104,8 +104,8 @@
                       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
                     </div>
                   </div>
-                  <div class="stat-card-value" id="completedAppts">10</div>
-                  <div class="stat-card-change positive">83% completion rate</div>
+                  <div class="stat-card-value" id="completedAppts">–</div>
+                  <div class="stat-card-change positive" id="completionRate"></div>
                 </div>
               </div>
               <div class="card">
@@ -124,7 +124,7 @@
             <div class="dashboard-sidebar">
               <div class="queue-status-card" id="queueCard">
                 <div class="queue-number" id="queueNumber">--</div>
-                <div class="queue-label">Your Queue Number</div>
+                <div class="queue-label" id="queueLabel">Your Queue Number</div>
                 <div class="queue-info">
                   <div class="queue-info-item">
                     <div class="value" id="currentServing">--</div>
@@ -213,6 +213,12 @@
       ).join('');
     }
 
+    function renderUpcomingEmpty() {
+      document.getElementById('upcomingApptBody').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No Upcoming Appointments</h3><p>Book your first appointment to get started.</p><a href="appointments.html" class="btn btn-primary mt-md">Book Now</a></div>';
+      const badge = document.getElementById('apptStatusBadge');
+      if (badge) badge.style.display = 'none';
+    }
+
     async function loadDashboard() {
       if (!Auth.isAuthenticated()) return;
       try {
@@ -228,47 +234,57 @@
       try {
         const apptRes = await API.getAppointments();
         if (apptRes.success) {
-          renderActivity(apptRes.data || []);
-          document.getElementById('totalAppts').textContent = (apptRes.data || []).length;
-          if (apptRes.data.length > 0) {
-            const appt = apptRes.data[0];
+          const appts = apptRes.data || [];
+          renderActivity(appts);
+          const total = appts.length;
+          const completed = appts.filter((a) => a.status === 'completed').length;
+          document.getElementById('totalAppts').textContent = total;
+          document.getElementById('completedAppts').textContent = completed;
+          const rateEl = document.getElementById('completionRate');
+          if (rateEl) rateEl.textContent = total ? (Math.round((completed / total) * 100) + '% completion rate') : '';
+          const today = new Date();
+          const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+          const monthCount = appts.filter((a) => a.appointmentDate && a.appointmentDate.startsWith(monthKey)).length;
+          const monthEl = document.getElementById('apptMonthChange');
+          if (monthEl && monthCount > 0) monthEl.textContent = monthCount + ' this month';
+          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+          const appt = appts.find((a) =>
+            (a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'checked_in') &&
+            a.date >= todayStr
+          );
+          const badge = document.getElementById('apptStatusBadge');
+          if (appt) {
             document.getElementById('apptDoctor').textContent = appt.doctor_name;
             document.getElementById('apptService').textContent = appt.service;
             document.getElementById('apptDept').textContent = appt.department;
             document.getElementById('apptTime').textContent = Utils.formatTime(appt.time);
             document.getElementById('apptDate').textContent = Utils.formatDate(appt.date);
-            const badge = document.getElementById('apptStatusBadge');
-            badge.textContent = Utils.capitalize(appt.status.replace('_', ' '));
-            badge.className = 'badge badge-' + Utils.getStatusColor(appt.status);
+            if (badge) {
+              badge.textContent = Utils.capitalize(appt.status.replace('_', ' '));
+              badge.className = 'badge badge-' + Utils.getStatusColor(appt.status);
+              badge.style.display = '';
+            }
           } else {
-            document.getElementById('upcomingApptBody').innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No Upcoming Appointments</h3><p>Book your first appointment to get started.</p><a href="appointments.html" class="btn btn-primary mt-md">Book Now</a></div>';
+            renderUpcomingEmpty();
           }
         }
-      } catch (e) {}
-      try {
-        const histRes = await API.getAppointmentHistory();
-        if (histRes.success) {
-          const completed = histRes.data.filter((a) => a.status === 'completed').length;
-          document.getElementById('completedAppts').textContent = completed;
-          const totalEl = document.getElementById('totalAppts');
-          const total = parseInt(totalEl.textContent) || completed;
-          const rateEl = document.querySelector('#completedAppts').closest('.stat-card').querySelector('.stat-card-change');
-          if (rateEl) {
-            const pct = total ? Math.round((completed / total) * 100) : 0;
-            rateEl.textContent = pct + '% completion rate';
-          }
-        }
-      } catch (e) {}
+      } catch (e) {
+        renderUpcomingEmpty();
+      }
       try {
         const queueRes = await API.getQueue();
         if (queueRes.success) {
           const q = queueRes.data;
-          document.getElementById('queueNumber').textContent = q.ticket_number;
-          document.getElementById('currentServing').textContent = q.current_serving;
-          document.getElementById('patientsAhead').textContent = q.patients_ahead;
-          document.getElementById('estWait').textContent = q.estimated_wait_minutes + 'm';
-          const progress = Math.max(10, Math.min(95, (1 - q.patients_ahead / 20) * 100));
-          document.getElementById('queueProgress').style.width = progress + '%';
+          const active = q.status === 'waiting' || q.status === 'called' || q.status === 'in_progress';
+          document.getElementById('queueNumber').textContent = active ? q.ticket_number : '--';
+          document.getElementById('currentServing').textContent = active ? q.current_serving : '--';
+          document.getElementById('patientsAhead').textContent = active ? q.patients_ahead : '--';
+          document.getElementById('estWait').textContent = active ? q.estimated_wait_minutes + 'm' : '--';
+          const lbl = document.getElementById('queueLabel');
+          if (lbl) lbl.textContent = active ? 'Your Queue Number' : 'No active queue';
+          document.getElementById('queueProgress').style.width = active
+            ? Math.max(10, Math.min(95, (1 - q.patients_ahead / 20) * 100)) + '%'
+            : '0%';
         } else {
           document.getElementById('queueCard').querySelector('.queue-number').textContent = '--';
         }
@@ -318,7 +334,7 @@
       updateGreeting();
       loadComponents();
       loadDashboard();
-      setInterval(loadDashboard, 30000);
+      setInterval(loadDashboard, 60000);
     });
   </script>
 </body>

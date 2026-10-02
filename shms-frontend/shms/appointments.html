@@ -154,12 +154,6 @@
               <form id="bookingForm" novalidate>
                 <div class="booking-step-content active" data-step="1">
                   <div class="form-section">
-                    <div class="form-section-title">Select Department</div>
-                    <select class="form-select" id="deptSelect">
-                      <option value="">Choose a department</option>
-                    </select>
-                  </div>
-                  <div class="form-section">
                     <div class="form-section-title">Select Service</div>
                     <div id="serviceOptions" class="grid grid-2"></div>
                   </div>
@@ -198,7 +192,6 @@
                       <h4 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--primary)">Appointment Summary</h4>
                       <div style="display:grid;gap:8px;font-size:14px">
                         <div><strong>Service:</strong> <span id="summaryService">-</span></div>
-                        <div><strong>Department:</strong> <span id="summaryDept">-</span></div>
                         <div><strong>Doctor:</strong> <span id="summaryDoctor">-</span></div>
                         <div><strong>Date:</strong> <span id="summaryDate">-</span></div>
                         <div><strong>Time:</strong> <span id="summaryTime">-</span></div>
@@ -227,12 +220,58 @@
       </div>
     </div>
   </div>
+  <div class="modal-overlay" id="cancelModal">
+    <div class="modal">
+      <div class="modal-header"><h3>Cancel Appointment</h3><button type="button" class="modal-close" data-close-modal="cancelModal">&times;</button></div>
+      <div class="modal-body">
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px" id="cancelSummary"></p>
+        <div class="form-group">
+          <label class="form-label" for="cancelReason">Reason for Cancellation <span style="color:var(--danger)">*</span></label>
+          <textarea class="form-textarea" id="cancelReason" rows="3" maxlength="500" placeholder="Please tell us why you are cancelling..."></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="cancelModal">Keep Appointment</button>
+        <button type="button" class="btn btn-danger" id="confirmCancel" disabled>Confirm Cancellation</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="rescheduleModal">
+    <div class="modal">
+      <div class="modal-header"><h3>Reschedule Appointment</h3><button type="button" class="modal-close" data-close-modal="rescheduleModal">&times;</button></div>
+      <div class="modal-body">
+        <p style="font-size:14px;color:var(--text-secondary);margin-bottom:16px" id="reschedSummary"></p>
+        <div class="form-section">
+          <div class="form-section-title">Doctor</div>
+          <select class="form-select" id="reschedDoctor"></select>
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Select Date (max 2 days ahead)</div>
+          <input type="date" class="form-input" id="reschedDate" min="" max="" style="max-width:280px">
+        </div>
+        <div class="form-section">
+          <div class="form-section-title">Select Time</div>
+          <div id="reschedSlots" class="time-slot-grid"></div>
+          <input type="time" class="form-input mt-sm" id="reschedTime" style="max-width:280px" title="Or enter a time manually">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="rescheduleModal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="confirmReschedule" disabled>Confirm Rescheduling</button>
+      </div>
+    </div>
+  </div>
   <script src="js/config.js"></script>
-  <script src="js/api.js?v=3"></script>
+  <script src="js/api.js?v=4"></script>
   <script src="js/utils.js"></script>
   <script src="js/auth.js"></script>
   <script>
-    let selectedData = { department: null, service: null, doctor: null, date: null, time: null };
+    let selectedData = { department: null, service: null, doctor: null, date: null, time: null, noPreference: false };
+    let cancelCtx = null;
+    let reschedCtx = null;
+    let upcomingById = {};
+    let slotLoadSeq = 0;
+    let reschedSlotSeq = 0;
 
     function initTabs() {
       document.querySelectorAll('.tabs .tab').forEach(tab => {
@@ -245,17 +284,6 @@
           if (tab.dataset.tab === 'history') loadHistory();
         });
       });
-    }
-
-    async function loadDepartments() {
-      try {
-        const res = await API.getDepartments();
-        if (res.success) {
-          const sel = document.getElementById('deptSelect');
-          sel.innerHTML = '<option value="">Choose a department</option>';
-          [...new Set((res.data || []).filter(Boolean))].forEach(d => { sel.innerHTML += `<option value="${d}">${d}</option>`; });
-        }
-      } catch (e) {}
     }
 
     async function loadServices() {
@@ -277,6 +305,19 @@
           });
         }
       } catch (e) {}
+    }
+
+    async function loadStudentDepartment() {
+      try {
+        const res = await API.getProfile();
+        if (res.success && res.data && res.data.department) {
+          selectedData.department = res.data.department;
+        } else {
+          Utils.showToast('Your department could not be determined. Please update your profile or contact an administrator.', 'error');
+        }
+      } catch (e) {
+        Utils.showToast('Failed to load your department. Please try again.', 'error');
+      }
     }
 
     async function loadDoctors() {
@@ -302,6 +343,7 @@
             document.querySelectorAll('#doctorList .doctor-card').forEach(c => c.classList.remove('selected'));
             div.classList.add('selected');
             selectedData.doctor = d;
+            selectedData.noPreference = !d.id;
           });
           container.appendChild(div);
         });
@@ -310,19 +352,45 @@
 
     async function loadTimeSlots(date) {
       const container = document.getElementById('timeSlots');
+      const seq = ++slotLoadSeq;
+      selectedData.time = null;
       container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:20px">Loading available slots...</div>';
       try {
-        const res = await API.getAvailableSlots(date, selectedData.doctor?.id);
+        let doctor = selectedData.doctor;
+        if (selectedData.noPreference) {
+          const resolve = await API.getAvailableDoctorsForDate(date, selectedData.service);
+          if (seq !== slotLoadSeq) return;
+          if (resolve.success && resolve.data.length > 0) {
+            doctor = resolve.data[0];
+            selectedData.doctor = doctor;
+          } else {
+            container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:20px">${resolve.message || 'No doctors are available on this date.'}</div>`;
+            return;
+          }
+        }
+        const res = await API.getAvailableSlots(date, doctor.id, selectedData.service);
+        if (seq !== slotLoadSeq) return;
         container.innerHTML = '';
-        if (res.success && res.data.length === 0) {
-          container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:20px">No available slots for this date.</div>';
+        if (res.success && !res.hasSchedule) {
+          container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:20px">${res.message || 'No schedule available for this doctor.'}</div>`;
           return;
         }
+        if (res.success && res.data.length === 0) {
+          container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:20px">No available time slots for this date.</div>';
+          return;
+        }
+        const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+        const isToday = date === toDateInput(new Date());
         res.data.forEach(slot => {
+          let available = slot.available;
+          if (isToday && available) {
+            const [h, m] = String(slot.time).split(':').map(Number);
+            if (h * 60 + m <= nowMin) available = false;
+          }
           const div = document.createElement('div');
-          div.className = 'time-slot' + (slot.available ? '' : ' unavailable');
+          div.className = 'time-slot' + (available ? '' : ' unavailable');
           div.textContent = Utils.formatTime(slot.time);
-          if (slot.available) {
+          if (available) {
             div.addEventListener('click', () => {
               document.querySelectorAll('.time-slot').forEach(t => t.classList.remove('selected'));
               div.classList.add('selected');
@@ -332,13 +400,13 @@
           container.appendChild(div);
         });
       } catch (e) {
+        if (seq !== slotLoadSeq) return;
         container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--danger);padding:20px">Failed to load slots.</div>';
       }
     }
 
     function updateSummary() {
       document.getElementById('summaryService').textContent = selectedData.service || '-';
-      document.getElementById('summaryDept').textContent = selectedData.department || '-';
       document.getElementById('summaryDoctor').textContent = selectedData.doctor?.name || '-';
       document.getElementById('summaryDate').textContent = selectedData.date ? Utils.formatDate(selectedData.date, 'long') : '-';
       document.getElementById('summaryTime').textContent = selectedData.time ? Utils.formatTime(selectedData.time) : '-';
@@ -362,13 +430,24 @@
       try {
         const res = await API.getAppointments();
         container.innerHTML = '';
-        if (!res.success || res.data.length === 0) {
+        const activeStatuses = ['scheduled', 'confirmed', 'checked_in', 'in_progress'];
+        const upcoming = (res.data || []).filter(a => activeStatuses.includes(a.status));
+        if (!res.success || upcoming.length === 0) {
           container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📅</div><h3>No Upcoming Appointments</h3><p>Book your first appointment.</p></div>';
           return;
         }
-        res.data.forEach(a => {
-          const colors = { pending: 'warning', confirmed: 'primary', checked_in: 'info', in_queue: 'info', in_consultation: 'warning', completed: 'success', cancelled: 'danger' };
+        upcomingById = {};
+        upcoming.forEach(a => {
+          upcomingById[a.id] = a;
+          const colors = { scheduled: 'warning', confirmed: 'primary', checked_in: 'info', in_progress: 'warning', completed: 'success', cancelled: 'danger', no_show: 'danger' };
           const color = colors[a.status] || 'neutral';
+          const canManage = a.status === 'scheduled' || a.status === 'confirmed';
+          const actions = canManage
+            ? `<div class="apt-actions">
+                 <button type="button" class="btn btn-sm btn-secondary" data-manage="reschedule" data-id="${a.id}">Reschedule</button>
+                 <button type="button" class="btn btn-sm btn-danger" data-manage="cancel" data-id="${a.id}">Cancel</button>
+               </div>`
+            : '';
           container.innerHTML += `
             <div class="appointment-card">
               <div class="apt-icon" style="background:var(--${color}-light,var(--bg-tertiary));color:var(--${color},var(--text-primary))">📋</div>
@@ -377,8 +456,17 @@
                 <p>${a.doctor_name} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</p>
               </div>
               <span class="badge badge-${color}">${Utils.capitalize(a.status.replace(/_/g, ' '))}</span>
+              ${actions}
             </div>
           `;
+        });
+        container.querySelectorAll('[data-manage]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const appt = upcomingById[btn.dataset.id];
+            if (!appt) return;
+            if (btn.dataset.manage === 'cancel') openCancelModal(appt);
+            else openRescheduleModal(appt);
+          });
         });
       } catch (e) {
         container.innerHTML = '<div class="empty-state"><p>Failed to load appointments.</p></div>';
@@ -395,6 +483,8 @@
           return;
         }
         res.data.forEach(a => {
+          const colors = { scheduled: 'warning', confirmed: 'primary', checked_in: 'info', in_progress: 'warning', completed: 'success', cancelled: 'danger', no_show: 'danger' };
+          const color = colors[a.status] || 'neutral';
           container.innerHTML += `
             <div class="appointment-card">
               <div class="apt-icon" style="background:#dcfce7;color:#166534">✓</div>
@@ -403,13 +493,132 @@
                 <p>${a.doctor_name} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</p>
                 ${a.diagnosis ? `<p style="font-size:12px;color:var(--text-light)">Diagnosis: ${a.diagnosis}</p>` : ''}
               </div>
-              <span class="badge badge-success">Completed</span>
+              <span class="badge badge-${color}">${Utils.capitalize(a.status.replace(/_/g, ' '))}</span>
             </div>
           `;
         });
       } catch (e) {
         container.innerHTML = '<div class="empty-state"><p>Failed to load history.</p></div>';
       }
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('active');
+    }
+
+    function syncCancelButton() {
+      document.getElementById('confirmCancel').disabled =
+        !document.getElementById('cancelReason').value.trim();
+    }
+
+    function openCancelModal(appt) {
+      cancelCtx = appt;
+      document.getElementById('cancelSummary').textContent =
+        `${appt.service} - ${appt.doctor_name} - ${Utils.formatDate(appt.date)} at ${Utils.formatTime(appt.time)}`;
+      document.getElementById('cancelReason').value = '';
+      syncCancelButton();
+      document.getElementById('cancelModal').classList.add('active');
+      document.getElementById('cancelReason').focus();
+    }
+
+    function toDateInput(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function syncRescheduleButton() {
+      document.getElementById('confirmReschedule').disabled =
+        !document.getElementById('reschedDate').value ||
+        !document.getElementById('reschedTime').value;
+    }
+
+    async function loadRescheduleSlots() {
+      const date = document.getElementById('reschedDate').value;
+      const doctorId = document.getElementById('reschedDoctor').value;
+      const container = document.getElementById('reschedSlots');
+      const timeEl = document.getElementById('reschedTime');
+      if (!date) return;
+      if (!doctorId) {
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:14px">No preference selected - pick a doctor to see available times, or enter a time manually below.</div>';
+        syncRescheduleButton();
+        return;
+      }
+      container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:14px">Loading available slots...</div>';
+      const seq = ++reschedSlotSeq;
+      try {
+        const res = await API.getAvailableSlots(date, doctorId, reschedCtx.service);
+        if (seq !== reschedSlotSeq) return;
+        container.innerHTML = '';
+        if (res.success && !res.hasSchedule) {
+          container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:14px">${res.message || 'No schedule available for this doctor.'}</div>`;
+          syncRescheduleButton();
+          return;
+        }
+        const slots = res.success ? res.data : [];
+        if (slots.length === 0) {
+          container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:14px">No available time slots for this date.</div>';
+        } else {
+          const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+          const isToday = date === toDateInput(new Date());
+          slots.forEach(slot => {
+            let available = slot.available;
+            if (isToday && available) {
+              const [h, m] = String(slot.time).split(':').map(Number);
+              if (h * 60 + m <= nowMin) available = false;
+            }
+            const div = document.createElement('div');
+            div.className = 'time-slot' + (available ? '' : ' unavailable');
+            div.textContent = Utils.formatTime(slot.time);
+            if (available) {
+              div.addEventListener('click', () => {
+                container.querySelectorAll('.time-slot').forEach(t => t.classList.remove('selected'));
+                div.classList.add('selected');
+                timeEl.value = slot.time;
+                syncRescheduleButton();
+              });
+            }
+            container.appendChild(div);
+          });
+        }
+        syncRescheduleButton();
+      } catch (e) {
+        if (seq !== reschedSlotSeq) return;
+        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--danger);padding:14px">Failed to load slots.</div>';
+        syncRescheduleButton();
+      }
+    }
+
+    async function openRescheduleModal(appt) {
+      reschedCtx = appt;
+      document.getElementById('reschedSummary').textContent =
+        `${appt.service} - ${appt.doctor_name}`;
+
+      const today = new Date();
+      const max = new Date(today);
+      max.setDate(max.getDate() + 2);
+      const dateEl = document.getElementById('reschedDate');
+      dateEl.min = toDateInput(today);
+      dateEl.max = toDateInput(max);
+
+      const sel = document.getElementById('reschedDoctor');
+      sel.innerHTML = '';
+      if (appt.staffId) {
+        sel.innerHTML += `<option value="${appt.staffId}">Keep current doctor (${appt.doctor_name})</option>`;
+      }
+      sel.innerHTML += '<option value="">No preference (any available doctor)</option>';
+      try {
+        const res = await API.getAvailableDoctors();
+        const doctors = res.success ? res.data : [];
+        doctors.forEach(d => {
+          if (d.id && d.id !== appt.staffId) {
+            sel.innerHTML += `<option value="${d.id}">${d.name}${d.specialization ? ` - ${d.specialization}` : ''}</option>`;
+          }
+        });
+      } catch (e) { /* ignore doctor list failures */ }
+
+      document.getElementById('reschedSlots').innerHTML = '';
+      document.getElementById('reschedTime').value = '';
+      document.getElementById('rescheduleModal').classList.add('active');
+      await loadRescheduleSlots();
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -431,15 +640,68 @@
       }, 100);
 
       initTabs();
-      loadDepartments();
+      loadStudentDepartment();
       loadServices();
 
+      document.querySelectorAll('[data-close-modal]').forEach(btn => {
+        btn.addEventListener('click', () => closeModal(btn.dataset.closeModal));
+      });
+
+      document.getElementById('cancelReason').addEventListener('input', syncCancelButton);
+      document.getElementById('confirmCancel').addEventListener('click', async () => {
+        const btn = document.getElementById('confirmCancel');
+        const reason = document.getElementById('cancelReason').value;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Cancelling...';
+        try {
+          await API.cancelAppointment(cancelCtx.id, reason);
+          Utils.showToast('Appointment cancelled.', 'success');
+          closeModal('cancelModal');
+          loadUpcoming();
+          loadHistory();
+        } catch (err) {
+          Utils.showToast(err.message || 'Could not cancel the appointment.', 'error');
+        } finally {
+          btn.textContent = 'Confirm Cancellation';
+          btn.disabled = false;
+          if (document.getElementById('cancelModal').classList.contains('active')) syncCancelButton();
+        }
+      });
+
+      document.getElementById('reschedDoctor').addEventListener('change', loadRescheduleSlots);
+      document.getElementById('reschedDate').addEventListener('change', loadRescheduleSlots);
+      document.getElementById('reschedTime').addEventListener('input', syncRescheduleButton);
+      document.getElementById('confirmReschedule').addEventListener('click', async () => {
+        const btn = document.getElementById('confirmReschedule');
+        const date = document.getElementById('reschedDate').value;
+        const time = document.getElementById('reschedTime').value;
+        const staffSel = document.getElementById('reschedDoctor');
+        const staffId = staffSel.value === '' ? null : staffSel.value;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Rescheduling...';
+        try {
+          await API.rescheduleAppointment(reschedCtx.id, { date, time, staffId });
+          Utils.showToast('Appointment rescheduled.', 'success');
+          closeModal('rescheduleModal');
+          loadUpcoming();
+          loadHistory();
+        } catch (err) {
+          Utils.showToast(err.message || 'Could not reschedule the appointment.', 'error');
+        } finally {
+          btn.textContent = 'Confirm Rescheduling';
+          btn.disabled = false;
+          if (document.getElementById('rescheduleModal').classList.contains('active')) syncRescheduleButton();
+        }
+      });
+
       document.getElementById('step1Next').addEventListener('click', () => {
-        selectedData.department = document.getElementById('deptSelect').value;
         selectedData.service = selectedData.service || document.querySelector('#serviceOptions .doctor-card.selected .doc-info h4')?.textContent.trim() || null;
-        if (!selectedData.department || !selectedData.service) {
-          Utils.showToast('Please select a department and service', 'warning');
+        if (!selectedData.service) {
+          Utils.showToast('Please select a service', 'warning');
           return;
+        }
+        if (!selectedData.department) {
+          Utils.showToast('Your academic department could not be determined. You can still book; please update your profile so records show it.', 'warning');
         }
         goToStep(2);
         loadDoctors();
@@ -448,9 +710,13 @@
       document.getElementById('step2Next').addEventListener('click', () => {
         if (!selectedData.doctor) { Utils.showToast('Please select a doctor', 'warning'); return; }
         goToStep(3);
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('apptDate').min = today;
-        document.getElementById('apptDate').value = today;
+        const today = toDateInput(new Date());
+        const max = new Date();
+        max.setDate(max.getDate() + 2);
+        const dateEl = document.getElementById('apptDate');
+        dateEl.min = today;
+        dateEl.max = toDateInput(max);
+        dateEl.value = today;
         selectedData.date = today;
         loadTimeSlots(today);
       });
@@ -475,7 +741,6 @@
           const res = await API.bookAppointment({
             doctor_id: selectedData.doctor.id,
             service: selectedData.service,
-            department: selectedData.department,
             date: selectedData.date,
             time: selectedData.time,
             reason: document.getElementById('reason').value,

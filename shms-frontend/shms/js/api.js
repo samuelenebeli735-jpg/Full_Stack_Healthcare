@@ -71,6 +71,31 @@ const API = (() => {
     return data || { success: true, data: null };
   };
 
+  /* Fetch every page of a paginated list endpoint using the backend
+     `pagination.hasNextPage` metadata. Falls back to treating the whole
+     response as the list for non-paginated callers. `limit` caps each
+     page's size (backend max 100); `onPage` receives each page's
+     `pagination` meta so callers can capture the true record `total`. */
+  const _allPages = async (endpoint, limit, onPage) => {
+    const all = [];
+    let page = 1;
+    let hasNextPage = false;
+    do {
+      const params = [];
+      if (page > 1) params.push(`page=${page}`);
+      if (limit) params.push(`limit=${limit}`);
+      const suffix = params.length ? `?${params.join('&')}` : '';
+      const res = await _request('GET', `${endpoint}${suffix}`);
+      const data = res.data || {};
+      const items = (data && data.items) || res.data || [];
+      all.push(...items);
+      hasNextPage = !!(data && data.pagination && data.pagination.hasNextPage);
+      if (typeof onPage === 'function' && data && data.pagination) onPage(data.pagination);
+      page += 1;
+    } while (hasNextPage);
+    return all;
+  };
+
   /* ---------- small helpers ---------- */
 
   const _staffName = (staff) => {
@@ -183,6 +208,20 @@ const API = (() => {
     return mapped;
   };
 
+  /* All of today's queue entries for the staff's organization, following the
+     backend page metadata so a single response page is never mistaken for the
+     whole day. `total` is the authoritative backend `pagination.total`; staff
+     pages should never derive a "today" total from one page's `items` length. */
+  const _todayQueue = async () => {
+    const orgId = _orgId();
+    if (!orgId) return { items: [], total: 0 };
+    let total = 0;
+    const items = await _allPages(`/queues/today/${orgId}`, 100, (pagination) => {
+      total = pagination.total;
+    });
+    return { items, total };
+  };
+
   const _servicesByName = async () => {
     const orgId = _orgId();
     if (!orgId) return {};
@@ -215,53 +254,6 @@ const API = (() => {
   };
 
   const DAY_INDEX = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-
-  const _slotsFromSchedule = (schedule) => {
-    const start = schedule && schedule.startTime ? new Date(schedule.startTime) : null;
-    const end = schedule && schedule.endTime ? new Date(schedule.endTime) : null;
-    if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) return [];
-
-    const breakStart = schedule.breakStart ? new Date(schedule.breakStart) : null;
-    const breakEnd = schedule.breakEnd ? new Date(schedule.breakEnd) : null;
-    const inBreak = (t) => {
-      if (!breakStart || !breakEnd || isNaN(breakStart.getTime()) || isNaN(breakEnd.getTime())) return false;
-      const ms = t.getTime();
-      const startMs = breakStart.getTime();
-      const endMs = breakEnd.getTime();
-      const day = (ms - new Date(ms).setHours(0, 0, 0, 0));
-      const bStart = day + (startMs - new Date(startMs).setHours(0, 0, 0, 0));
-      const bEnd = day + (endMs - new Date(endMs).setHours(0, 0, 0, 0));
-      const slotStart = day;
-      const slotEnd = slotStart + 30 * 60000;
-      return slotStart < bEnd && slotEnd > bStart;
-    };
-
-    const slots = [];
-    const cursor = new Date(start);
-    cursor.setHours(0, 0, 0, 0);
-    const hour = start.getHours();
-    cursor.setHours(hour, Math.floor(start.getMinutes() / 30) * 30, 0, 0);
-
-    const endHour = end.getHours();
-    const endMinute = end.getMinutes();
-    while (cursor.getHours() < endHour || (cursor.getHours() === endHour && cursor.getMinutes() < endMinute)) {
-      if (!inBreak(cursor)) {
-        const pad = (n) => String(n).padStart(2, '0');
-        slots.push({ time: `${pad(cursor.getHours())}:${pad(cursor.getMinutes())}`, available: true });
-      }
-      cursor.setMinutes(cursor.getMinutes() + 30);
-    }
-    return slots;
-  };
-
-  const _defaultSlots = () => {
-    const slots = [];
-    for (let h = 8; h < 17; h++) {
-      slots.push({ time: `${String(h).padStart(2, '0')}:00`, available: true });
-      slots.push({ time: `${String(h).padStart(2, '0')}:30`, available: true });
-    }
-    return slots;
-  };
 
   /* ============================ PUBLIC API ============================ */
 
@@ -402,9 +394,6 @@ const API = (() => {
       };
     },
     sendTestNotification: () => _request('POST', '/notifications/send-test'),
-    async getSentNotifications() {
-      return { success: true, data: [] };
-    },
 
     /* ---------- Appointments ---------- */
     async getAppointments() {
@@ -412,8 +401,7 @@ const API = (() => {
       const orgId = _orgId();
       let items = [];
       if (role === 'student') {
-        const res = await _request('GET', '/appointments/my');
-        items = (res.data && res.data.items) || [];
+        items = await _allPages('/appointments/my');
       } else {
         const res = await _request('GET', `/appointments/organization/${orgId}`);
         items = (res.data && res.data.items) || [];
@@ -477,8 +465,7 @@ const API = (() => {
       const role = _role();
       let items = [];
       if (role === 'student') {
-        const res = await _request('GET', '/appointments/my');
-        items = (res.data && res.data.items) || [];
+        items = await _allPages('/appointments/my');
       } else {
         const orgId = _orgId();
         const res = await _request('GET', `/appointments/organization/${orgId}`);
@@ -488,6 +475,21 @@ const API = (() => {
         .filter((a) => a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show')
         .map(_mapAppointment);
       return { success: true, data: history };
+    },
+    async cancelAppointment(id, reason) {
+      const res = await _request('POST', `/appointments/${id}/cancel`, { reason });
+      return { success: true, data: _mapAppointment(res.data) };
+    },
+    async rescheduleAppointment(id, data) {
+      const date = data.date || data.appointmentDate || '';
+      const time = data.time || '09:00';
+      const appointmentDate = date.includes('T')
+        ? date
+        : new Date(`${date}T${time}:00`).toISOString();
+      const body = { appointmentDate };
+      if (data.staffId !== undefined) body.staffId = data.staffId;
+      const res = await _request('POST', `/appointments/${id}/reschedule`, body);
+      return { success: true, data: _mapAppointment(res.data) };
     },
 
     /* ---------- Queue ---------- */
@@ -514,9 +516,7 @@ const API = (() => {
           },
         };
       }
-      const orgId = _orgId();
-      const res = await _request('GET', `/queues/today/${orgId}`);
-      const items = (res.data && res.data.items) || [];
+      const { items } = await _todayQueue();
       const serving = items.find((q) => q.status === 'in_progress' || q.status === 'called');
       return {
         success: true,
@@ -536,10 +536,8 @@ const API = (() => {
           data: [{ ticket: '#' + String(q.queueNumber), patient: 'You', service: '', doctor: '', status: 'waiting', queueId: q.id }],
         };
       }
-      const orgId = _orgId();
-      const res = await _request('GET', `/queues/today/${orgId}`);
-      const items = (res.data && res.data.items) || [];
-      return { success: true, data: items.map(_mapQueueEntry) };
+      const { items, total } = await _todayQueue();
+      return { success: true, data: items.map(_mapQueueEntry), total };
     },
     async checkIn(appointmentId) {
       const res = await _request('POST', '/queues/check-in', { appointmentId });
@@ -564,8 +562,7 @@ const API = (() => {
       if (action === 'start' || action === 'complete') {
         let queueId = queueIdByTicket[ticket] || (data && data.queueId) || null;
         if (!queueId) {
-          const res = await _request('GET', `/queues/today/${orgId}`);
-          const items = (res.data && res.data.items) || [];
+          const { items } = await _todayQueue();
           items.forEach(_mapQueueEntry);
           queueId = queueIdByTicket[ticket];
         }
@@ -578,10 +575,9 @@ const API = (() => {
     /* ---------- Doctors / Staff ---------- */
     async getDoctors() {
       const orgId = _orgId();
-      const res = await _request('GET', `/staff/organization/${orgId}`);
-      const items = (res.data && res.data.items) || res.data || [];
-      staffCache = items;
-      return { success: true, data: items.map(_mapStaffDoctor) };
+      const all = await _allPages(`/staff/organization/${orgId}`);
+      staffCache = all;
+      return { success: true, data: all.map(_mapStaffDoctor) };
     },
     async getAvailableDoctors() {
       const res = await this.getDoctors();
@@ -709,44 +705,93 @@ const API = (() => {
       });
     },
     deleteSchedule: (id) => _request('DELETE', `/schedules/${id}`),
-    async getAvailableSlots(date, doctorId) {
-      if (!doctorId) return { success: true, data: _defaultSlots() };
-      let schedule = null;
-      try {
-        const res = await _request('GET', `/schedules/staff/${doctorId}`);
-        const schedules = res.data || [];
-        const dayOfWeek = DAY_INDEX[new Date(date + 'T00:00:00').getDay()];
-        schedule = schedules.find((s) => s.dayOfWeek === dayOfWeek && s.isActive !== false) || null;
-      } catch (e) {
-        schedule = null;
+    async getAvailableSlots(date, doctorId, serviceName) {
+      const orgId = _orgId();
+      if (!doctorId || !orgId) {
+        return { success: true, data: [], message: 'Choose a doctor to view available time slots.', hasSchedule: false };
       }
-      const slots = schedule ? _slotsFromSchedule(schedule) : _defaultSlots();
-      return { success: true, data: slots };
+      let serviceQs = '';
+      if (serviceName) {
+        const services = await _servicesByName();
+        const svc = services[String(serviceName).toLowerCase()];
+        if (svc) serviceQs = `?serviceId=${encodeURIComponent(svc.id)}`;
+      }
+      const res = await _request('GET', `/appointments/slots/${doctorId}/${date}${serviceQs}`);
+      return {
+        success: true,
+        data: (res.data && res.data.slots) || [],
+        message: (res.data && res.data.message) || null,
+        hasSchedule: res.data ? !!res.data.hasSchedule : false,
+      };
+    },
+
+    /* Resolve a real, eligible doctor for the "No preference" booking path.
+       The backend only returns staff with an active schedule for the requested
+       day, scoped to the logged-in organization. */
+    async getAvailableDoctorsForDate(date, serviceName) {
+      const orgId = _orgId();
+      if (!orgId) {
+        return { success: true, data: [], message: 'Organization not found. Please log in again.' };
+      }
+      let serviceQs = '';
+      if (serviceName) {
+        const services = await _servicesByName();
+        const svc = services[String(serviceName).toLowerCase()];
+        if (svc) serviceQs = `&serviceId=${encodeURIComponent(svc.id)}`;
+      }
+      const res = await _request('GET', `/appointments/doctors/available?date=${date}${serviceQs}`);
+      return {
+        success: true,
+        data: ((res.data && res.data.doctors) || []).map(_mapStaffDoctor),
+        message: (res.data && res.data.message) || null,
+      };
     },
 
     /* ---------- Analytics / Reports ---------- */
     async getAdminStats() {
       const orgId = _orgId();
-      const summary = await _request('GET', `/dashboard?organizationId=${orgId}`).catch(() => ({ data: { counts: {}, appointmentStatusCounts: [] } }));
+      const qs = orgId ? `?organizationId=${orgId}` : '';
+      const summary = await _request('GET', `/dashboard${qs}`).catch(() => ({ data: { counts: {}, appointmentStatusCounts: [] } }));
       const c = summary.data.counts || {};
       const statusCounts = {};
       (summary.data.appointmentStatusCounts || []).forEach((g) => { statusCounts[g.status] = g.count; });
+
+      let weekly_appointments = Array(7).fill(0);
+      let busiest_day = null;
+      let total_appointments = c.appointments || 0;
+      try {
+        const apptRes = await _request('GET', `/reports/appointments${qs}`);
+        const appt = (apptRes && apptRes.data) || {};
+        const byDay = Array.isArray(appt.byDay) ? [...appt.byDay].sort((a, b) => (a.date < b.date ? -1 : 1)) : [];
+        if (byDay.length) {
+          weekly_appointments = byDay.slice(-7).map((d) => d.total || 0);
+          while (weekly_appointments.length < 7) weekly_appointments.unshift(0);
+          const peak = byDay.reduce((m, d) => (!m || (d.total || 0) > m.total ? d : m), null);
+          if (peak) busiest_day = { date: peak.date, total: peak.total || 0 };
+        }
+        if (typeof appt.total === 'number') total_appointments = appt.total;
+      } catch (e) { /* /reports/* endpoints are admin/super_admin only */ }
+
       return {
         success: true,
         data: {
           total_doctors: c.staff || 0,
           available_doctors: c.staff || 0,
           total_students: c.profiles || 0,
-          total_appointments: c.appointments || 0,
+          total_departments: c.departments || 0,
+          total_services: c.services || 0,
+          total_consultations: c.consultations || 0,
+          total_appointments,
+          appointments_today: c.appointmentsToday || 0,
           completed_today: statusCounts.completed || 0,
-          pending_appointments: (statusCounts.scheduled || 0) + (statusCounts.confirmed || 0),
+          pending_appointments: (statusCounts.scheduled || 0) + (statusCounts.confirmed || 0) + (statusCounts.pending || 0) + (statusCounts.checked_in || 0),
           cancelled_appointments: statusCounts.cancelled || 0,
-          avg_wait_time: 12,
-          peak_hour: '10:00 AM',
-          busiest_day: 'Monday',
-          satisfaction_rate: 94,
+          avg_wait_time: null,
+          peak_hour: null,
+          busiest_day,
+          satisfaction_rate: null,
           appointments_by_department: [],
-          weekly_appointments: Array(7).fill(0),
+          weekly_appointments,
         },
       };
     },
@@ -781,38 +826,78 @@ const API = (() => {
       };
     },
     async getAnalytics() {
-      const stats = await this.getAdminStats();
       const orgId = _orgId();
-      let weeklyTrend = stats.data.weekly_appointments;
-      let doctorWorkload = [];
-      try {
-        if (orgId) {
-          const apptRes = await _request('GET', `/reports/appointments?organizationId=${orgId}`);
-          const byDay = (apptRes.data && apptRes.data.byDay) || [];
-          const last7 = byDay.slice(-7);
-          weeklyTrend = last7.map((d) => d.total || 0);
-          while (weeklyTrend.length < 7) weeklyTrend.unshift(0);
-        }
-        const staffRes = await _request('GET', `/reports/staff?organizationId=${orgId}`).catch(() => null);
-        if (staffRes && staffRes.data) {
-          doctorWorkload = (staffRes.data.byDepartment || []).map((d) => ({
-            doctor: d.name || 'Department',
-            patients: d.count || 0,
-          }));
-        }
-      } catch (e) { /* keep defaults */ }
+      const qs = orgId ? `?organizationId=${orgId}` : '';
+      const [statsRes, healthRes, apptRes, patRes, staffRes, queueRes] = await Promise.all([
+        this.getAdminStats().catch(() => null),
+        _request('GET', `/dashboard/health${qs}`).catch(() => null),
+        _request('GET', `/reports/appointments${qs}`).catch(() => null),
+        _request('GET', `/reports/patients${qs}`).catch(() => null),
+        _request('GET', `/reports/staff${qs}`).catch(() => null),
+        _request('GET', `/dashboard/queue${qs}`).catch(() => null),
+      ]);
+
+      const stats = (statsRes && statsRes.data) || {};
+      const health = (healthRes && healthRes.data) || {};
+      const appt = (apptRes && apptRes.data) || null;
+      const patients = (patRes && patRes.data) || null;
+      const staff = (staffRes && staffRes.data) || null;
+      const queue = (queueRes && queueRes.data) || null;
+
+      const sc = { completed: 0, cancelled: 0, no_show: 0, checked_in: 0, scheduled: 0, confirmed: 0, pending: 0 };
+      (appt ? appt.statusCounts : []).forEach((g) => {
+        if (g && g.status) sc[g.status] = (sc[g.status] || 0) + (g.count || 0);
+      });
+
+      const byDay = Array.isArray(appt && appt.byDay) ? [...appt.byDay].sort((a, b) => (a.date < b.date ? -1 : 1)) : [];
+      let weekly_trend = Array(7).fill(0);
+      if (byDay.length) {
+        weekly_trend = byDay.slice(-7).map((d) => d.total || 0);
+        while (weekly_trend.length < 7) weekly_trend.unshift(0);
+      }
+      let busiest_day = null;
+      if (byDay.length) {
+        const peak = byDay.reduce((m, d) => (!m || (d.total || 0) > m.total ? d : m), null);
+        if (peak) busiest_day = { date: peak.date, total: peak.total || 0 };
+      }
+
+      const condition_breakdown = (health && Array.isArray(health.breakdown)) ? health.breakdown : [];
+      const total_cases = typeof health.totalCases === 'number'
+        ? health.totalCases
+        : condition_breakdown.reduce((s, b) => s + (b.count || 0), 0);
+      const monthly_trend = (health && Array.isArray(health.monthlyTrend)) ? health.monthlyTrend : [];
+
+      const queue_counts = {};
+      (queue && queue.statusCounts || []).forEach((g) => { if (g && g.status) queue_counts[g.status] = g.count; });
+
       return {
         success: true,
         data: {
-          total_appointments_today: stats.data.total_appointments,
-          completed: stats.data.completed_today,
-          pending: stats.data.pending_appointments,
-          cancelled: stats.data.cancelled_appointments,
-          average_wait_time: stats.data.avg_wait_time,
-          max_queue_length: stats.data.max_queue_length,
-          doctor_workload: doctorWorkload,
-          weekly_trend: weeklyTrend,
-          satisfaction_rate: stats.data.satisfaction_rate,
+          as_of: new Date().toISOString(),
+          total_students: stats.total_students || 0,
+          total_doctors: stats.total_doctors || 0,
+          total_departments: stats.total_departments || 0,
+          total_services: stats.total_services || 0,
+          total_consultations: stats.total_consultations || 0,
+          total_appointments: stats.total_appointments || 0,
+          appointments_today: stats.appointments_today || 0,
+          completed: sc.completed,
+          pending: sc.pending + sc.scheduled + sc.confirmed + sc.checked_in,
+          cancelled: sc.cancelled,
+          checked_in: sc.checked_in,
+          no_show: sc.no_show,
+          weekly_trend,
+          monthly_trend,
+          condition_breakdown,
+          total_cases,
+          patients_by_level: (patients && Array.isArray(patients.byLevel)) ? patients.byLevel : [],
+          staff_by_department: (staff && Array.isArray(staff.byDepartment)) ? staff.byDepartment : [],
+          busiest_day,
+          queue_counts,
+          avg_wait_time: null,
+          peak_hour: null,
+          satisfaction_rate: null,
+          max_queue_length: null,
         },
       };
     },
@@ -821,8 +906,9 @@ const API = (() => {
     async getStaffDashboard() {
       const orgId = _orgId();
       const summary = await _request('GET', `/dashboard?organizationId=${orgId}`).catch(() => ({ data: { counts: {}, queueStatusCounts: [] } }));
-      const queueRes = await _request('GET', `/queues/today/${orgId}`).catch(() => ({ data: { items: [] } }));
-      const items = (queueRes.data && queueRes.data.items) || [];
+      const queueRes = await _todayQueue().catch(() => ({ items: [], total: 0 }));
+      const items = queueRes.items;
+      const queueTotal = queueRes.total;
       const c = summary.data.counts || {};
       const qCounts = {};
       (summary.data.queueStatusCounts || []).forEach((g) => { qCounts[g.status] = g.count; });
@@ -831,7 +917,7 @@ const API = (() => {
       return {
         success: true,
         data: {
-          total_appointments: c.appointmentsToday || items.length,
+          total_appointments: c.appointmentsToday || queueTotal,
           checked_in: waiting + inConsultation,
           waiting,
           in_consultation: inConsultation,
@@ -851,8 +937,7 @@ const API = (() => {
     async getPrescriptions() {
       const role = _role();
       if (role === 'student') {
-        const res = await _request('GET', '/appointments/my');
-        const items = (res.data && res.data.items) || [];
+        const items = await _allPages('/appointments/my');
         const out = [];
         items.forEach((a) => {
           const rx = a.queue && a.queue.consultation && a.queue.consultation.prescription;
@@ -895,8 +980,7 @@ const API = (() => {
     async getMedicalRecords() {
       const role = _role();
       if (role === 'student') {
-        const res = await _request('GET', '/appointments/my');
-        const items = (res.data && res.data.items) || [];
+        const items = await _allPages('/appointments/my');
         const completed = items.filter((a) => a.status === 'completed');
         return {
           success: true,

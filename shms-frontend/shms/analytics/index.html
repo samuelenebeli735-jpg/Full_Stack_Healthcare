@@ -113,6 +113,10 @@
     .ax-kpi-fill.amber{background:#f59e0b}
     .ax-kpi-fill.red{background:#ef4444}
 
+    .ax-unavailable{padding:28px 12px;text-align:center;color:#9ca3af;font-size:13px;font-weight:600;letter-spacing:0.2px}
+    .ax-kpi-sub{font-size:11px;color:#9ca3af;font-style:italic;margin-top:2px}
+    .ax-kpi-val.unavail{color:#9ca3af;font-weight:600}
+
     @keyframes fadeInUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
     .ax-stat,.ax-card{animation:fadeInUp 0.5s ease both}
     .ax-stat:nth-child(2){animation-delay:0.05s}
@@ -134,8 +138,7 @@
             <p>Insights across health, clinical, and operational performance.</p>
           </div>
           <div class="ax-header-actions">
-            <button class="ax-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg> Last 30 days</button>
-            <button class="ax-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export</button>
+            <button class="ax-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg> Live data</button>
           </div>
         </div>
 
@@ -143,19 +146,19 @@
         <div class="ax-stat-row" id="kpiGrid">
           <div class="ax-stat">
             <div class="ax-stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-            <div><div class="ax-stat-value" id="kpiTotal">0</div><div class="ax-stat-label">Total students enrolled</div><div class="ax-stat-change up">&#8593; 14 new this month</div></div>
+            <div><div class="ax-stat-value" id="kpiStudents">–</div><div class="ax-stat-label">Total students enrolled</div></div>
           </div>
           <div class="ax-stat">
             <div class="ax-stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-            <div><div class="ax-stat-value" id="kpiCompleted">0</div><div class="ax-stat-label">Appointments this month</div><div class="ax-stat-change up">&#8593; 12% vs last month</div></div>
+            <div><div class="ax-stat-value" id="kpiAppointments">–</div><div class="ax-stat-label">Total appointments</div><div class="ax-stat-change" id="kpiApptToday"></div></div>
           </div>
           <div class="ax-stat">
             <div class="ax-stat-icon teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>
-            <div><div class="ax-stat-value" id="kpiWait">0%</div><div class="ax-stat-label">Immunization coverage</div><div class="ax-stat-change up">&#8593; 3% since last term</div></div>
+            <div><div class="ax-stat-value" id="kpiCompleted">–</div><div class="ax-stat-label">Completed appointments</div><div class="ax-stat-change" id="kpiStatusSub"></div></div>
           </div>
           <div class="ax-stat">
             <div class="ax-stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
-            <div><div class="ax-stat-value" id="kpiSatisfaction">0m</div><div class="ax-stat-label">Avg. consultation time</div><div class="ax-stat-change down">&#8595; 2 min this week</div></div>
+            <div><div class="ax-stat-value" id="kpiConsultations">–</div><div class="ax-stat-label">Consultations (health visits)</div></div>
           </div>
         </div>
 
@@ -164,60 +167,13 @@
           <div class="ax-card">
             <div class="ax-card-header"><h3>Monthly health visits</h3><span class="filter-link">Last 6 months</span></div>
             <div class="ax-card-body">
-              <div class="ax-chart-area">
-                <div class="ax-chart-tooltip" id="chartTooltip" style="display:none">128 visits</div>
-                <svg class="ax-line-chart" viewBox="0 0 500 180" preserveAspectRatio="none">
-                  <defs>
-                    <linearGradient id="axFill" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/>
-                      <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
-                    </linearGradient>
-                  </defs>
-                  <line x1="0" y1="45" x2="500" y2="45" stroke="#f3f4f6" stroke-width="1"/>
-                  <line x1="0" y1="90" x2="500" y2="90" stroke="#f3f4f6" stroke-width="1"/>
-                  <line x1="0" y1="135" x2="500" y2="135" stroke="#f3f4f6" stroke-width="1"/>
-                  <text x="0" y="42" font-size="10" fill="#9ca3af">150</text>
-                  <text x="0" y="87" font-size="10" fill="#9ca3af">100</text>
-                  <text x="0" y="132" font-size="10" fill="#9ca3af">50</text>
-                  <text x="0" y="175" font-size="10" fill="#9ca3af">0</text>
-                  <path d="M60,140 L155,120 L250,95 L345,75 L440,55 L500,50 L500,180 L60,180Z" fill="url(#axFill)"/>
-                  <polyline points="60,140 155,120 250,95 345,75 440,55 500,50" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  <circle cx="60" cy="140" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
-                  <circle cx="155" cy="120" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
-                  <circle cx="250" cy="95" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
-                  <circle cx="345" cy="75" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
-                  <circle cx="440" cy="55" r="5" fill="#10b981" stroke="#fff" stroke-width="2"/>
-                  <circle cx="500" cy="50" r="4" fill="#10b981" stroke="#fff" stroke-width="2"/>
-                </svg>
-                <div class="ax-chart-labels">
-                  <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span>
-                </div>
-              </div>
+              <div class="ax-chart-area" id="lineChartArea"></div>
             </div>
           </div>
           <div class="ax-card">
             <div class="ax-card-header"><h3>Health condition breakdown</h3><span class="filter-link">This month</span></div>
             <div class="ax-card-body">
-              <div class="ax-donut-wrap">
-                <div class="ax-donut">
-                  <svg viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="14"/>
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#3b82f6" stroke-width="14" stroke-dasharray="115.5 198.5" stroke-dashoffset="0" stroke-linecap="round"/>
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#ef4444" stroke-width="14" stroke-dasharray="78.5 235.5" stroke-dashoffset="-115.5" stroke-linecap="round"/>
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#8b5cf6" stroke-width="14" stroke-dasharray="47.1 266.9" stroke-dashoffset="-194" stroke-linecap="round"/>
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#f59e0b" stroke-width="14" stroke-dasharray="37 277" stroke-dashoffset="-241.1" stroke-linecap="round"/>
-                    <circle cx="60" cy="60" r="50" fill="none" stroke="#10b981" stroke-width="14" stroke-dasharray="42.5 271.5" stroke-dashoffset="-278.1" stroke-linecap="round"/>
-                  </svg>
-                  <div class="ax-donut-center"><span class="num">377</span><span class="lbl">Total cases</span></div>
-                </div>
-                <div class="ax-legend">
-                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#3b82f6"></span><span class="name">Cold &amp; Cough</span></div><div><span class="count">132</span><span class="pct">(35%)</span></div></div>
-                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#ef4444"></span><span class="name">Fever</span></div><div><span class="count">94</span><span class="pct">(25%)</span></div></div>
-                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#8b5cf6"></span><span class="name">Migraine</span></div><div><span class="count">56</span><span class="pct">(15%)</span></div></div>
-                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#f59e0b"></span><span class="name">Allergy</span></div><div><span class="count">44</span><span class="pct">(12%)</span></div></div>
-                  <div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:#10b981"></span><span class="name">Other</span></div><div><span class="count">51</span><span class="pct">(13%)</span></div></div>
-                </div>
-              </div>
+              <div id="conditionDonutArea"></div>
             </div>
           </div>
         </div>
@@ -225,61 +181,21 @@
         <!-- Row 2: Bar Chart + Completion Donut + KPIs -->
         <div class="ax-grid-3">
           <div class="ax-card">
-            <div class="ax-card-header"><h3>Health visits by grade</h3><span class="filter-link">This term</span></div>
+            <div class="ax-card-header"><h3>Staff by department</h3><span class="filter-link">All time</span></div>
             <div class="ax-card-body">
-              <div class="ax-bar-chart">
-                <div class="ax-bar-row"><span class="ax-bar-label">Grade 6</span><div class="ax-bar-track"><div class="ax-bar-fill green" style="width:45%"></div></div><span class="ax-bar-count">40</span></div>
-                <div class="ax-bar-row"><span class="ax-bar-label">Grade 7</span><div class="ax-bar-track"><div class="ax-bar-fill green" style="width:68%"></div></div><span class="ax-bar-count">62</span></div>
-                <div class="ax-bar-row"><span class="ax-bar-label">Grade 8</span><div class="ax-bar-track"><div class="ax-bar-fill red" style="width:95%"></div></div><span class="ax-bar-count">88</span></div>
-                <div class="ax-bar-row"><span class="ax-bar-label">Grade 9</span><div class="ax-bar-track"><div class="ax-bar-fill amber" style="width:80%"></div></div><span class="ax-bar-count">74</span></div>
-                <div class="ax-bar-row"><span class="ax-bar-label">Grade 10</span><div class="ax-bar-track"><div class="ax-bar-fill blue" style="width:60%"></div></div><span class="ax-bar-count">55</span></div>
-              </div>
+              <div class="ax-bar-chart" id="deptBarArea"></div>
             </div>
           </div>
           <div class="ax-card">
-            <div class="ax-card-header"><h3>Appointment completion</h3><span class="filter-link">This month</span></div>
+            <div class="ax-card-header"><h3>Appointment completion</h3><span class="filter-link">All time</span></div>
             <div class="ax-card-body">
-              <div class="ax-completion">
-                <div class="ax-completion-donut">
-                  <svg viewBox="0 0 110 110">
-                    <circle cx="55" cy="55" r="45" fill="none" stroke="#e5e7eb" stroke-width="12"/>
-                    <circle cx="55" cy="55" r="45" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="232 51" stroke-dashoffset="0" stroke-linecap="round"/>
-                  </svg>
-                  <div class="ax-completion-center"><span class="pct">82%</span><span class="lbl">Completed</span></div>
-                </div>
-                <div class="ax-completion-stats">
-                  <div class="ax-cs-row"><span class="label">Completed</span><span class="value green">563</span></div>
-                  <div class="ax-cs-row"><span class="label">No-shows</span><span class="value amber">82</span></div>
-                  <div class="ax-cs-row"><span class="label">Cancelled</span><span class="value red">42</span></div>
-                </div>
-              </div>
+              <div id="completionArea"></div>
             </div>
           </div>
           <div class="ax-card">
-            <div class="ax-card-header"><h3>Key performance metrics</h3></div>
+            <div class="ax-card-header"><h3>Operational metrics</h3></div>
             <div class="ax-card-body">
-              <div class="ax-kpi-list">
-                <div class="ax-kpi-item">
-                  <div class="ax-kpi-top"><span class="ax-kpi-name">Immunization rate</span><span class="ax-kpi-val green">95%</span></div>
-                  <div class="ax-kpi-track"><div class="ax-kpi-fill green" style="width:95%"></div></div>
-                </div>
-                <div class="ax-kpi-item">
-                  <div class="ax-kpi-top"><span class="ax-kpi-name">Lab result turnaround</span><span class="ax-kpi-val blue">78%</span></div>
-                  <div class="ax-kpi-track"><div class="ax-kpi-fill blue" style="width:78%"></div></div>
-                </div>
-                <div class="ax-kpi-item">
-                  <div class="ax-kpi-top"><span class="ax-kpi-name">Patient satisfaction</span><span class="ax-kpi-val purple">88%</span></div>
-                  <div class="ax-kpi-track"><div class="ax-kpi-fill purple" style="width:88%"></div></div>
-                </div>
-                <div class="ax-kpi-item">
-                  <div class="ax-kpi-top"><span class="ax-kpi-name">Pharmacy dispense rate</span><span class="ax-kpi-val amber">70%</span></div>
-                  <div class="ax-kpi-track"><div class="ax-kpi-fill amber" style="width:70%"></div></div>
-                </div>
-                <div class="ax-kpi-item">
-                  <div class="ax-kpi-top"><span class="ax-kpi-name">Critical flag response time</span><span class="ax-kpi-val red">62%</span></div>
-                  <div class="ax-kpi-track"><div class="ax-kpi-fill red" style="width:62%"></div></div>
-                </div>
-              </div>
+              <div class="ax-kpi-list" id="kpiListArea"></div>
             </div>
           </div>
         </div>
@@ -292,52 +208,138 @@
   <script src="../js/utils.js"></script>
   <script src="../js/auth.js"></script>
   <script>
+    function el(id) { return document.getElementById(id); }
+
+    function renderLineChart(container, items) {
+      const data = (items || []).map((m) => m.count || 0);
+      const labels = (items || []).map((m) => m.label || '');
+      if (!data.length || !data.some((v) => v > 0)) {
+        container.innerHTML = '<div class="ax-unavailable">No consultation data for the last 6 months.</div>';
+        return;
+      }
+      const W = 500, H = 180, pad = 40, bot = 165, top = 10;
+      const maxV = Math.max.apply(null, data);
+      const step = data.length > 1 ? (W - pad) / (data.length - 1) : 0;
+      const pts = data.map((v, i) => [pad + i * step, bot - (v / maxV) * (bot - top)]);
+      const line = pts.map((p) => p.join(',')).join(' ');
+      const area = 'M' + pts[0][0] + ',' + bot + ' ' + pts.map((p) => 'L' + p[0] + ',' + p[1]).join(' ') + ' L' + pts[pts.length - 1][0] + ',' + bot + ' Z';
+      const grid = [0.25, 0.5, 0.75, 1].map((f) =>
+        `<line x1="${pad}" y1="${bot - (bot - top) * f}" x2="${W - 10}" y2="${bot - (bot - top) * f}" stroke="#f3f4f6" stroke-width="1"/>` +
+        `<text x="4" y="${bot - (bot - top) * f + 3}" font-size="10" fill="#9ca3af">${Math.round(maxV * f)}</text>`
+      ).join('');
+      container.innerHTML =
+        `<svg class="ax-line-chart" viewBox="0 0 500 180" preserveAspectRatio="none">
+          <defs><linearGradient id="axFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/><stop offset="100%" stop-color="#10b981" stop-opacity="0"/></linearGradient></defs>
+          ${grid}
+          <path d="${area}" fill="url(#axFill)"/>
+          <polyline points="${line}" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          ${pts.map((p, i) => `<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="#10b981" stroke="#fff" stroke-width="2"><title>${labels[i]}: ${data[i]}</title></circle>`).join('')}
+        </svg>
+        <div class="ax-chart-labels">${labels.map((l) => `<span>${l}</span>`).join('')}</div>`;
+    }
+
+    function renderConditionDonut(container, breakdown, totalCases) {
+      const list = (breakdown || []).filter((b) => (b.count || 0) > 0);
+      if (!list.length) {
+        container.innerHTML = '<div class="ax-unavailable">No health condition data for this month.</div>';
+        return;
+      }
+      const total = totalCases || list.reduce((s, b) => s + (b.count || 0), 0);
+      const C = 2 * Math.PI * 50;
+      let acc = 0;
+      const segs = list.map((b) => {
+        const len = (b.count / total) * C;
+        const seg = { name: b.name || 'Other', count: b.count, color: b.color || '#94a3b8', len, off: acc };
+        acc += len;
+        return seg;
+      });
+      const svg = `<svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" fill="none" stroke="#e5e7eb" stroke-width="14"/>${segs.map((s) => `<circle cx="60" cy="60" r="50" fill="none" stroke="${s.color}" stroke-width="14" stroke-dasharray="${s.len.toFixed(2)} ${(C - s.len).toFixed(2)}" stroke-dashoffset="${(-s.off).toFixed(2)}"><title>${s.name}: ${s.count}</title></circle>`).join('')}</svg>`;
+      container.innerHTML =
+        `<div class="ax-donut-wrap">
+          <div class="ax-donut">${svg}<div class="ax-donut-center"><span class="num">${total}</span><span class="lbl">Total cases</span></div></div>
+          <div class="ax-legend">${segs.map((s) => `<div class="ax-legend-item"><div class="left"><span class="ax-legend-dot" style="background:${s.color}"></span><span class="name">${s.name}</span></div><div><span class="count">${s.count}</span><span class="pct">(${Math.round((s.count / total) * 100)}%)</span></div></div>`).join('')}</div>
+        </div>`;
+    }
+
+    function renderDepartments(container, list) {
+      const rows = (list || []).filter((d) => (d.count || 0) > 0);
+      if (!rows.length) {
+        container.innerHTML = '<div class="ax-unavailable">No staff department data available.</div>';
+        return;
+      }
+      const maxV = Math.max.apply(null, rows.map((d) => d.count || 0));
+      const colors = ['green', 'blue', 'amber', 'red'];
+      container.innerHTML = rows.map((d, i) =>
+        `<div class="ax-bar-row"><span class="ax-bar-label" style="text-align:left;min-width:120px">${d.name || 'Department'}</span><div class="ax-bar-track"><div class="ax-bar-fill ${colors[i % 4]}" style="width:${Math.round(((d.count || 0) / maxV) * 100)}%"></div></div><span class="ax-bar-count">${d.count || 0}</span></div>`
+      ).join('');
+    }
+
+    function renderCompletion(container, sc, total) {
+      const completed = (sc && sc.completed) || 0;
+      const checkedIn = (sc && sc.checked_in) || 0;
+      const noShow = (sc && sc.no_show) || 0;
+      const cancelled = (sc && sc.cancelled) || 0;
+      if (!total) {
+        container.innerHTML = '<div class="ax-unavailable">No appointment data available.</div>';
+        return;
+      }
+      const pct = Math.round((completed / total) * 100);
+      const C = 2 * Math.PI * 45;
+      const len = (pct / 100) * C;
+      const row = (label, value, color) => `<div class="ax-cs-row"><span class="label">${label}</span><span class="value" style="color:${color}">${value}</span></div>`;
+      container.innerHTML =
+        `<div class="ax-completion">
+          <div class="ax-completion-donut">
+            <svg viewBox="0 0 110 110"><circle cx="55" cy="55" r="45" fill="none" stroke="#e5e7eb" stroke-width="12"/><circle cx="55" cy="55" r="45" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="${len.toFixed(2)} ${(C - len).toFixed(2)}" stroke-dashoffset="0" stroke-linecap="round"/></svg>
+            <div class="ax-completion-center"><span class="pct">${pct}%</span><span class="lbl">Completed</span></div>
+          </div>
+          <div class="ax-completion-stats">
+            ${row('Completed', completed, '#16a34a')}
+            ${checkedIn ? row('Checked-in', checkedIn, '#2563eb') : ''}
+            ${noShow ? row('No-shows', noShow, '#d97706') : ''}
+            ${cancelled ? row('Cancelled', cancelled, '#dc2626') : ''}
+          </div>
+        </div>`;
+    }
+
+    function renderKpis(container, d) {
+      const busiest = d.busiest_day ? `${d.busiest_day.date}<span style="color:#9ca3af;font-weight:400"> (${d.busiest_day.total} appts)</span>` : '–';
+      const pct = d.total_appointments ? Math.round((d.completed / d.total_appointments) * 100) + '%' : '–';
+      const items = [
+        { name: 'Appointments today', val: String(d.appointments_today != null ? d.appointments_today : '–') },
+        { name: 'Busiest day (30 days)', val: busiest },
+        { name: 'Appointment completion', val: pct },
+        { name: 'Average wait time', val: '–', note: 'no wait-time timestamps available via API' },
+        { name: 'Peak consultation hour', val: '–', note: 'no hourly data available via API' },
+        { name: 'Patient satisfaction', val: '–', note: 'no satisfaction data available' },
+      ];
+      container.innerHTML = items.map((it) =>
+        `<div class="ax-kpi-item"><div class="ax-kpi-top"><span class="ax-kpi-name">${it.name}</span><span class="ax-kpi-val ${it.note ? 'unavail' : ''}">${it.val}</span></div>${it.note ? `<div class="ax-kpi-sub">${it.note}</div>` : ''}</div>`
+      ).join('');
+    }
+
     async function loadAnalytics() {
       try {
         const res = await API.getAnalytics();
-        if (res.success) {
-          const a = res.data;
-          document.getElementById('kpiTotal').textContent = a.total_appointments_today;
-          document.getElementById('kpiCompleted').textContent = a.completed;
-          document.getElementById('kpiWait').textContent = a.average_wait_time + 'm';
-          document.getElementById('kpiSatisfaction').textContent = a.satisfaction_rate + '%';
-          const mq = document.getElementById('maxQueue');
-          if (mq) mq.textContent = a.max_queue_length;
+        if (!res.success) return;
+        const a = res.data;
+        const set = (id, v) => { const e = el(id); if (e) e.textContent = (v == null ? '–' : v); };
 
-          const chart = document.getElementById('weeklyChart');
-          if (chart) {
-            chart.innerHTML = '';
-            const maxVal = Math.max(...a.weekly_trend);
-            a.weekly_trend.forEach((val, i) => {
-              const bar = document.createElement('div');
-              bar.className = 'bar';
-              const pct = (val / maxVal) * 100;
-              bar.style.height = pct + '%';
-              bar.style.background = i === a.weekly_trend.length - 1 ? 'var(--primary)' : 'var(--accent-light)';
-              bar.title = `Day ${i+1}: ${val} appointments`;
-              chart.appendChild(bar);
-            });
-          }
+        set('kpiStudents', a.total_students);
+        set('kpiAppointments', a.total_appointments);
+        const apptToday = el('kpiApptToday');
+        if (apptToday) apptToday.textContent = (a.appointments_today != null) ? `${a.appointments_today} today` : '';
+        set('kpiCompleted', a.completed);
+        const statusSub = el('kpiStatusSub');
+        if (statusSub) statusSub.textContent = (a.pending || a.cancelled) ? `Pending ${a.pending} · Cancelled ${a.cancelled}` : '';
+        set('kpiConsultations', a.total_consultations);
 
-          const workload = document.getElementById('workloadList');
-          if (workload) {
-            workload.innerHTML = '';
-            a.doctor_workload.forEach(d => {
-              const total = a.doctor_workload.reduce((sum, x) => sum + x.patients, 0);
-              const pct = total > 0 ? (d.patients / total) * 100 : 0;
-              workload.innerHTML += `
-                <div style="margin-bottom:16px">
-                  <div class="flex-between mb-sm">
-                    <span style="font-size:14px;font-weight:500">${d.doctor}</span>
-                    <span style="font-size:13px;color:var(--text-secondary)">${d.patients} patients</span>
-                  </div>
-                  <div class="progress-bar"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
-                </div>
-              `;
-            });
-          }
-        }
-      } catch(e) {}
+        renderLineChart(el('lineChartArea'), a.monthly_trend);
+        renderConditionDonut(el('conditionDonutArea'), a.condition_breakdown, a.total_cases);
+        renderDepartments(el('deptBarArea'), a.staff_by_department);
+        renderCompletion(el('completionArea'), { completed: a.completed, checked_in: a.checked_in, no_show: a.no_show, cancelled: a.cancelled }, a.total_appointments);
+        renderKpis(el('kpiListArea'), a);
+      } catch (e) { /* keep the page in its honest unavailable state */ }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -352,7 +354,7 @@
         document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
       }, 100);
       loadAnalytics();
-      setInterval(loadAnalytics, 60000);
+      setInterval(loadAnalytics, 300000);
     });
   </script>
 </body>

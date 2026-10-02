@@ -50,18 +50,18 @@
         <div class="profile-grid">
           <div class="card">
             <div class="profile-card-header">
-              <div class="profile-avatar user-initials">JD</div>
-              <h2 class="user-name">John Doe</h2>
-              <p class="user-email">john@university.edu</p>
+              <div class="profile-avatar user-initials"></div>
+              <h2 class="user-name"></h2>
+              <p class="user-email"></p>
               <span class="badge badge-primary mt-sm" id="profileRole">Student</span>
             </div>
             <div class="profile-meta">
-              <div class="profile-meta-item" id="pMatricRow"><span class="label">Matric Number</span><span class="value user-matric">STU001</span></div>
-              <div class="profile-meta-item" id="pFacultyRow"><span class="label">Faculty</span><span class="value" id="pFaculty">Engineering</span></div>
-              <div class="profile-meta-item" id="pDeptRow"><span class="label">Department</span><span class="value user-department">Computer Science</span></div>
-              <div class="profile-meta-item" id="pLevelRow"><span class="label">Level</span><span class="value" id="pLevel">400</span></div>
-              <div class="profile-meta-item"><span class="label">Phone</span><span class="value" id="pPhone">+2348012345678</span></div>
-              <div class="profile-meta-item"><span class="label">Member Since</span><span class="value" id="pJoined">Sep 2023</span></div>
+              <div class="profile-meta-item" id="pMatricRow"><span class="label">Matric Number</span><span class="value user-matric">-</span></div>
+              <div class="profile-meta-item" id="pFacultyRow"><span class="label">Faculty</span><span class="value" id="pFaculty">-</span></div>
+              <div class="profile-meta-item" id="pDeptRow"><span class="label">Department</span><span class="value user-department">-</span></div>
+              <div class="profile-meta-item" id="pLevelRow"><span class="label">Level</span><span class="value" id="pLevel">-</span></div>
+              <div class="profile-meta-item"><span class="label">Phone</span><span class="value" id="pPhone">-</span></div>
+              <div class="profile-meta-item"><span class="label">Member Since</span><span class="value" id="pJoined">-</span></div>
             </div>
           </div>
           <div class="card">
@@ -166,23 +166,41 @@
     }
 
     async function loadProfile() {
+      const resetMeta = () => {
+        ['pFaculty', 'pLevel', 'pPhone', 'pJoined'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.textContent = '-';
+        });
+      };
+      resetMeta();
       try {
         const res = await API.getProfile();
-        if (res.success) {
-          const p = res.data;
-          document.getElementById('editName').value = p.full_name || '';
-          document.getElementById('editEmail').value = p.email || '';
-          document.getElementById('editPhone').value = p.phone || '';
-          document.getElementById('editFaculty').value = p.faculty || '';
-          document.getElementById('editDept').value = p.department || '';
-          document.getElementById('editLevel').value = p.level || '';
-          document.getElementById('pFaculty').textContent = p.faculty || '-';
-          document.getElementById('pLevel').textContent = p.level || '-';
-          document.getElementById('pPhone').textContent = p.phone || '-';
-          document.getElementById('pJoined').textContent = p.joined ? Utils.formatDate(p.joined, 'short') : '-';
-          applyProfileRole();
+        if (!res.success) {
+          Utils.showToast(res.message || 'Could not load profile.', 'error');
+          return;
         }
-      } catch (e) {}
+        const p = res.data;
+        document.getElementById('editName').value = p.full_name || '';
+        document.getElementById('editEmail').value = p.email || '';
+        document.getElementById('editPhone').value = p.phone || '';
+        document.getElementById('editFaculty').value = p.faculty || '';
+        document.getElementById('editDept').value = p.department || '';
+        document.getElementById('editLevel').value = p.level || '';
+        document.querySelectorAll('.user-name').forEach(el => { el.textContent = p.full_name || '-'; });
+        document.querySelectorAll('.user-email').forEach(el => { el.textContent = p.email || '-'; });
+        document.querySelectorAll('.user-initials').forEach(el => { el.textContent = Utils.getInitials(p.full_name); });
+        document.querySelectorAll('.user-matric').forEach(el => { el.textContent = p.matric_number || '-'; });
+        document.querySelectorAll('.user-department').forEach(el => { el.textContent = p.department || '-'; });
+        document.getElementById('pFaculty').textContent = p.faculty || '-';
+        document.getElementById('pLevel').textContent = p.level || '-';
+        document.getElementById('pPhone').textContent = p.phone || '-';
+        document.getElementById('pJoined').textContent = p.joined
+          ? new Date(p.joined).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+          : '-';
+        applyProfileRole();
+      } catch (e) {
+        Utils.showToast('Could not load profile.', 'error');
+      }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {

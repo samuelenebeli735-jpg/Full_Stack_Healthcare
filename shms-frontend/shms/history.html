@@ -49,7 +49,7 @@
           <p>View all your past appointments and consultation notes.</p>
         </div>
         <div class="grid grid-4 history-stats">
-          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Total Visits</span></div><div class="stat-card-value" id="totalVisits">0</div></div>
+          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Total Appointments</span></div><div class="stat-card-value" id="totalVisits">0</div></div>
           <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">This Month</span></div><div class="stat-card-value" id="monthVisits">0</div></div>
           <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Cancelled</span></div><div class="stat-card-value" id="cancelledVisits">0</div></div>
           <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Last Visit</span></div><div class="stat-card-value" id="lastVisit" style="font-size:14px">-</div></div>
@@ -75,18 +75,23 @@
   <script src="js/auth.js"></script>
   <script>
     let allHistory = [];
+    const HISTORY_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function historyDay(a) { return Number(a.date.slice(8, 10)); }
+    function historyMonth(a) { return HISTORY_MONTHS[Number(a.date.slice(5, 7)) - 1] || '?'; }
+    function historyMonthKey(a) { return a.date.slice(0, 7); }
+    function historyMonthKeyFor(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
 
     function renderHistory(data) {
       const container = document.getElementById('historyContainer');
       if (!data || data.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No Appointment History</h3><p>Your completed appointments will appear here.</p></div>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📋</div><h3>No Appointment History</h3><p>Your past appointments will appear here.</p></div>';
         return;
       }
       container.innerHTML = '';
       data.forEach(a => {
-        const d = new Date(a.date);
-        const day = d.getDate();
-        const month = d.toLocaleString('en-US', { month: 'short' });
+        const day = historyDay(a);
+        const month = historyMonth(a);
         const div = document.createElement('div');
         div.className = 'history-item';
         div.innerHTML = `
@@ -132,15 +137,11 @@
         if (res.success) {
           allHistory = res.data;
           document.getElementById('totalVisits').textContent = allHistory.length;
-          const thisMonth = allHistory.filter(a => {
-            const d = new Date(a.date);
-            const now = new Date();
-            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-          });
+          const thisMonth = allHistory.filter(a => historyMonthKey(a) === historyMonthKeyFor(new Date()));
           document.getElementById('monthVisits').textContent = thisMonth.length;
           document.getElementById('cancelledVisits').textContent = allHistory.filter(a => a.status === 'cancelled').length;
           if (allHistory.length > 0) {
-            const sorted = [...allHistory].sort((a, b) => new Date(b.date) - new Date(a.date));
+            const sorted = [...allHistory].sort((a, b) => b.date.localeCompare(a.date));
             document.getElementById('lastVisit').textContent = Utils.formatDate(sorted[0].date, 'short');
           }
           filterAndRender();

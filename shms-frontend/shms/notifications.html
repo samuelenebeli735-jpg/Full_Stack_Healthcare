@@ -99,7 +99,7 @@
               <div class="pref-section">
                 <div class="channel-toggle">
                   <div class="channel-icon" style="background:var(--primary-light);color:var(--primary)">📧</div>
-                  <div class="channel-info"><h4>Email Notifications</h4><p>Receive reminders via email at john@university.edu</p></div>
+                  <div class="channel-info"><h4>Email Notifications</h4><p>Receive reminders via email at <span class="user-email"></span></p></div>
                   <label class="toggle-switch"><input type="checkbox" id="emailToggle"><span class="toggle-slider"></span></label>
                 </div>
                 <div class="channel-toggle">
@@ -117,8 +117,8 @@
                  <div class="pref-section-title">Contact Details</div>
                  <div class="form-row">
                    <div class="form-group" style="grid-column:1/-1">
-                     <label class="form-label">Phone Number (WhatsApp)</label>
-                     <input type="tel" class="form-input" id="prefPhone" placeholder="+2348012345678">
+<label class="form-label">Phone Number (WhatsApp)</label>
+                      <input type="tel" class="form-input" id="prefPhone" placeholder="Enter WhatsApp phone number">
                    </div>
                  </div>
                </div>
@@ -156,9 +156,9 @@
         <!-- SENT HISTORY PANEL -->
         <div class="notif-panel" id="notif-panel-sent">
           <div class="card">
-            <div class="card-header"><h3>Recently Sent Reminders</h3><span class="badge badge-info" id="sentCount">0 sent</span></div>
+            <div class="card-header"><h3>Sent Reminder History</h3></div>
             <div class="card-body" id="sentHistoryList">
-              <div class="empty-state"><div class="empty-state-icon">📤</div><h3>No Sent Notifications</h3><p>Your sent reminders will appear here.</p></div>
+              <div class="empty-state"><div class="empty-state-icon">📤</div><h3>Not Available</h3><p>Sent reminder history is not available yet.</p></div>
             </div>
           </div>
         </div>
@@ -185,7 +185,7 @@
       if (tab === 'sent') loadSentHistory();
     }
     document.querySelectorAll('.notif-tab').forEach(tab => {
-      tab.addEventListener('click', () => switchNotifTab(tab.dataset.notif-tab));
+      tab.addEventListener('click', () => switchNotifTab(tab.dataset.notifTab));
     });
 
     function getNotifIcon(type) {
@@ -203,13 +203,18 @@
       return colors[type] || 'var(--text-secondary)';
     }
 
+    function renderEmptyState(title, msg) {
+      const container = document.getElementById('notificationsList');
+      container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔔</div><h3>${title}</h3><p>${msg}</p></div>`;
+    }
+
     function renderNotifications(filter = 'all') {
       const container = document.getElementById('notificationsList');
       let filtered = allNotifications;
       if (filter === 'unread') filtered = allNotifications.filter(n => !n.read);
       else if (filter !== 'all') filtered = allNotifications.filter(n => n.type === filter);
       if (filtered.length === 0) {
-        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🔔</div><h3>No Notifications</h3><p>You\'re all caught up!</p></div>';
+        renderEmptyState('No Notifications', 'You\'re all caught up!');
         return;
       }
       container.innerHTML = '';
@@ -220,8 +225,8 @@
           <div class="notif-dot"></div>
           <div class="notif-icon" style="background:${getNotifBg(n.type)};color:${getNotifColor(n.type)}">${getNotifIcon(n.type)}</div>
           <div class="notif-body">
-            <h4>${n.title}</h4>
-            <p>${n.message}</p>
+            <h4>${Utils.sanitize(n.title)}</h4>
+            <p>${Utils.sanitize(n.message)}</p>
             <div class="flex-between" style="margin-top:6px">
               <span class="notif-time">${Utils.timeAgo(n.created_at)}</span>
               <span class="notif-type" style="color:${getNotifColor(n.type)}">${Utils.capitalize(n.type)}</span>
@@ -256,26 +261,36 @@
           allNotifications = res.data;
           renderNotifications('all');
           updateCounts();
+        } else if (allNotifications.length === 0) {
+          renderEmptyState('Could Not Load', res.message || 'Could not load notifications.');
         }
-      } catch (e) {}
+      } catch (e) {
+        if (allNotifications.length === 0) {
+          renderEmptyState('Could Not Load', 'Could not load notifications.');
+        }
+      }
     }
 
     // ==================== PREFERENCES ====================
     async function loadPreferences() {
       try {
         const res = await API.getNotificationPrefs();
-        if (res.success) {
-          notificationPrefs = res.data;
-          document.getElementById('emailToggle').checked = notificationPrefs.email_enabled;
-          document.getElementById('whatsappToggle').checked = notificationPrefs.whatsapp_enabled;
-          document.getElementById('telegramToggle').checked = notificationPrefs.telegram_enabled;
-           document.getElementById('prefPhone').value = notificationPrefs.phone || '';
-           document.getElementById('prefRemindHours').value = notificationPrefs.remind_before_hours || 24;
-          document.getElementById('remindAppt').checked = notificationPrefs.remind_for_appointment !== false;
-          document.getElementById('remindQueue').checked = notificationPrefs.remind_for_queue !== false;
-          document.getElementById('remindResults').checked = notificationPrefs.remind_for_results !== false;
+        if (!res.success) {
+          Utils.showToast(res.message || 'Could not load notification settings.', 'error');
+          return;
         }
-      } catch(e) {}
+        notificationPrefs = res.data;
+        document.getElementById('emailToggle').checked = notificationPrefs.email_enabled;
+        document.getElementById('whatsappToggle').checked = notificationPrefs.whatsapp_enabled;
+        document.getElementById('telegramToggle').checked = notificationPrefs.telegram_enabled;
+        document.getElementById('prefPhone').value = notificationPrefs.phone || '';
+        document.getElementById('prefRemindHours').value = notificationPrefs.remind_before_hours || 24;
+        document.getElementById('remindAppt').checked = notificationPrefs.remind_for_appointment !== false;
+        document.getElementById('remindQueue').checked = notificationPrefs.remind_for_queue !== false;
+        document.getElementById('remindResults').checked = notificationPrefs.remind_for_results !== false;
+      } catch (e) {
+        Utils.showToast('Could not load notification settings.', 'error');
+      }
     }
 
     document.getElementById('savePrefs')?.addEventListener('click', async () => {
@@ -317,33 +332,8 @@
 
     // ==================== SENT HISTORY ====================
     async function loadSentHistory() {
-      try {
-        const res = await API.getSentNotifications();
-        if (res.success) {
-          const sent = res.data;
-          const container = document.getElementById('sentHistoryList');
-          document.getElementById('sentCount').textContent = sent.length + ' sent';
-          container.innerHTML = '';
-          if (sent.length === 0) {
-            container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📤</div><h3>No Sent Notifications</h3><p>Your sent reminders will appear here.</p></div>';
-            return;
-          }
-          sent.forEach(s => {
-            const channelColors = { 'Email': { bg: 'var(--primary-light)', color: 'var(--primary)' }, 'WhatsApp': { bg: '#dcfce7', color: '#166534' }, 'Telegram': { bg: '#e0f2fe', color: '#075985' } };
-            const cc = channelColors[s.channel] || { bg: 'var(--bg-tertiary)', color: 'var(--text-secondary)' };
-            const iconMap = { 'Email': '📧', 'WhatsApp': '💬', 'Telegram': '✈️' };
-            container.innerHTML += `<div class="sent-item">
-              <div class="sent-icon" style="background:${cc.bg};color:${cc.color}">${iconMap[s.channel] || '📤'}</div>
-              <div class="sent-info">
-                <h4>${s.title}</h4>
-                <p>To: ${s.recipient} &middot; via ${s.channel}</p>
-              </div>
-              <span class="badge badge-success">${s.status}</span>
-              <span class="sent-time">${Utils.timeAgo(s.sent_at)}</span>
-            </div>`;
-          });
-        }
-      } catch(e) {}
+      const container = document.getElementById('sentHistoryList');
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📤</div><h3>Not Available</h3><p>Sent reminder history is not available yet.</p></div>';
     }
 
     // ==================== INIT ====================
@@ -376,7 +366,16 @@
         });
       });
       document.getElementById('markAllRead').addEventListener('click', async () => {
-        try { await API.markAllNotificationsRead(); } catch (e) {}
+        try {
+          const res = await API.markAllNotificationsRead();
+          if (!res.success) {
+            Utils.showToast(res.message || 'Could not mark all as read', 'error');
+            return;
+          }
+        } catch (e) {
+          Utils.showToast('Could not mark all as read', 'error');
+          return;
+        }
         allNotifications.forEach(n => n.read = true);
         renderNotifications('all');
         updateCounts();
