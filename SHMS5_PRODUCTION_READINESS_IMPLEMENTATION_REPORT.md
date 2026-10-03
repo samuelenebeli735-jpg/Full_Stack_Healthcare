@@ -1,5 +1,7 @@
 # SHMS5 — Production Readiness & Scaling Implementation Report
 
+> **ARCHIVED — SUPERSEDED.** This report documents a historical implementation state (Redis-backed distributed rate limiting/risk, PgBouncer pooling, application backup/retention jobs, `/health/deep`, multi-service Docker compose). The architecture was subsequently **simplified** by commit `0f59809` ("refactor(shms): simplify security and deployment architecture"): the Redis/PgBouncer/backup/retention/deep-health components and their deployment artifacts were removed. None of those components are part of the current architecture. This document is retained as historical implementation evidence only — **not** the current architecture spec. The authoritative current-state reference is `ARCHITECTURE_REPORT.md`, and the live RLS/`shms_app` runtime findings recorded in §1, §1.2, §6.3, and §8 remain valid.
+
 **Project:** SHMS (School Health Management System) — `shms-backend` + `shms-frontend`
 **Scope of this report:** everything completed in this working session, from the initial status handoff through live RLS enforcement under the `shms_app` role and the 20k–50k user scale-prep work (distributed rate limiting/risk in Redis, retention, backups, deep health, deployment artifacts).
 **Date:** 14 Sep 2026 · **Companion reports:** `SHMS4_RLS_IMPLEMENTATION_REPORT.md`, `SHMS_TIER3_AUTHORIZATION_REPORT.md`, `SHMS_MULTI_TENANT_HARDENING_REPORT.md`
