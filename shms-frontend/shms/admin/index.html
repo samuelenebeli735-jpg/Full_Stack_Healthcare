@@ -78,6 +78,7 @@
           <button class="admin-tab" data-tab="schedules">Schedules</button>
           <button class="admin-tab" data-tab="appointments">Appointments</button>
           <button class="admin-tab" data-tab="reports">Reports</button>
+          <button class="admin-tab" data-tab="broadcast">Broadcast</button>
         </div>
 
         <!-- OVERVIEW TAB -->
@@ -217,6 +218,54 @@
             <div class="card-body"><div class="admin-chart" id="peakHoursChart"></div></div>
           </div>
         </div>
+
+        <!-- BROADCAST TAB -->
+        <div class="tab-panel" id="panel-broadcast">
+          <div class="admin-grid-2">
+            <div class="card">
+              <div class="card-header"><h3>Send Broadcast</h3><span class="badge badge-info">Active users in your organization</span></div>
+              <div class="card-body">
+                <form id="broadcastForm" novalidate>
+                  <div class="form-group" id="broadcastOrgGroup" style="display:none">
+                    <label class="form-label">Target organization</label>
+                    <select class="form-select" id="broadcastOrganization">
+                      <option value="">Loading organizations…</option>
+                    </select>
+                  </div>
+                  <div class="form-group"><label class="form-label">Broadcast title</label><input type="text" class="form-input" id="broadcastTitle" maxlength="255" placeholder="e.g. Clinic closed on Monday"></div>
+                  <div class="form-group"><label class="form-label">Broadcast message</label><textarea class="form-input" id="broadcastMessage" rows="5" maxlength="2000" placeholder="Write the broadcast message..."></textarea></div>
+                  <div class="form-group">
+                    <label class="form-label">Audience</label>
+                    <select class="form-select" id="broadcastAudience">
+                      <option value="">All active users</option>
+                      <option value="student">Students only</option>
+                      <option value="staff">Staff only</option>
+                      <option value="admin">Admins only</option>
+                      <option value="super_admin">Super admins only</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Notification type</label>
+                    <select class="form-select" id="broadcastType">
+                      <option value="general">General</option>
+                      <option value="system">System</option>
+                      <option value="appointment">Appointment</option>
+                      <option value="queue">Queue</option>
+                      <option value="checkin">Check-in</option>
+                      <option value="consultation">Consultation</option>
+                      <option value="reminder">Reminder</option>
+                      <option value="result">Result</option>
+                      <option value="prescription">Prescription</option>
+                    </select>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                    <button type="button" class="btn btn-primary" id="sendBroadcastBtn" onclick="sendBroadcast()">Send Broadcast</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -275,6 +324,7 @@
       else if (tab === 'schedules') populateScheduleDropdown();
       else if (tab === 'appointments') loadAdminAppointments();
       else if (tab === 'reports') loadReports();
+      else if (tab === 'broadcast') loadBroadcastOrganizations();
     }
     document.querySelectorAll('.admin-tab').forEach(tab => {
       tab.addEventListener('click', () => switchTab(tab.dataset.tab));
@@ -630,6 +680,78 @@
           requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.height = h + '%'; }));
         });
       } catch(e) {}
+    }
+
+    // ==================== BROADCAST ====================
+    let broadcastOrgs = [];
+
+    const currentUserRole = () => {
+      const user = Auth.getUser();
+      return user ? user.role : null;
+    };
+
+    function renderBroadcastOrgOptions() {
+      const select = document.getElementById('broadcastOrganization');
+      if (!select) return;
+      if (broadcastOrgs.length === 0) {
+        select.innerHTML = '<option value="">No organizations available</option>';
+      } else {
+        select.innerHTML = '<option value="">Select organization</option>' +
+          broadcastOrgs.map(o => '<option value="' + Utils.escapeHtml(o.id) + '">' + Utils.sanitize(o.name) + '</option>').join('');
+      }
+    }
+
+    async function loadBroadcastOrganizations() {
+      const orgGroup = document.getElementById('broadcastOrgGroup');
+      const select = document.getElementById('broadcastOrganization');
+      if (!orgGroup || !select) return;
+      if (currentUserRole() !== 'super_admin') { orgGroup.style.display = 'none'; return; }
+      orgGroup.style.display = 'block';
+      select.innerHTML = '<option value="">Loading organizations…</option>';
+      try {
+        const res = await API.getOrganizations();
+        broadcastOrgs = (res && res.data) || [];
+        renderBroadcastOrgOptions();
+      } catch (e) {
+        broadcastOrgs = [];
+        select.innerHTML = '<option value="">Could not load organizations</option>';
+        Utils.showToast('Failed to load organizations', 'error');
+      }
+    }
+
+    async function sendBroadcast() {
+      const title = (document.getElementById('broadcastTitle').value || '').trim();
+      const message = (document.getElementById('broadcastMessage').value || '').trim();
+      const type = document.getElementById('broadcastType').value;
+      if (!title) { Utils.showToast('Broadcast title is required', 'error'); return; }
+      if (!message) { Utils.showToast('Broadcast message is required', 'error'); return; }
+      if (title.length > 255) { Utils.showToast('Title must be 255 characters or fewer', 'error'); return; }
+      if (message.length > 2000) { Utils.showToast('Message must be 2000 characters or fewer', 'error'); return; }
+      const isSuperAdmin = currentUserRole() === 'super_admin';
+      let organizationId = '';
+      if (isSuperAdmin) {
+        organizationId = document.getElementById('broadcastOrganization').value;
+        if (!organizationId) { Utils.showToast('Select a target organization first', 'error'); return; }
+      }
+      const payload = { title, message, type };
+      const audienceRole = document.getElementById('broadcastAudience').value;
+      if (audienceRole) payload.role = audienceRole;
+      if (organizationId) payload.organizationId = organizationId;
+      const btn = document.getElementById('sendBroadcastBtn');
+      const originalLabel = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Sending...';
+      try {
+        const res = await API.sendBroadcast(payload);
+        Utils.showToast(res.data.sentCount != null ? `Broadcast sent to ${res.data.sentCount} users` : 'Broadcast sent successfully', 'success');
+        document.getElementById('broadcastForm').reset();
+        if (isSuperAdmin) renderBroadcastOrgOptions();
+      } catch (e) {
+        Utils.showToast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalLabel;
+      }
     }
 
     // ==================== INIT ====================

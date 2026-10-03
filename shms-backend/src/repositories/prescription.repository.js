@@ -8,7 +8,11 @@ const prescriptionInclude = {
         include: {
           appointment: {
             include: {
-              medicalRecord: true,
+              medicalRecord: {
+                include: {
+                  profile: true,
+                },
+              },
               service: true,
               staff: true,
             },

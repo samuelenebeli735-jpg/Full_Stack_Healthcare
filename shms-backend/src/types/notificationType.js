@@ -2,6 +2,7 @@ export const NOTIFICATION_TYPES = {
   APPOINTMENT: "appointment",
   QUEUE: "queue",
   CHECKIN: "checkin",
+  CONSULTATION: "consultation",
   REMINDER: "reminder",
   RESULT: "result",
   PRESCRIPTION: "prescription",

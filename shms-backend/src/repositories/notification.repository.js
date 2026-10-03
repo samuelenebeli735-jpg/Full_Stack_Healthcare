@@ -44,9 +44,9 @@ export async function findUnreadNotificationCount(userId, db = prisma) {
   });
 }
 
-export async function findUsersByOrganization(organizationId, db = prisma) {
+export async function findUsersByOrganization(organizationId, role, db = prisma) {
   return await db.user.findMany({
-    where: { organizationId },
+    where: { organizationId, isActive: true, ...(role ? { role } : {}) },
     select: { id: true, organizationId: true },
   });
 }

@@ -8,6 +8,7 @@ import {
   getPreferences,
   savePreferences,
   sendNotification,
+  sendOrganizationBroadcast as sendOrganizationBroadcastService,
 } from "../services/notification.service.js";
 
 export const getNotifications = asyncHandler(async (req, res) => {
@@ -49,4 +50,17 @@ export const sendTestNotification = asyncHandler(async (req, res) => {
   );
 
   return successResponse(res, notification, "Test notification sent.");
+});
+
+export const sendOrganizationBroadcast = asyncHandler(async (req, res) => {
+  const result = await sendOrganizationBroadcastService(
+    req.body,
+    req.user
+  );
+
+  return successResponse(
+    res,
+    result,
+    "Broadcast sent successfully."
+  );
 });

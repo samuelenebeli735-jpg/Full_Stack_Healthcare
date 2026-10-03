@@ -5,6 +5,8 @@ import {
 } from "../utils/tenantAccess.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
+import { NOTIFICATION_TYPES } from "../types/notificationType.js";
+import { sendNotification } from "./notification.service.js";
 
 import validateSchedule from "../utils/scheduleValidator.js";
 
@@ -205,7 +207,9 @@ export async function createNewAppointment(data, user) {
     validateAppointmentDate(appointmentDate);
   }
 
-  return await withTenant(organizationId, async (tx) => {
+  let patientUserId = null;
+
+  const appointment = await withTenant(organizationId, async (tx) => {
     const organization = await findOrganizationById(organizationId, tx);
 
     if (!organization) {
@@ -213,6 +217,8 @@ export async function createNewAppointment(data, user) {
     }
 
     const medicalRecord = await validateMedicalRecord(data.medicalRecordId, organizationId, tx);
+
+    patientUserId = medicalRecord.profile.user.id;
 
     if (user.role === "student" && medicalRecord.profile.user.id !== user.id) {
       throw new AppError("Medical record not found.", 404);
@@ -247,6 +253,22 @@ export async function createNewAppointment(data, user) {
 
     return appointment;
   });
+
+  // Best-effort lifecycle notification to the patient (never blocks booking).
+  if (patientUserId) {
+    try {
+      await sendNotification(
+        patientUserId,
+        "Appointment booked",
+        `Your appointment has been booked for ${appointmentDate.toISOString()}.`,
+        NOTIFICATION_TYPES.APPOINTMENT
+      );
+    } catch (error) {
+      console.error("Failed to send appointment notification:", error.message);
+    }
+  }
+
+  return appointment;
 }
 
 /**
@@ -887,7 +909,7 @@ export async function cancelAppointment(id, data, user) {
 
   const organizationId = appointment.organizationId;
 
-  return await withTenant(organizationId, async (tx) => {
+  const updated = await withTenant(organizationId, async (tx) => {
     const updated = await updateAppointment(
       id,
       { status: "cancelled" },
@@ -912,6 +934,24 @@ export async function cancelAppointment(id, data, user) {
 
     return updated;
   });
+
+  // Best-effort lifecycle notification to the patient (never blocks cancellation).
+  const patientUserId = appointment.medicalRecord.profile.user.id;
+
+  if (patientUserId) {
+    try {
+      await sendNotification(
+        patientUserId,
+        "Appointment cancelled",
+        "Your appointment has been cancelled.",
+        NOTIFICATION_TYPES.APPOINTMENT
+      );
+    } catch (error) {
+      console.error("Failed to send appointment cancellation notification:", error.message);
+    }
+  }
+
+  return updated;
 }
 
 /**
@@ -951,7 +991,7 @@ export async function rescheduleAppointment(id, data, user) {
 
   const organizationId = appointment.organizationId;
 
-  return await withTenant(organizationId, async (tx) => {
+  const updated = await withTenant(organizationId, async (tx) => {
     const service = await validateService(
       appointment.serviceId,
       organizationId,
@@ -995,4 +1035,22 @@ export async function rescheduleAppointment(id, data, user) {
 
     return updated;
   });
+
+  // Best-effort lifecycle notification to the patient (never blocks rescheduling).
+  const patientUserId = appointment.medicalRecord.profile.user.id;
+
+  if (patientUserId) {
+    try {
+      await sendNotification(
+        patientUserId,
+        "Appointment rescheduled",
+        `Your appointment has been rescheduled to ${newDate.toISOString()}.`,
+        NOTIFICATION_TYPES.APPOINTMENT
+      );
+    } catch (error) {
+      console.error("Failed to send appointment reschedule notification:", error.message);
+    }
+  }
+
+  return updated;
 }

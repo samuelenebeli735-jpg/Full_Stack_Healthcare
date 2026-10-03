@@ -5,6 +5,8 @@ import {
   getPagination,
   buildPaginationMeta,
 } from "../utils/pagination.js";
+import { NOTIFICATION_TYPES } from "../types/notificationType.js";
+import { sendNotification } from "./notification.service.js";
 
 import {
   createPrescription,
@@ -92,6 +94,23 @@ export async function createNewPrescription(data, user) {
     entityId: prescription.id,
     description: `Created prescription for consultation ${consultation.id}.`,
   });
+
+  // Best-effort lifecycle notification to the patient (never blocks prescription creation).
+  const patientUserId =
+    prescription?.consultation?.queue?.appointment?.medicalRecord?.profile?.userId || null;
+
+  if (patientUserId) {
+    try {
+      await sendNotification(
+        patientUserId,
+        "Prescription created",
+        "Your prescription has been created. Please check your records for details.",
+        NOTIFICATION_TYPES.PRESCRIPTION
+      );
+    } catch (error) {
+      console.error("Failed to send prescription notification:", error.message);
+    }
+  }
 
   return prescription;
 }

@@ -2,6 +2,8 @@ import AppError from "../utils/AppError.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
 import { getPagination, buildPaginationMeta } from "../utils/pagination.js";
+import { NOTIFICATION_TYPES } from "../types/notificationType.js";
+import { sendNotification } from "./notification.service.js";
 
 import {
   findConsultationById,
@@ -17,12 +19,16 @@ import { findQueueById } from "../repositories/queue.repository.js";
 export async function createPatientConsultation(data, user) {
   const scoped = resolveUserScope(user);
 
+  let patientUserId = null;
+
   const result = await scoped(async (tx) => {
     const queue = await findQueueById(data.queueId, tx);
 
     if (!queue) {
       throw new AppError("Queue entry not found.", 404);
     }
+
+    patientUserId = queue.appointment.medicalRecord.profile.userId;
 
     if (user.role !== "super_admin" && queue.organizationId !== user.organizationId) {
       throw new AppError("Queue entry not found.", 404);
@@ -55,6 +61,20 @@ export async function createPatientConsultation(data, user) {
     entityId: result.consultation.id,
     description: `Consultation ${result.consultation.id} created for queue #${result.queueNumber}.`,
   });
+
+  // Best-effort lifecycle notification to the patient (never blocks consultation creation).
+  if (patientUserId) {
+    try {
+      await sendNotification(
+        patientUserId,
+        "Consultation completed",
+        "Your consultation has been completed. Please check your records for details.",
+        NOTIFICATION_TYPES.CONSULTATION
+      );
+    } catch (error) {
+      console.error("Failed to send consultation notification:", error.message);
+    }
+  }
 
   return result.consultation;
 }

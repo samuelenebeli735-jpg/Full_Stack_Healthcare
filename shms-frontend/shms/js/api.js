@@ -270,6 +270,14 @@ const API = (() => {
 
     /* ---------- Public ---------- */
     getActiveOrganizations: () => _request('GET', '/organizations/active'),
+    /* All organizations (super_admin only, `/organizations` is gated by
+       authorize("super_admin")). Pages through the backend metadata so the
+       returned array is never truncated to a single page. Each item carries
+       the organization id and name. */
+    async getOrganizations() {
+      const items = await _allPages('/organizations', 100);
+      return { success: true, data: items };
+    },
 
     /* ---------- Profile ---------- */
     async getProfile() {
@@ -394,6 +402,23 @@ const API = (() => {
       };
     },
     sendTestNotification: () => _request('POST', '/notifications/send-test'),
+    /* Send an organization-wide broadcast (admin/super_admin only). Only the
+       fields supported by the backend contract are sent. `organizationId` is
+       meaningful solely for super_admin; the caller decides whether to include
+       it. The backend remains authoritative for authorization and recipients. */
+    async sendBroadcast(data) {
+      const body = { title: data.title, message: data.message };
+      if (data.type) body.type = data.type;
+      if (data.role) body.role = data.role;
+      if (data.organizationId) body.organizationId = data.organizationId;
+      const res = await _request('POST', '/notifications/broadcast', body);
+      return {
+        success: true,
+        data: {
+          sentCount: res.data && typeof res.data.sentCount === 'number' ? res.data.sentCount : null,
+        },
+      };
+    },
 
     /* ---------- Appointments ---------- */
     async getAppointments() {

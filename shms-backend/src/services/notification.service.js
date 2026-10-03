@@ -1,6 +1,11 @@
 import AppError from "../utils/AppError.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import { withTenant } from "../utils/tenantContext.js";
+import { NOTIFICATION_TYPES } from "../types/notificationType.js";
+
+import {
+  findOrganizationById,
+} from "../repositories/organization.repository.js";
 
 import {
   findNotificationsByUserId,
@@ -170,14 +175,32 @@ export async function sendNotification(userId, title, message, type = "general")
   });
 }
 
+/**
+ * Split an array into fixed-size batches for fan-out inserts.
+ */
+function chunkArray(items, size) {
+  const batches = [];
+  for (let i = 0; i < items.length; i += size) {
+    batches.push(items.slice(i, i + size));
+  }
+  return batches;
+}
+
+// Conservative fan-out batch size: keeps each INSERT statement bounded while
+// staying well inside a single tenant transaction, so a large organization
+// cannot trigger one unbounded createMany. Nested inside one transaction, all
+// batches commit or roll back together.
+const BROADCAST_BATCH_SIZE = 500;
+
 export async function sendNotificationToOrganization(
   organizationId,
   title,
   message,
-  type = "general"
+  type = "general",
+  role
 ) {
   const users = await withTenant(organizationId, async (tx) => {
-    const found = await findUsersByOrganization(organizationId, tx);
+    const found = await findUsersByOrganization(organizationId, role, tx);
 
     const notifications = found.map((user) => ({
       userId: user.id,
@@ -187,12 +210,50 @@ export async function sendNotificationToOrganization(
       type,
     }));
 
-    if (notifications.length > 0) {
-      await createManyNotifications(notifications, tx);
+    for (const batch of chunkArray(notifications, BROADCAST_BATCH_SIZE)) {
+      await createManyNotifications(batch, tx);
     }
 
     return found;
   });
 
   return { sentCount: users.length };
+}
+
+export async function sendOrganizationBroadcast(data, user) {
+  const organizationId =
+    user.role === "super_admin"
+      ? data.organizationId
+      : user.organizationId;
+
+  if (!organizationId) {
+    throw new AppError("Organization ID is required.", 400);
+  }
+
+  const organization = await findOrganizationById(organizationId);
+
+  if (!organization) {
+    throw new AppError("Organization not found.", 404);
+  }
+
+  const result = await sendNotificationToOrganization(
+    organizationId,
+    data.title,
+    data.message,
+    data.type ?? NOTIFICATION_TYPES.GENERAL,
+    data.role
+  );
+
+  const audienceSuffix = data.role ? ` (role: ${data.role})` : "";
+
+  await auditLogger({
+    organizationId,
+    userId: user.id,
+    action: "BROADCAST",
+    entity: "Notification",
+    entityId: null,
+    description: `Broadcast "${data.title}" sent to ${result.sentCount} users${audienceSuffix}.`,
+  });
+
+  return result;
 }

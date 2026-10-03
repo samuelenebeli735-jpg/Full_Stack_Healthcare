@@ -2,6 +2,8 @@ import AppError from "../utils/AppError.js";
 import { resolveOrganizationId } from "../utils/tenantAccess.js";
 import { auditLogger } from "../utils/auditLogger.js";
 import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
+import { NOTIFICATION_TYPES } from "../types/notificationType.js";
+import { sendNotification } from "./notification.service.js";
 import {
   getPagination,
   buildPaginationMeta,
@@ -357,6 +359,23 @@ export async function callNextPatient(organizationId, user) {
       calledAt: new Date(),
     }, tx);
   });
+
+  // Best-effort lifecycle notification to the patient (never blocks the queue call).
+  const patientUserId =
+    updatedQueue?.appointment?.medicalRecord?.profile?.userId || null;
+
+  if (patientUserId) {
+    try {
+      await sendNotification(
+        patientUserId,
+        "Queue called",
+        `Queue number ${updatedQueue.queueNumber} has been called. Please proceed to the consultation room.`,
+        NOTIFICATION_TYPES.QUEUE
+      );
+    } catch (error) {
+      console.error("Failed to send queue notification:", error.message);
+    }
+  }
 
   return updatedQueue;
 }
