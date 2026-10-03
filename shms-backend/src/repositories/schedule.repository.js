@@ -59,6 +59,27 @@ export async function findSchedulesByStaff(
 }
 
 /**
+ * Get all active schedules for a set of staff members. Used to resolve
+ * which doctors are eligible to take appointments on a given day without
+ * issuing one query per staff member.
+ */
+export async function findActiveSchedulesByStaffIds(
+  staffIds,
+  db = prisma
+) {
+  return await db.schedule.findMany({
+    where: {
+      staffId: { in: staffIds },
+      isActive: true,
+    },
+    include: {
+      organization: true,
+      staff: true,
+    },
+  });
+}
+
+/**
  * Get all schedules for an organization on a specific day.
  */
 export async function findSchedulesByDay(

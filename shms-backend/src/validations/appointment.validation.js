@@ -44,6 +44,11 @@ export const slotsQuerySchema = z.object({
   serviceId: z.string().cuid("Invalid service ID.").optional(),
 });
 
+export const availableDoctorsQuerySchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date."),
+  serviceId: z.string().cuid("Invalid service ID.").optional(),
+});
+
 export const cancelAppointmentSchema = z.object({
   reason: z
     .string()

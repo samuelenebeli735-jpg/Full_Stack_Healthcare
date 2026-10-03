@@ -78,9 +78,17 @@ export default async function validateSchedule(
     start.getHours() * 60 +
     start.getMinutes();
 
-  const endMinutes =
+  let endMinutes =
     end.getHours() * 60 +
     end.getMinutes();
+
+  // Midnight-crossing schedules (e.g., 16:00–00:00) store their end time as
+  // 00:00 on the reference day, which reads as 0 minutes locally and is
+  // numerically less than the start. Treat the logical end as 24:00 (1440
+  // minutes) so afternoon-shift bookings are not rejected as "outside hours".
+  if (endMinutes <= startMinutes) {
+    endMinutes = 1440;
+  }
 
   if (
     appointmentMinutes < startMinutes ||

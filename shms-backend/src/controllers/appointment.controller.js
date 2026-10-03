@@ -10,6 +10,7 @@ import {
   updateExistingAppointment,
   removeAppointment,
   getStaffAvailableSlots,
+  getDoctorsAvailableOnDate,
   cancelAppointment as cancelAppointmentService,
   rescheduleAppointment as rescheduleAppointmentService,
 } from "../services/appointment.service.js";
@@ -93,6 +94,22 @@ export const getAvailableSlots = asyncHandler(
       res,
       result,
       "Available slots retrieved successfully."
+    );
+  }
+);
+
+export const getAvailableDoctors = asyncHandler(
+  async (req, res) => {
+    const result = await getDoctorsAvailableOnDate(
+      req.query.date,
+      req.user,
+      req.query
+    );
+
+    return successResponse(
+      res,
+      result,
+      "Available doctors retrieved successfully."
     );
   }
 );

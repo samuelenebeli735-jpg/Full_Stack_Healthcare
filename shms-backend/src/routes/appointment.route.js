@@ -11,6 +11,7 @@ import {
   updateAppointment,
   deleteAppointment,
   getAvailableSlots,
+  getAvailableDoctors,
   cancelAppointment,
   rescheduleAppointment,
 } from "../controllers/appointment.controller.js";
@@ -24,6 +25,7 @@ import {
   idParamSchema,
   staffSlotsParamsSchema,
   slotsQuerySchema,
+  availableDoctorsQuerySchema,
   cancelAppointmentSchema,
   rescheduleAppointmentSchema,
 } from "../validations/appointment.validation.js";
@@ -62,6 +64,16 @@ router.get(
     query: slotsQuerySchema,
   }),
   getAvailableSlots
+);
+
+router.get(
+  "/doctors/available",
+  authenticate,
+  authorize("student", "staff", "admin", "super_admin"),
+  validate({
+    query: availableDoctorsQuerySchema,
+  }),
+  getAvailableDoctors
 );
 
 router.post(

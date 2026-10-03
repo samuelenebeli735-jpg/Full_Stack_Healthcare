@@ -22,15 +22,21 @@ import {
 } from "../repositories/medical-record.repository.js";
 
 import {
+  findProfileByUserId,
+} from "../repositories/profile.repository.js";
+
+import {
   findServiceById,
 } from "../repositories/service.repository.js";
 
 import {
   findSchedulesByStaff,
+  findActiveSchedulesByStaffIds,
 } from "../repositories/schedule.repository.js";
 
 import {
   findStaffById,
+  findStaffByOrganization,
 } from "../repositories/staff.repository.js";
 
 import {
@@ -499,6 +505,77 @@ function minutesOfDay(date) {
 }
 
 /**
+ * Generate the 30-minute slot grid for one schedule on one calendar day,
+ * marking slots that overlap booked appointments or a break as unavailable.
+ * Returns `valid: false` when the configured working hours cannot be read.
+ *
+ * Handles both same-day schedules (e.g., 08:00–16:00) and midnight-crossing
+ * schedules (e.g., 16:00–00:00) by detecting when endMinutes <= startMinutes
+ * and treating the end as 24:00 (1440 minutes) on the same logical day.
+ */
+function buildDaySlots(schedule, dayDate, busy, slotWidth) {
+  const startMinutes = minutesOfDay(new Date(schedule.startTime));
+  let endMinutes = minutesOfDay(new Date(schedule.endTime));
+
+  if (Number.isNaN(startMinutes) || Number.isNaN(endMinutes)) {
+    return { slots: [], valid: false };
+  }
+
+  // Handle midnight-crossing shifts (e.g., 16:00–00:00).
+  // In the stored data, such schedules have endTime on the previous calendar day
+  // (e.g., 23:00 UTC = 00:00 local), so endMinutes < startMinutes.
+  // We treat the logical end as 24:00 (1440 minutes) on the same day.
+  const crossesMidnight = endMinutes <= startMinutes;
+  if (crossesMidnight) {
+    endMinutes = 1440; // 24:00 = 1440 minutes
+  }
+
+  let breakStartMinutes = null;
+  let breakEndMinutes = null;
+
+  if (schedule.breakStart && schedule.breakEnd) {
+    breakStartMinutes = minutesOfDay(new Date(schedule.breakStart));
+    breakEndMinutes = minutesOfDay(new Date(schedule.breakEnd));
+
+    // If the schedule crosses midnight and the break is on the next calendar day
+    // (break start < schedule start), the break times are stored with the same
+    // date as schedule.startTime (the logical day). Since we shifted endMinutes
+    // to 1440, break minutes are already correct as long as break is on the
+    // same logical day. If breakStart < startMinutes (break on next calendar day),
+    // it would be stored with schedule.startTime's date, which is correct.
+  }
+
+  const slots = [];
+
+  for (
+    let minutes = startMinutes;
+    minutes < endMinutes;
+    minutes += 30
+  ) {
+    const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+    const conflicting = busy.some(
+      (interval) =>
+        minutes < interval.end &&
+        interval.start < minutes + slotWidth
+    );
+
+    const inBreak =
+      breakStartMinutes !== null && breakEndMinutes !== null
+        ? minutes >= breakStartMinutes &&
+          minutes < breakEndMinutes
+        : false;
+
+    slots.push({
+      time,
+      available: !conflicting && !inBreak,
+    });
+  }
+
+  return { slots, valid: true };
+}
+
+/**
  * Compute the real available appointment slots for a staff member on a
  * given date. Uses the staff working schedule (active schedule for the
  * day, minus any break window) and excludes slots that overlap already
@@ -581,36 +658,6 @@ export async function getStaffAvailableSlots(staffId, date, user, query = {}) {
       slotWidth = service.estimatedDuration || 30;
     }
 
-    const startMinutes = minutesOfDay(
-      new Date(schedule.startTime)
-    );
-    const endMinutes = minutesOfDay(
-      new Date(schedule.endTime)
-    );
-
-    if (
-      Number.isNaN(startMinutes) ||
-      Number.isNaN(endMinutes)
-    ) {
-      return {
-        slots: [],
-        message: "Invalid working hours configured for this doctor.",
-        hasSchedule: false,
-      };
-    }
-
-    let breakStartMinutes = null;
-    let breakEndMinutes = null;
-
-    if (schedule.breakStart && schedule.breakEnd) {
-      breakStartMinutes = minutesOfDay(
-        new Date(schedule.breakStart)
-      );
-      breakEndMinutes = minutesOfDay(
-        new Date(schedule.breakEnd)
-      );
-    }
-
     const startOfDay = new Date(dayDate);
     const endOfDay = new Date(dayDate);
     endOfDay.setHours(23, 59, 59, 999);
@@ -634,31 +681,19 @@ export async function getStaffAvailableSlots(staffId, date, user, query = {}) {
       };
     });
 
-    const slots = [];
+    const { slots, valid } = buildDaySlots(
+      schedule,
+      dayDate,
+      busy,
+      slotWidth
+    );
 
-    for (
-      let minutes = startMinutes;
-      minutes < endMinutes;
-      minutes += 30
-    ) {
-      const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
-
-      const conflicting = busy.some(
-        (interval) =>
-          minutes < interval.end &&
-          interval.start < minutes + slotWidth
-      );
-
-      const inBreak =
-        breakStartMinutes !== null && breakEndMinutes !== null
-          ? minutes >= breakStartMinutes &&
-            minutes < breakEndMinutes
-          : false;
-
-      slots.push({
-        time,
-        available: !conflicting && !inBreak,
-      });
+    if (!valid) {
+      return {
+        slots: [],
+        message: "Invalid working hours configured for this doctor.",
+        hasSchedule: false,
+      };
     }
 
     return {
@@ -666,6 +701,149 @@ export async function getStaffAvailableSlots(staffId, date, user, query = {}) {
       message: null,
       hasSchedule: true,
     };
+  });
+}
+
+/**
+ * Resolve which doctors can take an appointment on a given date, for the
+ * "No preference" booking path. A doctor is eligible when they have an
+ * active working schedule for the requested day and belong to the same
+ * organization as the requester. Each eligible doctor carries
+ * `hasAvailableSlots`, which is false when every generated slot for that
+ * day overlaps an existing appointment or the configured break, so the
+ * list is never reduced to "the first row found".
+ */
+export async function getDoctorsAvailableOnDate(date, user, query = {}) {
+  const dayDate = new Date(date + "T00:00:00");
+
+  if (Number.isNaN(dayDate.getTime())) {
+    throw new AppError("Invalid date.", 400);
+  }
+
+  const dayOfWeek = DAY_NAMES[dayDate.getDay()];
+
+  const scoped = resolveUserScope(user);
+
+  return await scoped(async (tx) => {
+    const orgFilter =
+      user.role === "super_admin" ? null : user.organizationId;
+
+    const { items } = await findStaffByOrganization(
+      orgFilter,
+      { employmentStatus: "active", limit: 100 },
+      tx
+    );
+
+    const activeStaff = items.filter(
+      (staff) => staff.user?.isActive !== false
+    );
+
+    if (!activeStaff.length) {
+      return {
+        doctors: [],
+        message: "No active doctors available.",
+      };
+    }
+
+    const staffIds = activeStaff.map((staff) => staff.id);
+
+    const schedules = await findActiveSchedulesByStaffIds(staffIds, tx);
+
+    if (!schedules.length) {
+      return {
+        doctors: [],
+        message: "No doctors have a working schedule.",
+      };
+    }
+
+    const schedulesOnDay = schedules.filter(
+      (item) => item.dayOfWeek === dayOfWeek
+    );
+
+    if (!schedulesOnDay.length) {
+      return {
+        doctors: [],
+        message: `No doctors are scheduled to work on ${dayOfWeek}.`,
+      };
+    }
+
+    let slotWidth = 30;
+
+    if (query.serviceId) {
+      const service = await findServiceById(query.serviceId, tx);
+
+      if (
+        !service ||
+        !service.isActive ||
+        service.organizationId !== user.organizationId
+      ) {
+        throw new AppError("Clinical service not found.", 404);
+      }
+
+      slotWidth = service.estimatedDuration || 30;
+    }
+
+    const startOfDay = new Date(dayDate);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(dayDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const existing = await tx.appointment.findMany({
+      where: {
+        staffId: { in: staffIds },
+        appointmentDate: { gte: startOfDay, lte: endOfDay },
+        status: { notIn: ["cancelled", "no_show"] },
+      },
+      include: {
+        service: true,
+      },
+    });
+
+    const busyByStaff = {};
+
+    existing.forEach((appointment) => {
+      const start = minutesOfDay(appointment.appointmentDate);
+      (busyByStaff[appointment.staffId] ||= []).push({
+        start,
+        end: start + (appointment.service?.estimatedDuration || 30),
+      });
+    });
+
+    const doctors = [];
+
+    activeStaff.forEach((staff) => {
+      const schedule = schedulesOnDay.find(
+        (item) => item.staffId === staff.id
+      );
+
+      if (!schedule) return;
+
+      const { slots, valid } = buildDaySlots(
+        schedule,
+        dayDate,
+        busyByStaff[staff.id] || [],
+        slotWidth
+      );
+
+      if (!valid) return;
+
+      const availableSlots = slots.filter((slot) => slot.available);
+
+      doctors.push({
+        ...staff,
+        hasAvailableSlots: availableSlots.length > 0,
+        availableSlotCount: availableSlots.length,
+      });
+    });
+
+    doctors.sort(
+      (a, b) =>
+        Number(b.hasAvailableSlots) - Number(a.hasAvailableSlots) ||
+        (a.lastName || "").localeCompare(b.lastName || "")
+    );
+
+    return { doctors, message: null };
   });
 }
 
