@@ -8,7 +8,6 @@ RUN npm ci --omit=dev
 RUN npx prisma generate
 
 COPY src ./src
-COPY jobs ./jobs
 COPY ecosystem.config.cjs ./
 
 ENV NODE_ENV=production

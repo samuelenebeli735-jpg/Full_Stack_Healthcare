@@ -2,7 +2,6 @@ import { Router } from "express";
 
 import authenticate from "../middleware/auth.middleware.js";
 import authorize from "../middleware/role.middleware.js";
-import { authorizePolicy } from "../middleware/policy.middleware.js";
 import validate from "../middleware/validate.middleware.js";
 
 import {
@@ -28,7 +27,6 @@ router.post(
   "/",
   authenticate,
   authorize("staff", "admin", "super_admin"),
-  authorizePolicy({ action: "create", resourceType: "prescription", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ body: createPrescriptionSchema }),
   createPrescription
 );
@@ -40,7 +38,6 @@ router.get(
   "/",
   authenticate,
   authorize("staff", "admin", "super_admin"),
-  authorizePolicy({ action: "read", resourceType: "prescription", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   getPrescriptions
 );
 
@@ -51,7 +48,6 @@ router.get(
   "/:id",
   authenticate,
   authorize("staff", "admin", "super_admin"),
-  authorizePolicy({ action: "read", resourceType: "prescription", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ 
     params: prescriptionIdSchema
    }),
@@ -65,7 +61,6 @@ router.patch(
   "/:id",
   authenticate,
   authorize("staff", "admin", "super_admin"),
-  authorizePolicy({ action: "update", resourceType: "prescription", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ 
     params: prescriptionIdSchema,
     body: updatePrescriptionSchema,
@@ -80,7 +75,6 @@ router.delete(
   "/:id",
   authenticate,
   authorize("admin", "super_admin"),
-  authorizePolicy({ action: "delete", resourceType: "prescription", onDeny: { crossOrgStatus: 404, ownershipStatus: 404 } }),
   validate({ 
     params: prescriptionIdSchema
    }),

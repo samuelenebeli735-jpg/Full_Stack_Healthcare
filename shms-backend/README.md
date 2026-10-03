@@ -879,40 +879,28 @@ If you want the next response to be built on this reconstructed baseline, I’ll
 
 ---
 
-## 9. Operations & Scaling (20k–50k users)
+## 9. Operations
 
-The application is stateless (only DB + Redis hold state), so it scales out
-behind a load balancer. These are the operational pieces for that range:
+The application is a single Node process (Node 22+ / PM2) backed by a single
+PostgreSQL database. State is in-process (in-memory rate-limit counters via
+express-rate-limit), so run ONE instance per database. If you later need
+multi-instance, add a shared rate-limit/state store first.
 
-### Environment
-```
-REDIS_URL=redis://127.0.0.1:6379   # empty => in-memory fallback (single instance only)
-BACKUP_DATABASE_URL=               # empty => falls back to DATABASE_URL
-```
+### Environment (`.env`)
+- `DATABASE_URL` — PostgreSQL connection string (required).
+- `JWT_SECRET` — token signing secret (required).
+- `JWT_EXPIRES_IN` — JWT lifetime (e.g. `24h`); defaults to `1h` if unset or empty.
+- `PORT` (default 5000), `NODE_ENV`, `CORS_ORIGINS`, `FRONTEND_URL`, `EMAIL_WEBHOOK_URL`.
 
-### Multi-instance (#2)
-- **Node 22.6+ / PM2 cluster:** run `npm run cluster` (instances = CPU count).
-  On Windows PM2 forces fork mode — use multiple processes or Linux for production.
-- **Docker:** `docker compose up -d` runs the API plus Redis and PgBouncer.
-- All session/risk/rate-limit state lives in Redis (`rl:*`, `rs:*` keys), so any
-  number of instances share one accounting window.
+### Run
+- `npm start` or `npm run dev`.
+- PM2 cluster: `npm run cluster` (note: per-process in-memory rate limiting).
+- **Docker:** `docker compose up -d` builds and runs the single API image. It
+  connects to the host PostgreSQL through the `DATABASE_URL` you set in `.env`
+  (use a host-gateway address such as `host.docker.internal` from the container).
+  There is no Redis or PgBouncer service — the current application does not use them.
+- Health: `GET /api/v1/health` (liveness).
 
-### Connection pooling (#3)
-- `deploy/pgbouncer/pgbouncer.ini` + `userlist.txt.example` are provided.
-- Point `DATABASE_URL` at PgBouncer (`port 6432`) so Prisma pools across N
-  instances don't exhaust PostgreSQL `max_connections`.
-
-### Retention (#4)
-- `npm run retention` — deletes `AuditLog`/`Notification` rows older than the
-  window (default 365 days). Preview first: `node jobs/retention.js --days 365 --dry-run`.
-- Run on a schedule (cron / Task Scheduler).
-
-### Backups & monitoring (#5)
-- `npm run backup` — `pg_dump -Fc` to `./backups`, keeps the newest N
-  (`--keep 7`). Requires PostgreSQL client tools on PATH (`PGDUMP_BIN` to override).
-- The role in the connection string must be able to dump the whole database:
-  the RLS-restricted app role (`shms_app`) makes `pg_dump` fail on `COPY`.
-  Set `BACKUP_DATABASE_URL` to an owner/`postgres` connection for backups.
-- Health endpoints: `GET /api/v1/health` (liveness) and
-  `GET /api/v1/health/deep` (DB + Redis status, 503 when degraded) for
-  orchestrators/uptime checks.
+### Jobs
+Scheduled retention/backup jobs were removed from this revision; database
+backups are handled outside the application.

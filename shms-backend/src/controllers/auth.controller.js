@@ -32,10 +32,7 @@ export const register = asyncHandler(async (req, res) => {
 */
 
 export const login = asyncHandler(async (req, res) => {
-  const result = await loginStudent(req.body, {
-    ipAddress: req.ip || req.socket?.remoteAddress,
-    userAgent: req.headers["user-agent"],
-  });
+  const result = await loginStudent(req.body);
 
   return successResponse(
     res,

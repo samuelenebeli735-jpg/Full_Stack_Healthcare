@@ -6,7 +6,7 @@ import AppError from "../utils/AppError.js";
 import logger from "../utils/logger.js";
 import env from "../config/env.js";
 
-const errorMiddleware = (err, req, res, next) => {
+const errorMiddleware = (err, req, res, _next) => {
   logger.error(err.message, {
     stack: err.stack,
     method: req.method,
@@ -15,8 +15,8 @@ const errorMiddleware = (err, req, res, next) => {
   });
 
   // Default values
-  let statusCode = 500;
-  let message = "Internal Server Error";
+  let statusCode;
+  let message;
 
   // Prisma errors
   if (err instanceof Prisma.PrismaClientKnownRequestError) {

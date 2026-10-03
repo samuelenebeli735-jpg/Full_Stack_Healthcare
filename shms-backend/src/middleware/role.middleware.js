@@ -1,5 +1,4 @@
 import AppError from "../utils/AppError.js";
-import { recordAuthzDenial } from "../authorization/risk.js";
 
 /**
  * Restrict access to specific roles.
@@ -9,7 +8,7 @@ import { recordAuthzDenial } from "../authorization/risk.js";
  * authorize("student", "staff")
  */
 const authorize = (...roles) => {
-  return async (req, res, next) => {
+  return (req, res, next) => {
     if (!req.user) {
       return next(
         new AppError("Authentication required.", 401)
@@ -17,11 +16,6 @@ const authorize = (...roles) => {
     }
 
     if (!roles.includes(req.user.role)) {
-      try {
-        await recordAuthzDenial({ userId: req.user.id });
-      } catch {
-        // never let risk accounting break authorization
-      }
       return next(
         new AppError(
           "You do not have permission to perform this action.",

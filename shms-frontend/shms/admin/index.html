@@ -108,7 +108,7 @@
             <div class="card">
               <div class="card-header"><h3>Satisfaction Rate</h3></div>
               <div class="card-body text-center">
-                <div class="satisfaction-ring"><span id="satRate">94</span><span style="font-size:14px;position:relative;z-index:1">%</span></div>
+                <div class="satisfaction-ring"><span id="satRate">–</span><span id="satRatePct" style="font-size:14px;position:relative;z-index:1">%</span></div>
                 <p style="margin-top:12px;font-size:13px;color:var(--text-secondary)">Patient satisfaction score</p>
               </div>
             </div>
@@ -294,9 +294,11 @@
           <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Doctors</span><div class="stat-card-icon">👨‍⚕️</div></div><div class="stat-card-value">${d.total_doctors}</div><div class="stat-card-change positive">${d.available_doctors} available</div></div>
           <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Today's Appointments</span><div class="stat-card-icon">📋</div></div><div class="stat-card-value">${d.total_appointments}</div><div class="stat-card-change positive">${d.completed_today} completed</div></div>
           <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Students Registered</span><div class="stat-card-icon">🎓</div></div><div class="stat-card-value">${d.total_students}</div><div class="stat-card-change positive">Active</div></div>
-          <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Avg Wait Time</span><div class="stat-card-icon">⏱️</div></div><div class="stat-card-value">${d.avg_wait_time}m</div><div class="stat-card-change">Peak: ${d.peak_hour}</div></div>
+          <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Avg Wait Time</span><div class="stat-card-icon">⏱️</div></div><div class="stat-card-value">${d.avg_wait_time == null ? '–' : d.avg_wait_time + 'm'}</div><div class="stat-card-change">Peak: ${d.peak_hour || '–'}</div></div>
         `;
-        document.getElementById('satRate').textContent = d.satisfaction_rate;
+        document.getElementById('satRate').textContent = d.satisfaction_rate == null ? '–' : d.satisfaction_rate;
+        const satPct = document.getElementById('satRatePct');
+        if (satPct) satPct.style.display = d.satisfaction_rate == null ? 'none' : '';
         const weekDays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
         const weekChart = document.getElementById('weeklyChart');
         weekChart.innerHTML = '';
