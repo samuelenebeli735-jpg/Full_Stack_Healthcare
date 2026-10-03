@@ -85,11 +85,13 @@
               <button class="btn btn-sm btn-secondary filter-btn" data-filter="unread">Unread</button>
               <button class="btn btn-sm btn-secondary filter-btn" data-filter="appointment">Appointments</button>
               <button class="btn btn-sm btn-secondary filter-btn" data-filter="queue">Queue</button>
+              <button class="btn btn-sm btn-secondary filter-btn" data-filter="consultation">Consultations</button>
               <button class="btn btn-sm btn-secondary filter-btn" data-filter="reminder">Reminders</button>
             </div>
             <button class="btn btn-sm btn-secondary" id="markAllRead">Mark All as Read</button>
           </div>
           <div id="notificationsList"></div>
+          <div id="notifPagination" style="display:flex;justify-content:center;padding:16px 0 8px"></div>
         </div>
         <!-- PREFERENCES PANEL -->
         <div class="notif-panel" id="notif-panel-preferences">
@@ -172,6 +174,24 @@
   <script>
     let allNotifications = [];
     let notificationPrefs = {};
+    let notifPage = 1;
+    let notifTotal = 0;
+    let notifUnread = 0;
+    let notifHasMore = false;
+    let currentFilter = 'all';
+    let loadingNotifs = false;
+    const NOTIF_PAGE_SIZE = 20;
+    const NOTIF_MAX_LIMIT = 100;
+    const NOTIF_TYPE_FILTERS = ['appointment', 'queue', 'reminder', 'consultation'];
+
+    function notifQuery(page, limit) {
+      return {
+        page: page,
+        limit: limit,
+        read: currentFilter === 'unread' ? false : undefined,
+        type: NOTIF_TYPE_FILTERS.includes(currentFilter) ? currentFilter : undefined,
+      };
+    }
 
     function switchNotifTab(tab) {
       const tabButton = document.querySelector(`.notif-tab[data-notif-tab="${tab}"]`);
@@ -189,17 +209,17 @@
     });
 
     function getNotifIcon(type) {
-      const icons = { appointment: '📅', reminder: '⏰', queue: '🔢', checkin: '✅', lab: '🔬', pharmacy: '💊', system: '⚙️' };
+      const icons = { appointment: '📅', reminder: '⏰', queue: '🔢', checkin: '✅', consultation: '🩺', lab: '🔬', pharmacy: '💊', system: '⚙️' };
       return icons[type] || '📣';
     }
 
     function getNotifBg(type) {
-      const bgs = { appointment: '--primary-light', reminder: '#fef3c7', queue: '#e0f2fe', checkin: '#dcfce7', lab: '#f3e8ff', pharmacy: '#fce7f3', system: '#f1f5f9' };
-      return `var(${bgs[type] || '--bg-tertiary'})`;
+      const bgs = { appointment: 'var(--primary-light)', reminder: '#fef3c7', queue: '#e0f2fe', checkin: '#dcfce7', consultation: '#ccfbf1', lab: '#f3e8ff', pharmacy: '#fce7f3', system: '#f1f5f9' };
+      return bgs[type] || 'var(--bg-tertiary)';
     }
 
     function getNotifColor(type) {
-      const colors = { appointment: 'var(--primary)', reminder: '#92400e', queue: '#075985', checkin: '#166534', lab: '#6d28d9', pharmacy: '#be185d', system: 'var(--text-secondary)' };
+      const colors = { appointment: 'var(--primary)', reminder: '#92400e', queue: '#075985', checkin: '#166534', consultation: '#115e59', lab: '#6d28d9', pharmacy: '#be185d', system: 'var(--text-secondary)' };
       return colors[type] || 'var(--text-secondary)';
     }
 
@@ -208,16 +228,20 @@
       container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔔</div><h3>${title}</h3><p>${msg}</p></div>`;
     }
 
-    function renderNotifications(filter = 'all') {
+    function renderNotifications() {
       const container = document.getElementById('notificationsList');
-      let filtered = allNotifications;
-      if (filter === 'unread') filtered = allNotifications.filter(n => !n.read);
-      else if (filter !== 'all') filtered = allNotifications.filter(n => n.type === filter);
-      if (filtered.length === 0) {
+      if (allNotifications.length === 0) {
         renderEmptyState('No Notifications', 'You\'re all caught up!');
         return;
       }
       container.innerHTML = '';
+      const filtered = currentFilter === 'unread'
+        ? allNotifications.filter(n => !n.read)
+        : (currentFilter === 'all' ? allNotifications : allNotifications.filter(n => n.type === currentFilter));
+      if (filtered.length === 0) {
+        renderEmptyState('No Notifications', 'You\'re all caught up!');
+        return;
+      }
       filtered.forEach(n => {
         const div = document.createElement('div');
         div.className = 'notif-card' + (n.read ? '' : ' unread');
@@ -234,40 +258,133 @@
           </div>
         `;
         div.addEventListener('click', async () => {
-          if (!n.read) {
-            n.read = true;
-            div.classList.remove('unread');
-            try { await API.markNotificationRead(n.id); } catch (e) {}
-            updateCounts();
+          if (n.read) return;
+          try {
+            await API.markNotificationRead(n.id);
+          } catch (e) {
+            Utils.showToast('Could not mark notification as read. Please try again.', 'error');
+            return;
           }
+          n.read = true;
+          notifUnread = Math.max(0, notifUnread - 1);
+          renderNotifications();
+          renderPagination();
+          updateCounts();
         });
         container.appendChild(div);
       });
     }
 
     function updateCounts() {
-      const unread = allNotifications.filter(n => !n.read).length;
       const el = document.getElementById('notifCount');
-      if (el) el.textContent = unread;
+      if (el) { el.textContent = notifUnread; el.style.display = notifUnread > 0 ? 'flex' : 'none'; }
       const sideEl = document.getElementById('sidebarNotifCount');
-      if (sideEl) sideEl.textContent = unread;
+      if (sideEl) { sideEl.textContent = notifUnread; sideEl.style.display = notifUnread > 0 ? 'flex' : 'none'; }
     }
 
-    async function loadNotifications() {
-      if (!Auth.isAuthenticated()) return;
+    function renderPagination() {
+      const pag = document.getElementById('notifPagination');
+      if (!pag) return;
+      pag.innerHTML = '';
+      const shown = allNotifications.length;
+      if (shown > 0) {
+        const info = document.createElement('div');
+        info.style.cssText = 'width:100%;text-align:center;font-size:12px;color:var(--text-secondary);margin-bottom:8px';
+        info.textContent = `Showing ${shown} of ${notifTotal}` + (notifUnread > 0 ? ` · ${notifUnread} unread` : '');
+        pag.appendChild(info);
+      }
+      if (notifHasMore) {
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-secondary';
+        btn.id = 'loadMoreNotifs';
+        btn.textContent = 'Load More';
+        btn.addEventListener('click', () => loadMoreNotifications());
+        pag.appendChild(btn);
+      }
+    }
+
+    async function loadNotifications(reset) {
+      if (!Auth.isAuthenticated() || loadingNotifs) return;
+      loadingNotifs = true;
+      if (reset) { notifPage = 1; allNotifications = []; }
+      const container = document.getElementById('notificationsList');
       try {
-        const res = await API.getNotifications();
+        if (reset) {
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><h3>Loading Notifications</h3><p>Loading your notifications…</p></div>';
+        } else {
+          const loadMoreBtn = document.getElementById('loadMoreNotifs');
+          if (loadMoreBtn) { loadMoreBtn.disabled = true; loadMoreBtn.textContent = 'Loading…'; }
+        }
+        const res = await API.getNotifications(notifQuery(notifPage, NOTIF_PAGE_SIZE));
         if (res.success) {
-          allNotifications = res.data;
-          renderNotifications('all');
+          const items = res.data || [];
+          if (reset) allNotifications = items;
+          else allNotifications.push(...items);
+          notifUnread = typeof res.unread_count === 'number' ? res.unread_count : 0;
+          notifTotal = (res.pagination && res.pagination.total) || allNotifications.length;
+          notifHasMore = res.pagination ? !!res.pagination.hasNextPage : !!(notifTotal > allNotifications.length);
+          notifPage += 1;
+          renderNotifications();
+          renderPagination();
           updateCounts();
-        } else if (allNotifications.length === 0) {
-          renderEmptyState('Could Not Load', res.message || 'Could not load notifications.');
+        } else if (reset) {
+          renderEmptyState('Could Not Load', Utils.sanitize(res.message || 'Could not load notifications.'));
+          renderPagination();
         }
       } catch (e) {
-        if (allNotifications.length === 0) {
-          renderEmptyState('Could Not Load', 'Could not load notifications.');
+        if (!reset && allNotifications.length > 0) {
+          Utils.showToast('Could not load more notifications.', 'error');
+        } else {
+          renderEmptyState('Could Not Load', 'Could not load notifications. Check your connection and try again.');
         }
+        renderPagination();
+      } finally {
+        loadingNotifs = false;
+      }
+    }
+
+    async function refreshNotifications() { await loadNotifications(true); }
+
+    async function loadMoreNotifications() { await loadNotifications(false); }
+
+    /* Background poll that preserves the already-loaded window.
+       Page 1 only  -> ordinary refresh (single request).
+       Multiple pages -> re-read the same span with the existing endpoint,
+       using one request when the window fits the backend's 100-row cap and
+       bounded chunked requests beyond it. No new endpoint, no contract change. */
+    async function pollNotifications() {
+      if (!Auth.isAuthenticated() || loadingNotifs) return;
+      const windowSize = allNotifications.length;
+      if (windowSize <= NOTIF_PAGE_SIZE) {
+        await loadNotifications(true);
+        return;
+      }
+      loadingNotifs = true;
+      try {
+        const collected = [];
+        let lastRes = null;
+        if (windowSize <= NOTIF_MAX_LIMIT) {
+          lastRes = await API.getNotifications(notifQuery(1, windowSize));
+          collected.push(...(lastRes.data || []));
+        } else {
+          const pages = Math.ceil(windowSize / NOTIF_MAX_LIMIT);
+          for (let p = 1; p <= pages; p++) {
+            lastRes = await API.getNotifications(notifQuery(p, NOTIF_MAX_LIMIT));
+            collected.push(...(lastRes.data || []));
+          }
+        }
+        allNotifications = collected.slice(0, windowSize);
+        notifUnread = lastRes && typeof lastRes.unread_count === 'number' ? lastRes.unread_count : notifUnread;
+        notifTotal = (lastRes && lastRes.pagination && lastRes.pagination.total) || allNotifications.length;
+        notifHasMore = allNotifications.length < notifTotal;
+        notifPage = Math.ceil(allNotifications.length / NOTIF_PAGE_SIZE) + 1;
+        renderNotifications();
+        renderPagination();
+        updateCounts();
+      } catch (e) {
+        /* Background poll: keep the current view, no toast noise. */
+      } finally {
+        loadingNotifs = false;
       }
     }
 
@@ -354,15 +471,16 @@
           document.getElementById('sidebarOverlay')?.classList.remove('active');
         });
       }, 100);
-      await loadNotifications();
-      setInterval(loadNotifications, 30000);
+      await refreshNotifications();
+      setInterval(pollNotifications, 30000);
       document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('.filter-btn').forEach(b => {
             b.className = b.className.replace('btn-primary', 'btn-secondary');
           });
           btn.className = btn.className.replace('btn-secondary', 'btn-primary');
-          renderNotifications(btn.dataset.filter);
+          currentFilter = btn.dataset.filter;
+          refreshNotifications();
         });
       });
       document.getElementById('markAllRead').addEventListener('click', async () => {
@@ -377,7 +495,9 @@
           return;
         }
         allNotifications.forEach(n => n.read = true);
-        renderNotifications('all');
+        notifUnread = 0;
+        renderNotifications();
+        renderPagination();
         updateCounts();
         Utils.showToast('All notifications marked as read', 'success');
       });

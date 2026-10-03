@@ -306,11 +306,11 @@ const Auth = {
       return;
     }
 
-    const renderNotifs = (notifs) => {
+    const renderNotifs = (notifs, unreadCount) => {
       const body = document.getElementById('notifDropdownBody');
       const count = document.getElementById('notifCount');
       if (!body) return;
-      const unread = notifs.filter(n => !n.read).length;
+      const unread = (typeof unreadCount === 'number') ? unreadCount : notifs.filter(n => !n.read).length;
       if (count) {
         count.textContent = unread;
         count.style.display = unread > 0 ? 'flex' : 'none';
@@ -324,7 +324,7 @@ const Auth = {
         body.innerHTML = '<div class="notif-dropdown-empty">No notifications</div>';
         return;
       }
-      const typeIcons = { appointment: '📅', queue: '👥', checkin: '✅', reminder: '⏰', system: '⚙️' };
+      const typeIcons = { appointment: '📅', queue: '👥', checkin: '✅', consultation: '🩺', reminder: '⏰', system: '⚙️' };
       body.innerHTML = notifs.slice(0, 8).map(n => `
         <div class="notif-dropdown-item${n.read ? '' : ' unread'}" data-id="${n.id}">
           <div class="notif-icon">${typeIcons[n.type] || '🔔'}</div>
@@ -338,12 +338,19 @@ const Auth = {
       body.querySelectorAll('.notif-dropdown-item').forEach(el => {
         el.addEventListener('click', async () => {
           const id = el.dataset.id;
-          await API.markNotificationRead(id);
+          if (!id) return;
+          try {
+            await API.markNotificationRead(id);
+          } catch (e) {
+            Utils.showToast('Could not mark notification as read.', 'error');
+            return;
+          }
           el.classList.remove('unread');
           const notifCount = document.getElementById('notifCount');
-          const cur = parseInt(notifCount.textContent) || 0;
-          notifCount.textContent = Math.max(0, cur - 1);
-          if (notifCount.textContent === '0') notifCount.style.display = 'none';
+          const cur = parseInt(notifCount.textContent, 10) || 0;
+          const next = Math.max(0, cur - 1);
+          notifCount.textContent = next;
+          if (next === 0) notifCount.style.display = 'none';
         });
       });
     };
@@ -353,7 +360,7 @@ const Auth = {
       try {
         const res = await API.getNotifications();
         if (res.success) {
-          renderNotifs(res.data || []);
+          renderNotifs(res.data || [], res.unread_count);
         }
       } catch (e) {}
     };
@@ -379,13 +386,21 @@ const Auth = {
       try {
         await API.markAllNotificationsRead();
         fetchNotifs();
-      } catch (e) {}
+      } catch (e) {
+        Utils.showToast('Could not mark all notifications as read.', 'error');
+      }
     });
 
-    fetchNotifs();
-    setInterval(() => {
-      if (this.isAuthenticated()) fetchNotifs();
-    }, 30000);
+    /* The full notification center owns the notification counters and its own
+       30s poll. Skip the navbar poller there to avoid two pollers writing the
+       same state; the dropdown still refreshes when opened. */
+    const isNotificationCenter = !!document.getElementById('notificationsList');
+    if (!isNotificationCenter) {
+      fetchNotifs();
+      setInterval(() => {
+        if (this.isAuthenticated()) fetchNotifs();
+      }, 30000);
+    }
   },
 
   _insertAlert(form, alert) {

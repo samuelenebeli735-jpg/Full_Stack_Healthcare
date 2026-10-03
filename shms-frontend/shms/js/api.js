@@ -347,13 +347,27 @@ const API = (() => {
     }),
 
     /* ---------- Notifications ---------- */
-    async getNotifications() {
-      const res = await _request('GET', '/notifications');
-      const items = (res.data && res.data.items) || res.data || [];
+    /* `filters` supports: { page, limit, read: true|false, type }
+       Page reads first, then the accumulated items are appended by the caller.
+       `unread_count` is the authoritative backend count (all unread for the
+       user's organization), independent of the page actually loaded. */
+    async getNotifications(filters) {
+      const params = [];
+      if (filters) {
+        if (filters.page) params.push(`page=${filters.page}`);
+        if (filters.limit) params.push(`limit=${filters.limit}`);
+        if (filters.read === true || filters.read === false) params.push(`read=${filters.read}`);
+        if (filters.type) params.push(`type=${encodeURIComponent(filters.type)}`);
+      }
+      const qs = params.length ? `?${params.join('&')}` : '';
+      const res = await _request('GET', `/notifications${qs}`);
+      const data = res.data || {};
+      const rawItems = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
       return {
         success: true,
-        data: items.map(_mapNotification),
-        unread_count: (res.data && res.data.unreadCount) || 0,
+        data: rawItems.map(_mapNotification),
+        unread_count: (data && typeof data.unreadCount === 'number') ? data.unreadCount : 0,
+        pagination: (data && data.pagination) || null,
       };
     },
     markNotificationRead: (id) => _request('PUT', `/notifications/${id}/read`),
