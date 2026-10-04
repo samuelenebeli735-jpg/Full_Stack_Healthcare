@@ -208,6 +208,44 @@ const API = (() => {
     return mapped;
   };
 
+  const _mapConsultation = (c) => {
+    const queue = c.queue || {};
+    const appt = queue.appointment || {};
+    const profile = appt.medicalRecord && appt.medicalRecord.profile;
+    const patient = profile
+      ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim()
+      : 'Patient';
+    return {
+      id: c.id,
+      queueId: queue.id,
+      queueNumber: queue.queueNumber,
+      patient,
+      service: (appt.service && appt.service.name) || 'General',
+      doctor: appt.staff ? _staffName(appt.staff) : '',
+      chiefComplaint: c.chiefComplaint || '',
+      symptoms: c.symptoms || '',
+      diagnosis: c.diagnosis || '',
+      treatmentPlan: c.treatmentPlan || '',
+      notes: c.notes || '',
+      consultationDate: c.consultationDate || '',
+    };
+  };
+
+  const _mapPrescription = (p) => ({
+    id: p.id,
+    consultationId: p.consultation ? p.consultation.id : undefined,
+    items: (p.items || []).map((it) => ({
+      id: it.id,
+      medicationName: it.medicationName || '',
+      dosage: it.dosage || '',
+      frequency: it.frequency || '',
+      duration: it.duration || '',
+      quantity: it.quantity,
+      instructions: it.instructions || '',
+    })),
+    createdAt: p.createdAt || '',
+  });
+
   /* All of today's queue entries for the staff's organization, following the
      backend page metadata so a single response page is never mistaken for the
      whole day. `total` is the authoritative backend `pagination.total`; staff
@@ -1079,6 +1117,34 @@ const API = (() => {
           notes: `Record ${r.recordNumber || ''}`.trim(),
         })),
       };
+    },
+
+    /* ---------- Clinical: consultations & prescriptions (staff) ---------- */
+    /* The consultation list endpoint returns full queue/appointment context
+       per item. These helpers reuse the backend's own pagination metadata so
+       an existing consultation/prescription is found even when it falls after
+       the first page. The backend uniqueness constraints remain final. */
+    async getConsultationByQueueId(queueId) {
+      const items = await _allPages('/consultations', 100);
+      const found = items.find((c) => c.queue && c.queue.id === queueId) || null;
+      return { success: true, data: found ? _mapConsultation(found) : null };
+    },
+    async createConsultation(data) {
+      return _request('POST', '/consultations', data);
+    },
+    async updateConsultation(id, data) {
+      return _request('PATCH', `/consultations/${id}`, data);
+    },
+    async getPrescriptionByConsultation(consultationId) {
+      const items = await _allPages('/prescriptions', 100);
+      const found = items.find((p) => p.consultation && p.consultation.id === consultationId) || null;
+      return { success: true, data: found ? _mapPrescription(found) : null };
+    },
+    async createPrescription(data) {
+      return _request('POST', '/prescriptions', data);
+    },
+    async updatePrescription(id, data) {
+      return _request('PATCH', `/prescriptions/${id}`, data);
     },
 
     /* ---------- Patient search (staff) ---------- */

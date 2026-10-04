@@ -125,8 +125,38 @@
     .sf-pc-info h4{font-size:14px;font-weight:600;color:#111827}
     .sf-pc-info p{font-size:12px;color:#9ca3af;margin-top:1px}
     .sf-pc-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px}
-    .sf-pc-actions{display:none;gap:4px;margin-left:8px}
+    .sf-pc-badge.called{background:#fef3c7;color:#92400e}
+    .sf-pc-badge.checked{background:#dcfce7;color:#166534}
+    .sf-pc-badge.in-progress{background:#dbeafe;color:#1e40af}
+    .sf-pc-actions{display:none;gap:4px;margin-left:8px;flex-wrap:wrap}
     .sf-patient-card:hover .sf-pc-actions{display:flex}
+
+    .consult-patient{display:flex;align-items:center;gap:12px;padding:12px 14px;background:#f9fafb;border:1px solid var(--border);border-radius:12px;margin-bottom:14px;flex-wrap:wrap}
+    .consult-patient .cp-avatar{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;background:#10b981;flex-shrink:0}
+    .consult-patient .cp-info{flex:1;min-width:0}
+    .consult-patient .cp-info h4{font-size:15px;font-weight:700;color:#111827}
+    .consult-patient .cp-info p{font-size:12px;color:#6b7280;margin-top:2px}
+    .consult-patient .cp-badge{font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;background:#dbeafe;color:#1e40af;white-space:nowrap}
+
+    .consult-status{font-size:13px;line-height:1.5;padding:10px 12px;border-radius:10px;margin-bottom:14px}
+    .consult-status.info{background:#eff6ff;color:#1e40af}
+    .consult-status.error{background:#fef2f2;color:#b91c1c}
+    .consult-status.success{background:#f0fdf4;color:#166534}
+    .consult-status.warning{background:#fffbeb;color:#92400e}
+
+    .rx-status{font-size:13px;line-height:1.5;margin-bottom:8px}
+    .rx-status.info{color:#2563eb}
+    .rx-status.error{color:#dc2626}
+    .rx-status.success{color:#16a34a}
+    .rx-status.warning{color:#d97706}
+    .rx-status.muted{color:#9ca3af}
+    .rx-empty{font-size:13px;color:#9ca3af;padding:8px 0}
+    .rx-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;align-items:end;padding:10px;border:1px solid var(--border);border-radius:10px;margin-bottom:10px}
+    .rx-row .rx-name{grid-column:span 3}
+    .rx-row .rx-instr{grid-column:span 2}
+    .rx-row .rx-remove{grid-column:span 1;justify-self:end}
+    .rx-row .form-group{margin-bottom:0}
+    .rx-row .form-label{font-size:11px;margin-bottom:2px}
 
     .queue-actions-section{margin-top:20px}
     .queue-actions-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
@@ -295,8 +325,9 @@
               <div class="sf-card-body">
                 <div class="queue-actions-grid">
                   <button class="btn btn-primary" id="callNext">Call Next Patient</button>
+                  <button class="btn btn-success" id="startNextPatient">Start Consultation</button>
                   <button class="btn btn-secondary" id="skipPatient">Skip Patient</button>
-                  <button class="btn btn-success" id="completePatient">Mark Complete</button>
+                  <button class="btn btn-warning" id="completePatient">Mark Complete</button>
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid #f0f2f5">
                   <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Currently Serving</div><div style="font-size:18px;font-weight:700;color:#111827" id="currentServingStaff">--</div></div>
@@ -346,6 +377,55 @@
           <div class="sf-card" style="margin-top:20px;display:none" id="patientDetailCard">
             <div class="sf-card-header"><h3>Patient Details</h3><button class="btn btn-sm btn-secondary" onclick="document.getElementById('patientDetailCard').style.display='none'">Close</button></div>
             <div class="sf-card-body" id="patientDetailBody"></div>
+          </div>
+        </div>
+
+        <!-- ==================== CONSULTATION DOCUMENTATION MODAL ==================== -->
+        <div class="modal-overlay" id="consultationModal">
+          <div class="modal" style="max-width:680px">
+            <div class="modal-header">
+              <h3 id="consultationModalTitle">Consultation</h3>
+              <button type="button" class="modal-close" data-close-consultation aria-label="Close">&times;</button>
+            </div>
+            <div class="modal-body">
+              <div class="consult-patient" id="consultPatientContext"></div>
+              <div class="consult-status info" id="consultStatusBox">Loading consultation details&hellip;</div>
+              <div class="form-group">
+                <label class="form-label" for="ccChief">Chief Complaint</label>
+                <textarea class="form-input" id="ccChief" rows="2" maxlength="1000" placeholder="Reason for the visit"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ccSymptoms">Symptoms</label>
+                <textarea class="form-input" id="ccSymptoms" rows="3" maxlength="2000" placeholder="Describe the patient's symptoms"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ccDiagnosis">Diagnosis</label>
+                <textarea class="form-input" id="ccDiagnosis" rows="2" maxlength="1000" placeholder="Clinical diagnosis"></textarea>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="ccTreatment">Treatment Plan</label>
+                <textarea class="form-input" id="ccTreatment" rows="3" maxlength="2000" placeholder="Planned treatment and follow-up"></textarea>
+              </div>
+              <div class="form-group" style="margin-bottom:0">
+                <label class="form-label" for="ccNotes">Notes</label>
+                <textarea class="form-input" id="ccNotes" rows="2" maxlength="2000" placeholder="Additional notes"></textarea>
+              </div>
+              <div id="prescriptionSection" style="display:none;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+                  <h4 style="font-size:15px;font-weight:700">Prescription (optional)</h4>
+                  <button type="button" class="btn btn-sm btn-secondary" id="addRxBtn">+ Add medication</button>
+                </div>
+                <div class="rx-status muted" id="rxStatus">No prescription added.</div>
+                <div id="rxItems"></div>
+                <div style="display:flex;justify-content:flex-end;margin-top:12px">
+                  <button type="button" class="btn btn-sm btn-primary" id="saveRxBtn">Save Prescription</button>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-close-consultation>Close</button>
+              <button type="button" class="btn btn-primary" id="saveConsultBtn">Save Consultation</button>
+            </div>
           </div>
         </div>
 
@@ -548,11 +628,26 @@
       sorted.forEach((p, i) => {
         const isConsult = p.status === 'in_consultation';
         const isCheckedIn = p.status === 'checked_in';
+        const isWaiting = p.status === 'waiting';
         if (isCheckedIn) hasCheckedIn = true;
         const color = avatarColors[i % avatarColors.length];
         const initials = p.patient ? p.patient.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase() : '??';
         const div = document.createElement('div');
         div.className = 'sf-patient-card' + (isConsult ? ' in-consultation' : '');
+        const badgeLabel = isConsult ? 'In Progress' : isCheckedIn ? 'Called' : (isWaiting ? 'Checked In' : 'Closed');
+        const badgeClass = isConsult ? 'in-progress' : isCheckedIn ? 'called' : (isWaiting ? 'checked' : 'scheduled');
+        const actions = [];
+        if (isConsult) {
+          actions.push(`<button class="btn btn-sm btn-success" onclick="markComplete('${p.ticket}', this)">Complete</button>`);
+          actions.push(`<button class="btn btn-sm btn-primary" onclick="openConsultation('${p.ticket}')">Document</button>`);
+        }
+        if (isCheckedIn) {
+          actions.push(`<button class="btn btn-sm btn-primary" onclick="startConsultation('${p.ticket}', this)">Start Consultation</button>`);
+          actions.push(`<button class="btn btn-sm btn-secondary" onclick="callPatient('${p.ticket}')">Call</button>`);
+        }
+        if (!isConsult) {
+          actions.push(`<button class="btn btn-sm btn-secondary" onclick="skipPatient('${p.ticket}')">Skip</button>`);
+        }
         div.innerHTML = `
           <div class="sf-pc-ticket">${p.ticket}</div>
           <div class="sf-pc-avatar" style="background:var(--${color === 'green' ? 'success' : color === 'blue' ? 'info' : color === 'purple' ? 'primary' : color === 'amber' ? 'warning' : color === 'rose' ? 'danger' : 'primary'})">${initials}</div>
@@ -560,12 +655,8 @@
             <h4>${p.patient}</h4>
             <p>${p.service || 'General'} ${p.doctor ? '&middot; ' + p.doctor : ''}</p>
           </div>
-          <span class="sf-pc-badge ${isConsult ? 'in-progress' : isCheckedIn ? 'completed' : 'scheduled'}">${isConsult ? 'In Progress' : isCheckedIn ? 'Completed' : 'Scheduled'}</span>
-          <div class="sf-pc-actions">
-            ${isConsult ? `<button class="btn btn-sm btn-success" onclick="markComplete('${p.ticket}')">Complete</button>` : ''}
-            ${isCheckedIn ? `<button class="btn btn-sm btn-primary" onclick="callPatient('${p.ticket}')">Call</button>` : ''}
-            ${!isConsult ? `<button class="btn btn-sm btn-secondary" onclick="skipPatient('${p.ticket}')">Skip</button>` : ''}
-          </div>
+          <span class="sf-pc-badge ${badgeClass}">${badgeLabel}</span>
+          <div class="sf-pc-actions">${actions.join('')}</div>
         `;
         list.appendChild(div);
       });
@@ -593,13 +684,350 @@
       } catch(e) { Utils.showToast(e.message, 'error'); }
     }
 
-    async function markComplete(ticket) {
-      if (!confirm('Mark consultation for ' + ticket + ' as complete?')) return;
+    async function startConsultation(ticket, btn) {
+      if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Starting consultation…'; }
       try {
+        await API.updateQueue(ticket, 'start');
+        Utils.showToast('Consultation started for ' + ticket, 'success');
+        await loadStaffDashboard();
+        const entry = queueData.find((p) => p.ticket === ticket);
+        if (entry && entry.status === 'in_consultation') openConsultation(entry.ticket);
+      } catch(e) {
+        Utils.showToast(e.message || 'Unable to start consultation.', 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Start Consultation'; }
+      }
+    }
+
+    async function markComplete(ticket, btn) {
+      if (btn) { if (btn.disabled) return; btn.disabled = true; btn.textContent = 'Completing…'; }
+      try {
+        const entry = queueData.find((p) => p.ticket === ticket);
+        let undocumented = false;
+        if (entry && entry.status === 'in_consultation' && entry.queueId) {
+          const checked = await API.getConsultationByQueueId(entry.queueId).catch(() => ({ data: null }));
+          undocumented = !(checked && checked.data);
+        }
+        const msg = undocumented
+          ? 'No consultation has been documented for ' + ticket + '. Complete without consultation notes?'
+          : 'Mark consultation for ' + ticket + ' as complete?';
+        if (!confirm(msg)) return;
         await API.updateQueue(ticket, 'complete');
         Utils.showToast('Consultation completed', 'success');
         await loadStaffDashboard();
-      } catch(e) { Utils.showToast(e.message, 'error'); }
+      } catch(e) {
+        Utils.showToast(e.message || 'Unable to complete the consultation. Please try again.', 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Complete'; }
+      }
+    }
+
+    /* ---------- Consultation documentation modal ---------- */
+    let clinicalSession = null;
+
+    const consultModal = () => document.getElementById('consultationModal');
+    const consultStatusBox = () => document.getElementById('consultStatusBox');
+    const rxStatusBox = () => document.getElementById('rxStatus');
+
+    function openConsultationModal() {
+      const overlay = consultModal();
+      if (!overlay) return;
+      overlay.classList.add('active');
+    }
+
+    function closeConsultationModal() {
+      const overlay = consultModal();
+      if (overlay) overlay.classList.remove('active');
+      clinicalSession = null;
+    }
+
+    function setConsultStatus(message, type) {
+      const el = consultStatusBox();
+      if (!el) return;
+      el.textContent = message;
+      el.className = 'consult-status ' + (type || 'info');
+    }
+
+    function setRxStatus(message, type) {
+      const el = rxStatusBox();
+      if (!el) return;
+      el.textContent = message;
+      el.className = 'rx-status ' + (type || 'muted');
+    }
+
+    function consultFormValues() {
+      const raw = {
+        chiefComplaint: document.getElementById('ccChief').value.trim(),
+        symptoms: document.getElementById('ccSymptoms').value.trim(),
+        diagnosis: document.getElementById('ccDiagnosis').value.trim(),
+        treatmentPlan: document.getElementById('ccTreatment').value.trim(),
+        notes: document.getElementById('ccNotes').value.trim(),
+      };
+      const out = {};
+      Object.keys(raw).forEach((key) => { if (raw[key]) out[key] = raw[key]; });
+      return out;
+    }
+
+    function fillConsultForm(vals) {
+      document.getElementById('ccChief').value = vals.chiefComplaint || '';
+      document.getElementById('ccSymptoms').value = vals.symptoms || '';
+      document.getElementById('ccDiagnosis').value = vals.diagnosis || '';
+      document.getElementById('ccTreatment').value = vals.treatmentPlan || '';
+      document.getElementById('ccNotes').value = vals.notes || '';
+    }
+
+    function renderConsultPatientContext() {
+      const el = document.getElementById('consultPatientContext');
+      if (!el || !clinicalSession) return;
+      const s = clinicalSession;
+      el.innerHTML = `
+        <div class="cp-avatar">${Utils.getInitials(s.patient)}</div>
+        <div class="cp-info">
+          <h4>${Utils.sanitize(s.patient)}</h4>
+          <p>${Utils.sanitize(s.service)}${s.doctor ? ' &middot; ' + Utils.sanitize(s.doctor) : ''}</p>
+        </div>
+        <span class="cp-badge">${Utils.sanitize(s.ticket)}</span>
+      `;
+    }
+
+    function renderPrescriptionRows(rows) {
+      const container = document.getElementById('rxItems');
+      if (!container) return;
+      container.innerHTML = '';
+      if (!rows || rows.length === 0) {
+        container.innerHTML = '<div class="rx-empty">No medication added yet.</div>';
+        return;
+      }
+      rows.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.className = 'rx-row';
+        row.innerHTML = `
+          <div class="form-group rx-name">
+            <label class="form-label">Medication Name</label>
+            <input type="text" class="form-input rx-med" value="${Utils.sanitize(item.medicationName)}" placeholder="e.g. Paracetamol">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Dosage</label>
+            <input type="text" class="form-input rx-dose" value="${Utils.sanitize(item.dosage)}" placeholder="e.g. 500mg">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Frequency</label>
+            <input type="text" class="form-input rx-freq" value="${Utils.sanitize(item.frequency)}" placeholder="e.g. 3x daily">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Duration</label>
+            <input type="text" class="form-input rx-dur" value="${Utils.sanitize(item.duration)}" placeholder="e.g. 5 days">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantity</label>
+            <input type="number" class="form-input rx-qty" min="1" step="1" value="${item.quantity || ''}" placeholder="1">
+          </div>
+          <div class="form-group rx-instr">
+            <label class="form-label">Instructions</label>
+            <input type="text" class="form-input rx-instr-input" value="${Utils.sanitize(item.instructions)}" placeholder="e.g. After meals">
+          </div>
+          <button type="button" class="btn btn-sm btn-danger rx-remove">Remove</button>
+        `;
+        row.querySelector('.rx-remove').addEventListener('click', () => {
+          const current = collectPrescriptionRows();
+          current.splice(index, 1);
+          renderPrescriptionRows(current);
+          setRxStatus('No prescription added.', 'muted');
+        });
+        container.appendChild(row);
+      });
+    }
+
+    function collectPrescriptionRows() {
+      return Array.from(document.querySelectorAll('#rxItems .rx-row')).map((row) => {
+        const qtyInput = row.querySelector('.rx-qty');
+        const qtyVal = qtyInput.value.trim();
+        return {
+          medicationName: row.querySelector('.rx-med').value.trim(),
+          dosage: row.querySelector('.rx-dose').value.trim(),
+          frequency: row.querySelector('.rx-freq').value.trim(),
+          duration: row.querySelector('.rx-dur').value.trim(),
+          quantity: qtyVal === '' ? undefined : Number(qtyVal),
+          instructions: row.querySelector('.rx-instr-input').value.trim() || undefined,
+        };
+      });
+    }
+
+    function showPrescriptionSection(show) {
+      const el = document.getElementById('prescriptionSection');
+      if (el) el.style.display = show ? 'block' : 'none';
+    }
+
+    async function loadPrescription(consultationId, session) {
+      const guardSession = session || clinicalSession;
+      if (!guardSession) return;
+      setRxStatus('Loading prescription…', 'info');
+      renderPrescriptionRows([]);
+      try {
+        const res = await API.getPrescriptionByConsultation(consultationId);
+        if (clinicalSession !== guardSession) return;
+        if (res.data) {
+          guardSession.prescription = res.data;
+          renderPrescriptionRows(res.data.items);
+          setRxStatus('Prescription saved. You can update it below.', 'success');
+        } else {
+          guardSession.prescription = null;
+          setRxStatus('No prescription added.', 'muted');
+        }
+      } catch(e) {
+        if (clinicalSession !== guardSession) return;
+        guardSession.prescription = null;
+        setRxStatus('Could not load prescription: ' + (e.message || 'unknown error'), 'error');
+      }
+    }
+
+    async function openConsultation(ticket) {
+      const entry = queueData.find((p) => p.ticket === ticket);
+      if (!entry || !entry.queueId) {
+        Utils.showToast('Queue entry not found.', 'error');
+        return;
+      }
+      clinicalSession = {
+        ticket: entry.ticket,
+        queueId: entry.queueId,
+        patient: entry.patient || 'Patient',
+        service: entry.service || 'General',
+        doctor: entry.doctor || '',
+        consultation: null,
+        prescription: null,
+      };
+      const session = clinicalSession;
+      renderConsultPatientContext();
+      fillConsultForm({ chiefComplaint: '', symptoms: '', diagnosis: '', treatmentPlan: '', notes: '' });
+      renderPrescriptionRows([]);
+      showPrescriptionSection(false);
+      setRxStatus('No prescription added.', 'muted');
+      setConsultStatus('Loading consultation details…', 'info');
+      const saveBtn = document.getElementById('saveConsultBtn');
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Loading…'; }
+      openConsultationModal();
+      try {
+        const res = await API.getConsultationByQueueId(entry.queueId);
+        if (clinicalSession !== session) return;
+        if (res.data) {
+          clinicalSession.consultation = res.data;
+          fillConsultForm(res.data);
+          setConsultStatus('Consultation already saved. You can update it below.', 'success');
+          showPrescriptionSection(true);
+          await loadPrescription(res.data.id, session);
+        } else {
+          clinicalSession.consultation = null;
+          setConsultStatus('No consultation has been documented for this patient yet.', 'info');
+        }
+      } catch(e) {
+        if (clinicalSession !== session) return;
+        clinicalSession.consultation = null;
+        setConsultStatus('Could not load consultation status: ' + (e.message || 'unknown error'), 'error');
+      } finally {
+        if (clinicalSession === session && saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = clinicalSession && clinicalSession.consultation ? 'Update Consultation' : 'Save Consultation';
+        }
+      }
+    }
+
+    async function saveConsultationForm() {
+      if (!clinicalSession) return;
+      const btn = document.getElementById('saveConsultBtn');
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = 'Saving consultation…';
+      setConsultStatus('Saving consultation…', 'info');
+      const payload = consultFormValues();
+      try {
+        let res;
+        if (clinicalSession.consultation && clinicalSession.consultation.id) {
+          res = await API.updateConsultation(clinicalSession.consultation.id, payload);
+          clinicalSession.consultation = res.data || Object.assign({}, clinicalSession.consultation, payload);
+        } else {
+          res = await API.createConsultation(Object.assign({ queueId: clinicalSession.queueId }, payload));
+          clinicalSession.consultation = (res.data && res.data.consultation) ? res.data.consultation : (res.data || Object.assign({ id: null }, payload));
+        }
+        setConsultStatus('Consultation saved.', 'success');
+        Utils.showToast('Consultation saved', 'success');
+        showPrescriptionSection(true);
+        if (!clinicalSession.prescription && clinicalSession.consultation.id) {
+          const rx = await API.getPrescriptionByConsultation(clinicalSession.consultation.id).catch(() => null);
+          if (rx && rx.data) {
+            clinicalSession.prescription = rx.data;
+            renderPrescriptionRows(rx.data.items);
+            setRxStatus('Prescription saved. You can update it below.', 'success');
+          } else {
+            setRxStatus('No prescription added.', 'muted');
+          }
+        }
+      } catch(e) {
+        const msg = e.message || 'Unable to save consultation.';
+        if (/already exists/i.test(msg) && clinicalSession && clinicalSession.queueId) {
+          const res = await API.getConsultationByQueueId(clinicalSession.queueId).catch(() => null);
+          if (res && res.data) {
+            clinicalSession.consultation = res.data;
+            fillConsultForm(res.data);
+            showPrescriptionSection(true);
+            await loadPrescription(res.data.id);
+            setConsultStatus('A consultation already exists for this queue. The saved version has been loaded.', 'warning');
+          } else {
+            setConsultStatus(msg, 'error');
+          }
+        } else {
+          setConsultStatus(msg, 'error');
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = clinicalSession && clinicalSession.consultation ? 'Update Consultation' : 'Save Consultation';
+        }
+      }
+    }
+
+    async function savePrescription() {
+      if (!clinicalSession || !clinicalSession.consultation) {
+        setRxStatus('Save the consultation first.', 'warning');
+        return;
+      }
+      const btn = document.getElementById('saveRxBtn');
+      if (btn && btn.disabled) return;
+      const rows = collectPrescriptionRows();
+      for (const row of rows) {
+        if (!row.medicationName || !row.dosage || !row.frequency || !row.duration) {
+          setRxStatus('Medication name, dosage, frequency and duration are required for each item.', 'error');
+          return;
+        }
+        if (!Number.isInteger(row.quantity) || row.quantity < 1) {
+          setRxStatus('Quantity must be a whole number of at least 1.', 'error');
+          return;
+        }
+      }
+      if (btn) { btn.disabled = true; btn.textContent = 'Saving prescription…'; }
+      setRxStatus('Saving prescription…', 'info');
+      try {
+        const items = rows;
+        if (clinicalSession.prescription && clinicalSession.prescription.id) {
+          const res = await API.updatePrescription(clinicalSession.prescription.id, { items });
+          clinicalSession.prescription = res.data || Object.assign({}, clinicalSession.prescription, { items });
+        } else {
+          const res = await API.createPrescription({ consultationId: clinicalSession.consultation.id, items });
+          clinicalSession.prescription = res.data || { id: null, items };
+        }
+        renderPrescriptionRows(rows);
+        setRxStatus('Prescription saved.', 'success');
+        Utils.showToast('Prescription saved', 'success');
+      } catch(e) {
+        const msg = e.message || 'Unable to save prescription. Your consultation remains saved.';
+        if (/already exists/i.test(msg) && clinicalSession.consultation) {
+          await loadPrescription(clinicalSession.consultation.id);
+          setRxStatus('A prescription already exists for this consultation. The saved version has been loaded.', 'warning');
+        } else {
+          setRxStatus(msg, 'error');
+        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save Prescription'; }
+      }
     }
 
     document.getElementById('callNext')?.addEventListener('click', async () => {
@@ -620,13 +1048,53 @@
       }
     });
 
-    document.getElementById('completePatient')?.addEventListener('click', async () => {
-      const inConsult = queueData.find(p => p.status === 'in_consultation');
-      if (inConsult) {
-        await markComplete(inConsult.ticket);
-      } else {
-        Utils.showToast('No patients in consultation', 'info');
+    document.getElementById('startNextPatient')?.addEventListener('click', async function () {
+      const next = queueData.find(p => p.status === 'checked_in');
+      if (!next) {
+        Utils.showToast('No called patients to start', 'info');
+        return;
       }
+      this.disabled = true;
+      this.textContent = 'Starting…';
+      try {
+        await startConsultation(next.ticket);
+      } finally {
+        this.disabled = false;
+        this.textContent = 'Start Consultation';
+      }
+    });
+
+    document.getElementById('completePatient')?.addEventListener('click', async function () {
+      const inConsult = queueData.find(p => p.status === 'in_consultation');
+      if (!inConsult) {
+        Utils.showToast('No patients in consultation', 'info');
+        return;
+      }
+      this.disabled = true;
+      this.textContent = 'Completing…';
+      try {
+        await markComplete(inConsult.ticket);
+      } finally {
+        this.disabled = false;
+        this.textContent = 'Mark Complete';
+      }
+    });
+
+    /* ---------- Consultation modal wiring ---------- */
+    document.querySelectorAll('[data-close-consultation]').forEach((btn) => {
+      btn.addEventListener('click', closeConsultationModal);
+    });
+    document.getElementById('consultationModal')?.addEventListener('click', (e) => {
+      if (e.target && e.target.classList && e.target.classList.contains('modal-overlay')) {
+        closeConsultationModal();
+      }
+    });
+    document.getElementById('saveConsultBtn')?.addEventListener('click', saveConsultationForm);
+    document.getElementById('saveRxBtn')?.addEventListener('click', savePrescription);
+    document.getElementById('addRxBtn')?.addEventListener('click', () => {
+      const rows = collectPrescriptionRows();
+      renderPrescriptionRows(rows.concat([{ medicationName: '', dosage: '', frequency: '', duration: '', quantity: undefined, instructions: '' }]));
+      setRxStatus('No prescription added.', 'muted');
     });
 
     const doPatientSearch = Utils.debounce(async (query) => {

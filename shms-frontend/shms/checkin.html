@@ -127,8 +127,103 @@
   <script>
     let selectedAppt = null;
 
+    function todayLocal() {
+      const d = new Date();
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function checkinState(a, today) {
+      if (a.status === 'completed') return 'completed';
+      if (a.status === 'cancelled') return 'cancelled';
+      if (a.status === 'no_show') return 'no_show';
+      if (a.status === 'checked_in' || a.status === 'in_progress' || a.queueNumber != null) return 'checked_in';
+      if (a.date === today) return 'eligible';
+      return a.date < today ? 'past' : 'upcoming';
+    }
+
+    const CHECKIN_STATE = {
+      eligible: {
+        badge: 'success',
+        label: 'Ready',
+        note: 'You can check in now and join the queue.',
+      },
+      upcoming: {
+        badge: 'primary',
+        label: 'Upcoming',
+        note: (a) => `Check-in opens on ${Utils.formatDate(a.date)}. You can only check in on your appointment day.`,
+      },
+      past: {
+        badge: 'warning',
+        label: 'Past',
+        note: 'This appointment date has passed, so check-in is closed.',
+      },
+      checked_in: {
+        badge: 'info',
+        label: 'In Queue',
+        note: (a) => a.queueNumber != null ? `You are already in line as #${a.queueNumber}.` : 'You have already checked in.',
+      },
+      completed: {
+        badge: 'neutral',
+        label: 'Completed',
+        note: 'This visit has been completed.',
+      },
+      cancelled: {
+        badge: 'danger',
+        label: 'Cancelled',
+        note: 'Cancelled appointments cannot be checked in.',
+      },
+      no_show: {
+        badge: 'danger',
+        label: 'No Show',
+        note: 'This appointment was marked as a no-show.',
+      },
+    };
+
+    async function selectForCheckin(container, appt, row) {
+      selectedAppt = appt;
+      const existing = container.querySelector('.btn-checkin');
+      if (existing) existing.remove();
+      row.style.borderColor = 'var(--primary)';
+      row.style.background = 'var(--primary-light)';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-success btn-lg btn-checkin';
+      btn.style.width = '100%';
+      btn.style.marginBottom = '12px';
+      btn.textContent = 'Check In Now';
+      btn.addEventListener('click', () => performCheckin(btn, appt));
+      row.after(btn);
+    }
+
+    async function performCheckin(btn, appt) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Checking in...';
+      try {
+        const res = await API.checkIn(appt.id);
+        if (res.success) {
+          const queueNumber = res.data.queueNumber != null ? res.data.queueNumber : null;
+          const ticket = res.data.ticket || (queueNumber != null ? '#' + queueNumber : '–');
+          document.getElementById('checkinStart').classList.remove('active');
+          document.getElementById('checkinConfirm').classList.add('active');
+          document.getElementById('checkinDetails').innerHTML = `
+            <div class="detail-row"><span class="label">Ticket</span><span class="value" style="color:var(--primary);font-weight:700">${Utils.sanitize(String(ticket))}</span></div>
+            <div class="detail-row"><span class="label">Queue Number</span><span class="value" style="color:var(--primary);font-weight:700">${queueNumber != null ? '#' + Utils.sanitize(String(queueNumber)) : '–'}</span></div>
+            <div class="detail-row"><span class="label">Service</span><span class="value">${Utils.sanitize(appt.service)}</span></div>
+            <div class="detail-row"><span class="label">Doctor</span><span class="value">${Utils.sanitize(appt.doctor_name)}</span></div>
+            <div class="detail-row"><span class="label">Date</span><span class="value">${Utils.formatDate(appt.date)}</span></div>
+            <div class="detail-row"><span class="label">Time</span><span class="value">${Utils.formatTime(appt.time)}</span></div>
+          `;
+          Utils.showToast('Check-in successful!', 'success');
+        }
+      } catch (err) {
+        Utils.showToast(err.message || 'Check-in failed', 'error');
+      }
+      btn.disabled = false;
+      btn.textContent = 'Check In Now';
+    }
+
     async function loadCheckinAppts() {
       const container = document.getElementById('checkinAppts');
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⏳</div><h3>Loading</h3><p>Checking your appointments…</p></div>';
       try {
         const res = await API.getAppointments();
         if (!res.success || res.data.length === 0) {
@@ -136,57 +231,33 @@
           return;
         }
         container.innerHTML = '';
-        res.data.filter(a => a.status !== 'completed' && a.status !== 'cancelled').forEach(a => {
+        const today = todayLocal();
+        res.data.forEach(a => {
+          const st = checkinState(a, today);
+          const meta = CHECKIN_STATE[st] || CHECKIN_STATE.completed;
+          const note = typeof meta.note === 'function' ? meta.note(a) : meta.note;
+          const interactive = st === 'eligible';
           const div = document.createElement('div');
-          div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid var(--border);border-radius:var(--radius-md);margin-bottom:12px;cursor:pointer;transition:all 0.2s';
+          div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;border:2px solid var(--border);border-radius:var(--radius-md);margin-bottom:12px;' + (interactive ? 'cursor:pointer;transition:all 0.2s' : '');
           div.innerHTML = `
             <div style="flex:1">
-              <div style="font-weight:600;font-size:14px;color:var(--text-primary)">${a.service}</div>
-              <div style="font-size:13px;color:var(--text-secondary)">${a.doctor_name} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</div>
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div style="font-weight:600;font-size:14px;color:var(--text-primary)">${Utils.sanitize(a.service)}</div>
+                <span class="badge badge-${meta.badge}">${meta.label}</span>
+              </div>
+              <div style="font-size:13px;color:var(--text-secondary)">${Utils.sanitize(a.doctor_name)} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</div>
+              <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">${Utils.sanitize(note)}</div>
             </div>
-            <span class="badge badge-${Utils.getStatusColor(a.status)}">${Utils.capitalize(a.status.replace(/_/g, ' '))}</span>
           `;
-          div.addEventListener('mouseenter', () => { div.style.borderColor = 'var(--primary)'; div.style.background = 'var(--primary-light)'; });
-          div.addEventListener('mouseleave', () => { if (selectedAppt?.id !== a.id) { div.style.borderColor = 'var(--border)'; div.style.background = ''; }});
-          div.addEventListener('click', async () => {
-            selectedAppt = a;
-            const btn = document.createElement('button');
-            btn.className = 'btn btn-success btn-lg';
-            btn.style.width = '100%';
-            btn.textContent = 'Check In Now';
-            btn.addEventListener('click', async () => {
-              btn.disabled = true;
-              btn.innerHTML = '<span class="spinner"></span> Checking in...';
-              try {
-                const res = await API.checkIn(a.id);
-                if (res.success) {
-                  document.getElementById('checkinStart').classList.remove('active');
-                  document.getElementById('checkinConfirm').classList.add('active');
-                  const details = document.getElementById('checkinDetails');
-                  details.innerHTML = `
-                    <div class="detail-row"><span class="label">Ticket</span><span class="value" style="color:var(--primary);font-weight:700">${res.data?.ticket || 'A023'}</span></div>
-                    <div class="detail-row"><span class="label">Service</span><span class="value">${a.service}</span></div>
-                    <div class="detail-row"><span class="label">Doctor</span><span class="value">${a.doctor_name}</span></div>
-                    <div class="detail-row"><span class="label">Date</span><span class="value">${Utils.formatDate(a.date)}</span></div>
-                    <div class="detail-row"><span class="label">Time</span><span class="value">${Utils.formatTime(a.time)}</span></div>
-                    <div class="detail-row"><span class="label">Queue Position</span><span class="value" style="color:var(--primary);font-weight:600">#${res.data?.position || 5}</span></div>
-                  `;
-                  Utils.showToast('Check-in successful!', 'success');
-                }
-              } catch (err) {
-                Utils.showToast(err.message || 'Check-in failed', 'error');
-              }
-              btn.disabled = false;
-              btn.textContent = 'Check In Now';
-            });
-            const existing = container.querySelector('.btn-success');
-            if (existing) existing.remove();
-            div.after(btn);
-          });
+          if (interactive) {
+            div.addEventListener('mouseenter', () => { div.style.borderColor = 'var(--primary)'; div.style.background = 'var(--primary-light)'; });
+            div.addEventListener('mouseleave', () => { if (selectedAppt?.id !== a.id) { div.style.borderColor = 'var(--border)'; div.style.background = ''; }});
+            div.addEventListener('click', () => selectForCheckin(container, a, div));
+          }
           container.appendChild(div);
         });
       } catch (e) {
-        container.innerHTML = '<p style="color:var(--danger)">Failed to load appointments.</p>';
+        container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">⚠️</div><h3>Could Not Load</h3><p>Failed to load your appointments. <button class="btn btn-secondary btn-sm mt-md" onclick="loadCheckinAppts()">Try Again</button></p></div>';
       }
     }
 
