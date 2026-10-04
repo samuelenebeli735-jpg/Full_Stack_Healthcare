@@ -100,9 +100,13 @@
     .sf-banner-icon{position:relative;z-index:1;font-size:80px;opacity:0.2}
 
     .sf-alerts{display:flex;flex-direction:column;gap:12px}
+    .sf-alerts-title{font-size:15px;font-weight:700;color:#111827;margin:0 0 2px}
+    .sf-alerts-period{font-size:12px;font-weight:600;color:var(--text-secondary);margin-left:6px}
+    .sf-alerts > div:last-child{display:flex;flex-direction:column;gap:12px}
     .sf-alert{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:12px;font-size:13px;line-height:1.5;transition:all 0.3s}
     .sf-alert:hover{transform:translateX(2px)}
     .sf-alert.yellow{background:#fef9c3;border:1px solid #fde68a}
+    .sf-alert.neutral{background:#f9fafb;border:1px solid #e5e7eb}
     .sf-alert-icon{font-size:16px;flex-shrink:0;margin-top:1px}
     .sf-alert-text{flex:1}
     .sf-alert-text strong{font-weight:700;color:#111827}
@@ -189,19 +193,19 @@
         <div class="sf-stat-row" id="staffStatsRow">
           <div class="sf-stat">
             <div class="sf-stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-            <div><div class="sf-stat-value" id="sTotal">0</div><div class="sf-stat-label">Total Students</div><a class="sf-stat-link" href="#staff-panel-patients" id="viewAllStudents">View all</a></div>
+            <div><div class="sf-stat-value" id="sTotal">0</div><div class="sf-stat-label">Appointments Today</div><a class="sf-stat-link" href="#staff-panel-appointments" id="viewSchedule">View schedule</a></div>
           </div>
           <div class="sf-stat">
             <div class="sf-stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div>
-            <div><div class="sf-stat-value" id="sChecked">0</div><div class="sf-stat-label">Appointments Today</div><a class="sf-stat-link" href="#staff-panel-appointments" id="viewSchedule">View schedule</a></div>
+            <div><div class="sf-stat-value" id="sChecked">0</div><div class="sf-stat-label">Checked In Today</div><a class="sf-stat-link" href="#staff-panel-queue" id="viewCheckedIn">View queue</a></div>
           </div>
           <div class="sf-stat">
             <div class="sf-stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
-            <div><div class="sf-stat-value" id="sWaiting">0</div><div class="sf-stat-label">Health Alerts</div><a class="sf-stat-link" href="../notifications.html">View alerts</a></div>
+            <div><div class="sf-stat-value" id="sWaiting">0</div><div class="sf-stat-label">In Queue</div><a class="sf-stat-link" href="#staff-panel-queue" id="viewWaiting">View queue</a></div>
           </div>
           <div class="sf-stat">
             <div class="sf-stat-icon purple"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 12 11 14 15 10"/></svg></div>
-            <div><div class="sf-stat-value" id="sConsult">0</div><div class="sf-stat-label">Immunization Rate</div><a class="sf-stat-link" href="../analytics/index.html">View report</a></div>
+            <div><div class="sf-stat-value" id="sConsult">0</div><div class="sf-stat-label">In Consultation</div><a class="sf-stat-link" href="#staff-panel-queue" id="viewInConsultation">View queue</a></div>
           </div>
         </div>
 
@@ -259,34 +263,12 @@
             </div>
             <div class="sf-card">
               <div class="sf-card-header">
-                <h3>Recent Health Records</h3>
+                <h3>Recent Patient Records</h3>
                 <a class="view-link" id="viewAllRecords" href="javascript:void(0)">View all</a>
               </div>
               <div class="sf-card-body p-0">
-                <div class="sf-record-row">
-                  <div class="sf-record-avatar" style="background:#fef2f2;color:#dc2626">&#9829;</div>
-                  <div class="sf-record-info"><div class="sf-record-name">Rahul Das</div><div class="sf-record-meta">Grade 8-B &middot; Fever</div></div>
-                  <span class="sf-record-date">27 May</span>
-                </div>
-                <div class="sf-record-row">
-                  <div class="sf-record-avatar" style="background:#fefce8;color:#ca8a04">&#9888;</div>
-                  <div class="sf-record-info"><div class="sf-record-name">Ananya Gupta</div><div class="sf-record-meta">Allergy &middot; 10-A</div></div>
-                  <span class="sf-record-date">27 May</span>
-                </div>
-                <div class="sf-record-row">
-                  <div class="sf-record-avatar" style="background:#f0fdf4;color:#16a34a">&#10003;</div>
-                  <div class="sf-record-info"><div class="sf-record-name">Dev Joshi</div><div class="sf-record-meta">Grade 9-B &middot; Cold &amp; Cough</div></div>
-                  <span class="sf-record-date">26 May</span>
-                </div>
-                <div class="sf-record-row">
-                  <div class="sf-record-avatar" style="background:#f5f3ff;color:#7c3aed">&#10004;</div>
-                  <div class="sf-record-info"><div class="sf-record-name">Ishita Roy</div><div class="sf-record-meta">Grade 8-A &middot; Sprain</div></div>
-                  <span class="sf-record-date">26 May</span>
-                </div>
-                <div class="sf-record-row">
-                  <div class="sf-record-avatar" style="background:#ecfdf5;color:#059669">&#9829;</div>
-                  <div class="sf-record-info"><div class="sf-record-name">Neha Kumari</div><div class="sf-record-meta">Grade 7-A</div></div>
-                  <span class="sf-record-date">25 May</span>
+                <div id="recentRecordsList">
+                  <div class="empty-state" style="padding:20px"><p>Loading patient records…</p></div>
                 </div>
               </div>
             </div>
@@ -305,15 +287,12 @@
               </div>
             </div>
             <div class="sf-alerts">
-              <div class="sf-alert yellow">
-                <span class="sf-alert-icon">&#9888;</span>
-                <div class="sf-alert-text"><strong>2 students' immunizations are due.</strong><p>Check and update records.</p></div>
-                <a class="sf-alert-link" id="viewImmunization" href="javascript:void(0)">View</a>
-              </div>
-              <div class="sf-alert yellow">
-                <span class="sf-alert-icon">&#9888;</span>
-                <div class="sf-alert-text"><strong>5 students with fever reported today.</strong><p>Monitor and follow up.</p></div>
-                <a class="sf-alert-link" id="viewFever" href="javascript:void(0)">View</a>
+              <h3 class="sf-alerts-title">Health Alerts <span class="sf-alerts-period">This month</span></h3>
+              <div id="healthAlertsList">
+                <div class="sf-alert neutral">
+                  <span class="sf-alert-icon">&#128200;</span>
+                  <div class="sf-alert-text"><p>Loading condition data…</p></div>
+                </div>
               </div>
             </div>
           </div>
@@ -480,11 +459,13 @@
         }
       } catch(e) {}
       loadHealthAnalytics();
+      loadRecentPatientRecords();
     }
 
     async function loadHealthAnalytics() {
       const donutEl = document.getElementById('healthDonut');
       const trendEl = document.getElementById('monthlyTrendChart');
+      const alertsEl = document.getElementById('healthAlertsList');
       if (!donutEl || !trendEl) return;
       let data;
       try {
@@ -496,10 +477,83 @@
       if (!data) {
         donutEl.innerHTML = '<div class="empty-state"><p>Could not load analytics.</p></div>';
         trendEl.innerHTML = '<div class="empty-state"><p>Could not load analytics.</p></div>';
+        if (alertsEl) {
+          alertsEl.innerHTML = '<div class="sf-alert neutral"><span class="sf-alert-icon">&#9888;</span><div class="sf-alert-text"><p>Condition data is not available right now.</p></div></div>';
+        }
         return;
       }
       renderHealthDonut(donutEl, data);
       renderMonthlyTrend(trendEl, data.monthlyTrend || []);
+      /* The same organisation-scoped payload that feeds the donut above also
+         feeds the alerts panel, so no second request is issued. */
+      renderHealthAlerts(alertsEl, data);
+    }
+
+    /* Real, organization-scoped condition counts for the CURRENT CALENDAR
+       MONTH, taken from GET /dashboard/health (dashboard.service.js
+       getHealthAnalytics buckets diagnoses between monthStart and monthEnd).
+       Categories are reported exactly as the backend categorises them; the two
+       non-diagnostic catch-all buckets are excluded because they are not
+       medical conditions. No value is invented. */
+    const CONDITION_CATCH_ALL_BUCKETS = ['Other', 'Unspecified'];
+    function renderHealthAlerts(el, data) {
+      if (!el) return;
+      const breakdown = (data && Array.isArray(data.breakdown)) ? data.breakdown : [];
+      const named = breakdown
+        .filter((b) => b && (b.count || 0) > 0 && !CONDITION_CATCH_ALL_BUCKETS.includes(b.name))
+        .sort((a, b) => (b.count || 0) - (a.count || 0))
+        .slice(0, 4);
+      if (!named.length) {
+        el.innerHTML = '<div class="sf-alert neutral"><span class="sf-alert-icon">&#10003;</span><div class="sf-alert-text"><strong>No conditions recorded this month.</strong><p>Nothing requires follow-up.</p></div></div>';
+        return;
+      }
+      el.innerHTML = named.map((b) => {
+        const n = b.count || 0;
+        return `<div class="sf-alert yellow"><span class="sf-alert-icon">&#9888;</span><div class="sf-alert-text"><strong>${n} consultation${n === 1 ? '' : 's'} recorded for ${b.name} this month.</strong><p>Review affected patients in Patient Lookup.</p></div></div>`;
+      }).join('');
+    }
+
+    /* Most recently created medical records for this organization, from
+       GET /medical-records (sorted server-side by createdAt desc). Only real
+       record fields are shown: patient name, record number, faculty/level and
+       the actual created date. There is no per-patient condition on this
+       endpoint, so none is displayed. */
+    function _recordDate(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
+      return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+    async function loadRecentPatientRecords() {
+      const el = document.getElementById('recentRecordsList');
+      if (!el) return;
+      let records = [];
+      let unavailable = false;
+      try {
+        const res = await API.getRecentPatientRecords(5);
+        unavailable = !!(res && res.unavailable);
+        records = (res && res.success && Array.isArray(res.data)) ? res.data : [];
+      } catch (e) {
+        unavailable = true;
+        records = [];
+      }
+      if (unavailable) {
+        el.innerHTML = '<div class="empty-state" style="padding:20px"><div class="empty-state-icon">&#9888;</div><h3>Patient records are unavailable right now.</h3><p>The medical records service could not be reached. Please try again shortly.</p></div>';
+        return;
+      }
+      if (!records.length) {
+        el.innerHTML = '<div class="empty-state" style="padding:20px"><div class="empty-state-icon">&#128196;</div><h3>No patient records yet</h3><p>Records appear here once they are created for this organization.</p></div>';
+        return;
+      }
+      el.innerHTML = records.map((r, i) => {
+        const meta = [r.faculty, r.level].filter(Boolean).join(' · ');
+        const when = _recordDate(r.created_at);
+        return `<div class="sf-record-row">
+                  <div class="sf-record-avatar" style="background:#eef2ff;color:#4f46e5">&#128100;</div>
+                  <div class="sf-record-info"><div class="sf-record-name">${r.full_name || 'Unnamed student'}</div><div class="sf-record-meta">${meta ? meta + ' · ' : ''}Record ${r.recordNumber || '–'}</div></div>
+                  <span class="sf-record-date">${when || '–'}</span>
+                </div>`;
+      }).join('');
     }
 
     function renderHealthDonut(el, data) {
@@ -1192,11 +1246,11 @@
       } catch(e) {}
       await loadStaffDashboard();
       await loadStaffAppointments();
-      document.getElementById('viewAllStudents')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('patients'); });
       document.getElementById('viewSchedule')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('appointments'); });
+      document.getElementById('viewCheckedIn')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('queue'); });
+      document.getElementById('viewWaiting')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('queue'); });
+      document.getElementById('viewInConsultation')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('queue'); });
       document.getElementById('viewAllRecords')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('patients'); });
-      document.getElementById('viewImmunization')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('patients'); });
-      document.getElementById('viewFever')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('patients'); });
       setInterval(loadStaffDashboard, 15000);
     });
   </script>

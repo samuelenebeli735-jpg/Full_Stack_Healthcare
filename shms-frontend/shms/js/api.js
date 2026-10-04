@@ -185,6 +185,11 @@ const API = (() => {
       level: p.level || '',
       gender: p.gender || '',
       status: r.status || 'active',
+      /* createdAt is a real MedicalRecord column returned by
+         GET /medical-records (no field selection, so all scalars arrive). It
+         is exposed so views can order by an actual record timestamp instead
+         of presenting invented record dates. */
+      created_at: r.createdAt || '',
     };
   };
 
@@ -715,6 +720,26 @@ const API = (() => {
       const items = (res.data && res.data.items) || res.data || [];
       return { success: true, data: items.map(_mapPatient) };
     },
+    /* Genuinely most-recent medical records for this organization. The
+       backend already supports `sort`, `order` and `limit` on
+       GET /medical-records (buildPrismaQuery allows createdAt as a sort
+       field), so this needs no new endpoint and stays organization-scoped
+       by the existing route authorization plus RLS. */
+    async getRecentPatientRecords(limit = 5) {
+      const capped = Math.min(Math.max(Number(limit) || 5, 1), 100);
+      try {
+        const res = await _request(
+          'GET',
+          `/medical-records?sort=createdAt&order=desc&limit=${capped}`
+        );
+        const items = (res.data && res.data.items) || res.data || [];
+        return { success: true, data: items.map(_mapPatient) };
+      } catch (e) {
+        /* A failed request tells us nothing about whether records exist, so it
+           is reported as unavailable rather than as an empty list. */
+        return { success: false, data: [], unavailable: true };
+      }
+    },
     async getStudent(id) {
       const res = await _request('GET', `/medical-records/${id}`);
       return { success: true, data: _mapPatient(res.data) };
@@ -834,13 +859,33 @@ const API = (() => {
       (summary.data.appointmentStatusCounts || []).forEach((g) => { statusCounts[g.status] = g.count; });
 
       const now = new Date();
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const pad2 = (n) => String(n).padStart(2, '0');
+      const dayKey = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+      const today = dayKey(now);
+
+      /* "This week" is the actual current LOCAL calendar week (Monday-first),
+         derived with runtime-local getters to match the backend's documented
+         local day contract (report.service.js localDayKey). The seven keys are
+         built up front so real zero-appointment days keep their slot instead of
+         being dropped and replaced by older days. */
+      const mondayOffset = (now.getDay() + 6) % 7;
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - mondayOffset);
+      const weekDates = [];
+      for (let i = 0; i < 7; i++) {
+        weekDates.push(dayKey(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i)));
+      }
+
       const availRes = await _request('GET', `/appointments/doctors/available?date=${today}`).catch(() => null);
       const available_doctors = (availRes && Array.isArray(availRes.data && availRes.data.doctors))
         ? availRes.data.doctors.length
         : null;
 
-      let weekly_appointments = Array(7).fill(0);
+      /* Fixed-length week series. `weekAvailable` is false when the report
+         request could not be read, so callers can show an honest unavailable
+         state rather than a misleading row of zeros. */
+      const weekly_appointments = Array(7).fill(0);
+      let weekAvailable = false;
+      let completed_today = null;
       let busiest_day = null;
       let total_appointments = c.appointments || 0;
       let avg_wait_time = null;
@@ -850,9 +895,23 @@ const API = (() => {
         const apptRes = await _request('GET', `/reports/appointments${qs}`);
         const appt = (apptRes && apptRes.data) || {};
         const byDay = Array.isArray(appt.byDay) ? [...appt.byDay].sort((a, b) => (a.date < b.date ? -1 : 1)) : [];
-        if (byDay.length) {
-          weekly_appointments = byDay.slice(-7).map((d) => d.total || 0);
-          while (weekly_appointments.length < 7) weekly_appointments.unshift(0);
+        weekAvailable = Array.isArray(appt.byDay);
+        if (weekAvailable) {
+          /* Place each day bucket into its own calendar-week slot. Days with no
+             appointments are absent from byDay and correctly stay 0. */
+          const byDate = new Map(byDay.map((d) => [d.date, d]));
+          weekDates.forEach((key, i) => {
+            const row = byDate.get(key);
+            weekly_appointments[i] = row ? row.total || 0 : 0;
+          });
+          /* Genuinely date-scoped "completed today": the completed status
+             inside today's own day bucket. When the report loaded we know the
+             exact figure even if today has no rows at all (0); when it did not
+             load, the value stays null and is rendered as unavailable. */
+          const todayRow = byDate.get(today);
+          completed_today = todayRow && todayRow.byStatus
+            ? todayRow.byStatus.completed || 0
+            : 0;
           const peak = byDay.reduce((m, d) => (!m || (d.total || 0) > m.total ? d : m), null);
           if (peak) busiest_day = { date: peak.date, total: peak.total || 0 };
         }
@@ -873,7 +932,9 @@ const API = (() => {
           total_consultations: c.consultations || 0,
           total_appointments,
           appointments_today: c.appointmentsToday || 0,
-          completed_today: statusCounts.completed || 0,
+          completed_today,
+          weekly_appointment_dates: weekDates,
+          weekly_available: weekAvailable,
           pending_appointments: (statusCounts.scheduled || 0) + (statusCounts.confirmed || 0) + (statusCounts.pending || 0) + (statusCounts.checked_in || 0),
           cancelled_appointments: statusCounts.cancelled || 0,
           avg_wait_time,

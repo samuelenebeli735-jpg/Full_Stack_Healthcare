@@ -342,36 +342,58 @@
         const d = res.data;
         document.getElementById('adminStatsRow').innerHTML = `
           <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Doctors</span><div class="stat-card-icon">👨‍⚕️</div></div><div class="stat-card-value">${d.total_doctors}</div><div class="stat-card-change positive">${d.available_doctors == null ? '–' : d.available_doctors + ' available today'}</div></div>
-          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Today's Appointments</span><div class="stat-card-icon">📋</div></div><div class="stat-card-value">${d.total_appointments}</div><div class="stat-card-change positive">${d.completed_today} completed</div></div>
+          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Today's Appointments</span><div class="stat-card-icon">📋</div></div><div class="stat-card-value">${d.appointments_today}</div><div class="stat-card-change positive">${d.completed_today == null ? '– completed' : d.completed_today + ' completed'}</div></div>
           <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Students Registered</span><div class="stat-card-icon">🎓</div></div><div class="stat-card-value">${d.total_students}</div><div class="stat-card-change positive">Active</div></div>
           <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Avg Wait Time</span><div class="stat-card-icon">⏱️</div></div><div class="stat-card-value">${d.avg_wait_time == null ? '–' : d.avg_wait_time + 'm'}</div><div class="stat-card-change">Peak: ${d.peak_hour == null ? '–' : String(d.peak_hour).padStart(2, '0') + ':00'}</div></div>
         `;
         document.getElementById('satRate').textContent = d.satisfaction_rate == null ? '–' : d.satisfaction_rate;
         const satPct = document.getElementById('satRatePct');
         if (satPct) satPct.style.display = d.satisfaction_rate == null ? 'none' : '';
-        const weekDays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+        /* Day labels come from the real local calendar-week dates the API
+           returned, so a bar is never relabelled Mon-Sun regardless of which
+           days actually hold data. */
+        const weekDates = Array.isArray(d.weekly_appointment_dates) ? d.weekly_appointment_dates : [];
         const weekChart = document.getElementById('weeklyChart');
         weekChart.innerHTML = '';
-        const maxVal = Math.max(...d.weekly_appointments, 1);
-        d.weekly_appointments.forEach((v, i) => {
-          const bar = document.createElement('div');
-          bar.className = 'bar';
-          bar.style.background = 'linear-gradient(180deg, var(--primary), var(--primary-dark))';
-          const h = (v / maxVal * 100);
-          bar.style.setProperty('--bar-target', h + '%');
-          bar.style.height = '0';
-          bar.style.transition = 'height 0.6s cubic-bezier(0.34,1.56,0.64,1)';
-          bar.innerHTML = `<div class="bar-value">${v}</div><div class="bar-label">${weekDays[i]}</div>`;
-          weekChart.appendChild(bar);
-          requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.height = h + '%'; }));
-        });
+        if (d.weekly_available === false) {
+          weekChart.innerHTML = '<div class="empty-state" style="padding:16px"><p>Weekly appointment data is not available.</p></div>';
+        } else {
+          const weekLabels = weekDates.map((key) => {
+            const parts = String(key).split('-');
+            const dt = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            return {
+              day: dt.toLocaleDateString(undefined, { weekday: 'short' }),
+              date: dt.toLocaleDateString(undefined, { day: 'numeric', month: 'short' }),
+            };
+          });
+          const maxVal = Math.max(...d.weekly_appointments, 1);
+          d.weekly_appointments.forEach((v, i) => {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            bar.style.background = 'linear-gradient(180deg, var(--primary), var(--primary-dark))';
+            const h = (v / maxVal * 100);
+            bar.style.setProperty('--bar-target', h + '%');
+            bar.style.height = '0';
+            bar.style.transition = 'height 0.6s cubic-bezier(0.34,1.56,0.64,1)';
+            const label = weekLabels[i] || { day: '', date: '' };
+            bar.title = `${label.day} ${label.date}: ${v} appointment${v === 1 ? '' : 's'}`;
+            bar.innerHTML = `<div class="bar-value">${v}</div><div class="bar-label">${label.day}</div>`;
+            weekChart.appendChild(bar);
+            requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.height = h + '%'; }));
+          });
+        }
+        /* Department bars are all-time appointment rows, so they are scaled
+           against the largest department count in that same all-time dataset.
+           The weekly daily maximum is an unrelated population and must not be
+           used as this denominator. */
         const deptDiv = document.getElementById('deptBreakdown');
         if (!d.appointments_by_department.length) {
           deptDiv.innerHTML = '<div class="empty-state" style="text-align:center;padding:16px 0"><p>Department appointment data is not available.</p></div>';
         } else {
+          const deptMax = Math.max(...d.appointments_by_department.map((x) => x.count || 0), 1);
           deptDiv.innerHTML = '';
           d.appointments_by_department.forEach((dept, i) => {
-            const pct = maxVal > 0 ? (dept.count / maxVal * 100) : 0;
+            const pct = (dept.count || 0) / deptMax * 100;
             deptDiv.innerHTML += `<div class="flex-between mb-sm" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><span style="font-size:14px">${dept.dept}</span><span style="font-size:14px;font-weight:600">${dept.count}</span></div><div class="progress-bar mb-md" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
           });
         }
