@@ -140,10 +140,34 @@ export async function loginStudent(data) {
   const passwordMatches = await comparePassword(password, user.password);
 
   if (!passwordMatches) {
+    /* The account is known here, so the event can be attributed to the user's
+       organization. An unknown identifier cannot be audited at all: the audit
+       table requires an organizationId and there is no tenant to resolve. */
+    await auditLogger({
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: "LOGIN_FAILED",
+      entity: "User",
+      entityId: user.id,
+      description: `Failed sign-in attempt for ${user.email}.`,
+    });
+
     throw new AppError("Invalid email or password.", 401);
   }
 
   if (!user.isActive) {
+    /* Retrying a deactivated account is an intrusion signal in its own right,
+       and the account is known here, so it is attributed to the user's
+       organization exactly like a wrong-password attempt. */
+    await auditLogger({
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: "LOGIN_FAILED",
+      entity: "User",
+      entityId: user.id,
+      description: `Failed sign-in attempt for deactivated account ${user.email}.`,
+    });
+
     throw new AppError("Your account has been deactivated.", 403);
   }
 
@@ -190,6 +214,15 @@ export async function forgotPassword(email) {
     await updateResetToken(user.id, hashedToken, resetTokenExpiry, tx);
   });
 
+  await auditLogger({
+    organizationId: user.organizationId,
+    userId: user.id,
+    action: "PASSWORD_RESET_REQUEST",
+    entity: "User",
+    entityId: user.id,
+    description: `Password reset requested for ${user.email}.`,
+  });
+
   await sendPasswordResetEmail(user, resetToken);
 
   return { success: true };
@@ -209,6 +242,15 @@ export async function resetPassword(resetToken, newPassword) {
 
   await withTenant(user.organizationId, async (tx) => {
     await updatePassword(user.id, hashedPassword, tx);
+  });
+
+  await auditLogger({
+    organizationId: user.organizationId,
+    userId: user.id,
+    action: "PASSWORD_RESET",
+    entity: "User",
+    entityId: user.id,
+    description: `Password reset completed for ${user.email}.`,
   });
 
   return { success: true, message: "Password reset successfully." };

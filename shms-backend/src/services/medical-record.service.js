@@ -152,6 +152,21 @@ export async function getOrganizationMedicalRecords(user, query = {}) {
     return await findMedicalRecords(organizationId, query, tx);
   });
 
+  /* Read accountability: a staff/admin bulk read of patient records is written
+     to the audit trail only after the tenant-scoped query has actually
+     succeeded, so a rejected read can never produce a misleading READ event.
+     Cross-organization super_admin reads carry no organizationId, and the audit
+     schema requires one, so they are intentionally not logged here. */
+  if (organizationId) {
+    await auditLogger({
+      organizationId,
+      userId: user.id,
+      action: "READ",
+      entity: "MedicalRecord",
+      description: `Medical records list read (${total} record${total === 1 ? "" : "s"} returned, page ${page}, limit ${limit}).`,
+    });
+  }
+
   return {
     items,
     pagination: buildPaginationMeta({ page, limit, total }),
@@ -172,6 +187,20 @@ export async function getMedicalRecordById(id, user) {
   if (user.role !== "super_admin" && record.profile.user.organizationId !== user.organizationId) {
     throw new AppError("Medical record not found.", 404);
   }
+
+  /* Logged only after both existence and cross-organization ownership checks
+     pass, so an unauthorized read leaves no successful READ event behind.
+     The organization recorded is the record's own tenant, which is known even
+     when a super_admin opens another institution's record, so cross-tenant
+     global-admin access is attributed rather than left invisible. */
+  await auditLogger({
+    organizationId: record.profile.user.organizationId,
+    userId: user.id,
+    action: "READ",
+    entity: "MedicalRecord",
+    entityId: record.id,
+    description: `Medical record ${record.recordNumber} read.`,
+  });
 
   return record;
 }

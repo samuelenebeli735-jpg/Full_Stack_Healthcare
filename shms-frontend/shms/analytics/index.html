@@ -270,7 +270,7 @@
       const maxV = Math.max.apply(null, rows.map((d) => d.count || 0));
       const colors = ['green', 'blue', 'amber', 'red'];
       container.innerHTML = rows.map((d, i) =>
-        `<div class="ax-bar-row"><span class="ax-bar-label" style="text-align:left;min-width:120px">${d.name || 'Department'}</span><div class="ax-bar-track"><div class="ax-bar-fill ${colors[i % 4]}" style="width:${Math.round(((d.count || 0) / maxV) * 100)}%"></div></div><span class="ax-bar-count">${d.count || 0}</span></div>`
+        `<div class="ax-bar-row"><span class="ax-bar-label" style="text-align:left;min-width:120px">${Utils.escapeHtml(d.name || 'Department')}</span><div class="ax-bar-track"><div class="ax-bar-fill ${colors[i % 4]}" style="width:${Math.round(((d.count || 0) / maxV) * 100)}%"></div></div><span class="ax-bar-count">${d.count || 0}</span></div>`
       ).join('');
     }
 

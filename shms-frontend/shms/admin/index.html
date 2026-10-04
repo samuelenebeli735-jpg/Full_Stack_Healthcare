@@ -394,7 +394,7 @@
           deptDiv.innerHTML = '';
           d.appointments_by_department.forEach((dept, i) => {
             const pct = (dept.count || 0) / deptMax * 100;
-            deptDiv.innerHTML += `<div class="flex-between mb-sm" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><span style="font-size:14px">${dept.dept}</span><span style="font-size:14px;font-weight:600">${dept.count}</span></div><div class="progress-bar mb-md" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
+            deptDiv.innerHTML += `<div class="flex-between mb-sm" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><span style="font-size:14px">${Utils.escapeHtml(dept.dept || '')}</span><span style="font-size:14px;font-weight:600">${dept.count}</span></div><div class="progress-bar mb-md" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
           });
         }
       } catch(e) { Utils.showToast('Failed to load overview','error'); }
@@ -681,7 +681,7 @@
            satisfaction figure or percentage bar is rendered here. The counts
            are appointment rows per department, not unique patients. */
         deptDiv.innerHTML = d.department_breakdown.length
-          ? d.department_breakdown.map(dept => `<div class="flex-between mb-sm"><span style="font-size:14px">${dept.dept}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${dept.appointments} appointment${dept.appointments === 1 ? '' : 's'}</span></div>`).join('')
+          ? d.department_breakdown.map(dept => `<div class="flex-between mb-sm"><span style="font-size:14px">${Utils.escapeHtml(dept.dept || '')}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${dept.appointments} appointment${dept.appointments === 1 ? '' : 's'}</span></div>`).join('')
           : '<div class="empty-state"><p>Department appointment data is not available.</p></div>';
         const demographics = document.getElementById('patientDemographics');
         demographics.innerHTML = d.patient_demographics.length

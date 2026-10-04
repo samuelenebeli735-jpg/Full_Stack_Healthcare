@@ -75,6 +75,13 @@ export async function updateOrganization(id, data, db = prisma) {
 
 /**
  * Find active organizations (public registration listing).
+ *
+ * This endpoint is intentionally unauthenticated: the unauthenticated
+ * registration page must be able to populate its institution dropdown before
+ * any account exists, so authenticating it would make registration impossible.
+ * The payload is therefore deliberately minimal — only the identifier the form
+ * submits and the label it displays. Internal routing keys (slug) and all
+ * contact or administrative fields stay server-side.
  */
 export async function findActiveOrganizations(db = prisma) {
   return await db.organization.findMany({
@@ -82,7 +89,6 @@ export async function findActiveOrganizations(db = prisma) {
     select: {
       id: true,
       name: true,
-      slug: true,
     },
     orderBy: { name: "asc" },
   });
