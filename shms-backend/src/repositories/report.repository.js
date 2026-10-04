@@ -36,6 +36,23 @@ export async function findAppointmentsForReport(
       select: {
         appointmentDate: true,
         status: true,
+        queue: {
+          select: {
+            checkedInAt: true,
+            calledAt: true,
+            startedAt: true,
+          },
+        },
+        staff: {
+          select: {
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
     }),
   ]);

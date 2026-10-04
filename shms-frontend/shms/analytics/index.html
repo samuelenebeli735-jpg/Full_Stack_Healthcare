@@ -305,12 +305,14 @@
     function renderKpis(container, d) {
       const busiest = d.busiest_day ? `${d.busiest_day.date}<span style="color:#9ca3af;font-weight:400"> (${d.busiest_day.total} appts)</span>` : '–';
       const pct = d.total_appointments ? Math.round((d.completed / d.total_appointments) * 100) + '%' : '–';
+      const wait = d.avg_wait_time == null ? '–' : d.avg_wait_time + 'm';
+      const peak = d.peak_hour == null ? '–' : String(d.peak_hour).padStart(2, '0') + ':00';
       const items = [
         { name: 'Appointments today', val: String(d.appointments_today != null ? d.appointments_today : '–') },
-        { name: 'Busiest day (30 days)', val: busiest },
+        { name: 'Busiest day', val: busiest },
         { name: 'Appointment completion', val: pct },
-        { name: 'Average wait time', val: '–', note: 'no wait-time timestamps available via API' },
-        { name: 'Peak consultation hour', val: '–', note: 'no hourly data available via API' },
+        { name: 'Average wait time', val: wait, note: d.avg_wait_time == null ? 'no wait-time data available for checked-in queues' : undefined },
+        { name: 'Peak appointment hour', val: peak, note: d.peak_hour == null ? 'no hourly data available via API' : undefined },
         { name: 'Patient satisfaction', val: '–', note: 'no satisfaction data available' },
       ];
       container.innerHTML = items.map((it) =>

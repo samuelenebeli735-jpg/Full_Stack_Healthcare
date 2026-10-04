@@ -795,9 +795,19 @@ const API = (() => {
       const statusCounts = {};
       (summary.data.appointmentStatusCounts || []).forEach((g) => { statusCounts[g.status] = g.count; });
 
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const availRes = await _request('GET', `/appointments/doctors/available?date=${today}`).catch(() => null);
+      const available_doctors = (availRes && Array.isArray(availRes.data && availRes.data.doctors))
+        ? availRes.data.doctors.length
+        : null;
+
       let weekly_appointments = Array(7).fill(0);
       let busiest_day = null;
       let total_appointments = c.appointments || 0;
+      let avg_wait_time = null;
+      let peak_hour = null;
+      let appointments_by_department = [];
       try {
         const apptRes = await _request('GET', `/reports/appointments${qs}`);
         const appt = (apptRes && apptRes.data) || {};
@@ -809,13 +819,16 @@ const API = (() => {
           if (peak) busiest_day = { date: peak.date, total: peak.total || 0 };
         }
         if (typeof appt.total === 'number') total_appointments = appt.total;
+        avg_wait_time = typeof appt.avgWaitMinutes === 'number' ? appt.avgWaitMinutes : null;
+        peak_hour = (appt.peakHours && appt.peakHours.length) ? appt.peakHours[0].hour : null;
+        appointments_by_department = Array.isArray(appt.appointmentsByDepartment) ? appt.appointmentsByDepartment : [];
       } catch (e) { /* /reports/* endpoints are admin/super_admin only */ }
 
       return {
         success: true,
         data: {
           total_doctors: c.staff || 0,
-          available_doctors: c.staff || 0,
+          available_doctors,
           total_students: c.profiles || 0,
           total_departments: c.departments || 0,
           total_services: c.services || 0,
@@ -825,27 +838,48 @@ const API = (() => {
           completed_today: statusCounts.completed || 0,
           pending_appointments: (statusCounts.scheduled || 0) + (statusCounts.confirmed || 0) + (statusCounts.pending || 0) + (statusCounts.checked_in || 0),
           cancelled_appointments: statusCounts.cancelled || 0,
-          avg_wait_time: null,
-          peak_hour: null,
+          avg_wait_time,
+          peak_hour,
           busiest_day,
           satisfaction_rate: null,
-          appointments_by_department: [],
+          appointments_by_department,
           weekly_appointments,
+          /* Exposed so getAnalytics() can reuse this single report request
+             instead of issuing its own duplicate /reports/appointments call. */
+          appointment_status_counts: statusCounts,
         },
       };
     },
     async getAdminReports() {
       const orgId = _orgId();
       const qs = orgId ? `?organizationId=${orgId}` : '';
-      const apptRes = await _request('GET', `/reports/appointments${qs}`).catch(() => null);
-      const patRes = await _request('GET', `/reports/patients${qs}`).catch(() => null);
-      const staffRes = await _request('GET', `/reports/staff${qs}`).catch(() => null);
+      const [apptRes, patRes, staffRes, healthRes] = await Promise.all([
+        _request('GET', `/reports/appointments${qs}`).catch(() => null),
+        _request('GET', `/reports/patients${qs}`).catch(() => null),
+        _request('GET', `/reports/staff${qs}`).catch(() => null),
+        _request('GET', `/dashboard/health${qs}`).catch(() => null),
+      ]);
 
       const appt = apptRes ? apptRes.data : null;
       const statusCounts = {};
       (appt && appt.statusCounts || []).forEach((g) => { statusCounts[g.status] = g.count; });
       const byGender = (patRes && patRes.data && patRes.data.byGender || [])
         .map((g) => ({ label: g.gender || 'Unknown', value: g.count || 0 }));
+      const breakdown = (healthRes && Array.isArray(healthRes.data && healthRes.data.breakdown))
+        ? healthRes.data.breakdown
+        : [];
+      const peakHours = (appt && Array.isArray(appt.peakHours)) ? appt.peakHours : [];
+      const deptRows = (appt && Array.isArray(appt.appointmentsByDepartment))
+        ? appt.appointmentsByDepartment
+        : [];
+      /* `dashboard/health` buckets diagnoses by keyword into real categories
+         plus the two catch-all buckets "Other" and "Unspecified". Those two
+         are not medical conditions, so they are not presented as condition
+         tags. The full breakdown (including the catch-alls) is still
+         returned by condition_breakdown on getAnalytics() for the donut. */
+      const CONDITION_CATCH_ALL_BUCKETS = ['Other', 'Unspecified'];
+      const isNamedCondition = (b) =>
+        (b && (b.count || 0) > 0) && !CONDITION_CATCH_ALL_BUCKETS.includes(b.name);
 
       return {
         success: true,
@@ -856,21 +890,26 @@ const API = (() => {
             cancelled: statusCounts.cancelled || 0,
             no_show: statusCounts.no_show || 0,
           },
-          department_breakdown: [],
+          department_breakdown: deptRows.map((d) => ({ dept: d.dept, appointments: d.count || 0 })),
           patient_demographics: byGender,
-          top_conditions: [],
-          peak_times: [],
-          peak_counts: [],
+          top_conditions: breakdown.filter(isNamedCondition).map((b) => b.name),
+          peak_times: peakHours.map((p) => `${String(p.hour).padStart(2, '0')}:00`),
+          peak_counts: peakHours.map((p) => p.count || 0),
         },
       };
     },
     async getAnalytics() {
       const orgId = _orgId();
       const qs = orgId ? `?organizationId=${orgId}` : '';
-      const [statsRes, healthRes, apptRes, patRes, staffRes, queueRes] = await Promise.all([
+      /* getAdminStats() already performs the single /reports/appointments
+         request and exposes the derived totals (weekly_appointments,
+         busiest_day, avg_wait_time, peak_hour, total_appointments) plus
+         appointment_status_counts from /dashboard. Requesting the report
+         again here duplicated an unbounded aggregation on every analytics
+         load, so it is derived from `stats` below instead. */
+      const [statsRes, healthRes, patRes, staffRes, queueRes] = await Promise.all([
         this.getAdminStats().catch(() => null),
         _request('GET', `/dashboard/health${qs}`).catch(() => null),
-        _request('GET', `/reports/appointments${qs}`).catch(() => null),
         _request('GET', `/reports/patients${qs}`).catch(() => null),
         _request('GET', `/reports/staff${qs}`).catch(() => null),
         _request('GET', `/dashboard/queue${qs}`).catch(() => null),
@@ -878,27 +917,20 @@ const API = (() => {
 
       const stats = (statsRes && statsRes.data) || {};
       const health = (healthRes && healthRes.data) || {};
-      const appt = (apptRes && apptRes.data) || null;
       const patients = (patRes && patRes.data) || null;
       const staff = (staffRes && staffRes.data) || null;
       const queue = (queueRes && queueRes.data) || null;
 
       const sc = { completed: 0, cancelled: 0, no_show: 0, checked_in: 0, scheduled: 0, confirmed: 0, pending: 0 };
-      (appt ? appt.statusCounts : []).forEach((g) => {
-        if (g && g.status) sc[g.status] = (sc[g.status] || 0) + (g.count || 0);
+      const rawStatusCounts = (stats && stats.appointment_status_counts) || {};
+      Object.keys(rawStatusCounts).forEach((status) => {
+        sc[status] = (sc[status] || 0) + (rawStatusCounts[status] || 0);
       });
 
-      const byDay = Array.isArray(appt && appt.byDay) ? [...appt.byDay].sort((a, b) => (a.date < b.date ? -1 : 1)) : [];
-      let weekly_trend = Array(7).fill(0);
-      if (byDay.length) {
-        weekly_trend = byDay.slice(-7).map((d) => d.total || 0);
-        while (weekly_trend.length < 7) weekly_trend.unshift(0);
-      }
-      let busiest_day = null;
-      if (byDay.length) {
-        const peak = byDay.reduce((m, d) => (!m || (d.total || 0) > m.total ? d : m), null);
-        if (peak) busiest_day = { date: peak.date, total: peak.total || 0 };
-      }
+      const weekly_trend = Array.isArray(stats.weekly_appointments) && stats.weekly_appointments.length
+        ? stats.weekly_appointments
+        : Array(7).fill(0);
+      const busiest_day = stats.busiest_day || null;
 
       const condition_breakdown = (health && Array.isArray(health.breakdown)) ? health.breakdown : [];
       const total_cases = typeof health.totalCases === 'number'
@@ -933,8 +965,8 @@ const API = (() => {
           staff_by_department: (staff && Array.isArray(staff.byDepartment)) ? staff.byDepartment : [],
           busiest_day,
           queue_counts,
-          avg_wait_time: null,
-          peak_hour: null,
+          avg_wait_time: (stats && typeof stats.avg_wait_time === 'number') ? stats.avg_wait_time : null,
+          peak_hour: (stats && stats.peak_hour != null) ? stats.peak_hour : null,
           satisfaction_rate: null,
           max_queue_length: null,
         },

@@ -341,10 +341,10 @@
         if (!res.success) return;
         const d = res.data;
         document.getElementById('adminStatsRow').innerHTML = `
-          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Doctors</span><div class="stat-card-icon">👨‍⚕️</div></div><div class="stat-card-value">${d.total_doctors}</div><div class="stat-card-change positive">${d.available_doctors} available</div></div>
+          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Doctors</span><div class="stat-card-icon">👨‍⚕️</div></div><div class="stat-card-value">${d.total_doctors}</div><div class="stat-card-change positive">${d.available_doctors == null ? '–' : d.available_doctors + ' available today'}</div></div>
           <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Today's Appointments</span><div class="stat-card-icon">📋</div></div><div class="stat-card-value">${d.total_appointments}</div><div class="stat-card-change positive">${d.completed_today} completed</div></div>
           <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Students Registered</span><div class="stat-card-icon">🎓</div></div><div class="stat-card-value">${d.total_students}</div><div class="stat-card-change positive">Active</div></div>
-          <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Avg Wait Time</span><div class="stat-card-icon">⏱️</div></div><div class="stat-card-value">${d.avg_wait_time == null ? '–' : d.avg_wait_time + 'm'}</div><div class="stat-card-change">Peak: ${d.peak_hour || '–'}</div></div>
+          <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Avg Wait Time</span><div class="stat-card-icon">⏱️</div></div><div class="stat-card-value">${d.avg_wait_time == null ? '–' : d.avg_wait_time + 'm'}</div><div class="stat-card-change">Peak: ${d.peak_hour == null ? '–' : String(d.peak_hour).padStart(2, '0') + ':00'}</div></div>
         `;
         document.getElementById('satRate').textContent = d.satisfaction_rate == null ? '–' : d.satisfaction_rate;
         const satPct = document.getElementById('satRatePct');
@@ -366,11 +366,15 @@
           requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.height = h + '%'; }));
         });
         const deptDiv = document.getElementById('deptBreakdown');
-        deptDiv.innerHTML = '';
-        d.appointments_by_department.forEach((dept, i) => {
-          const pct = maxVal > 0 ? (dept.count / maxVal * 100) : 0;
-          deptDiv.innerHTML += `<div class="flex-between mb-sm" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><span style="font-size:14px">${dept.dept}</span><span style="font-size:14px;font-weight:600">${dept.count}</span></div><div class="progress-bar mb-md" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
-        });
+        if (!d.appointments_by_department.length) {
+          deptDiv.innerHTML = '<div class="empty-state" style="text-align:center;padding:16px 0"><p>Department appointment data is not available.</p></div>';
+        } else {
+          deptDiv.innerHTML = '';
+          d.appointments_by_department.forEach((dept, i) => {
+            const pct = maxVal > 0 ? (dept.count / maxVal * 100) : 0;
+            deptDiv.innerHTML += `<div class="flex-between mb-sm" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><span style="font-size:14px">${dept.dept}</span><span style="font-size:14px;font-weight:600">${dept.count}</span></div><div class="progress-bar mb-md" style="animation:fadeInUp 0.4s ease ${i * 0.08}s both"><div class="progress-bar-fill" style="width:${pct}%"></div></div>`;
+          });
+        }
       } catch(e) { Utils.showToast('Failed to load overview','error'); }
     }
 
@@ -645,40 +649,46 @@
         if (!res.success) return;
         const d = res.data;
         document.getElementById('reportsStatRow').innerHTML = `
-          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Monthly Total</span></div><div class="stat-card-value">${d.monthly_summary.total}</div></div>
-          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Completed</span></div><div class="stat-card-value">${d.monthly_summary.completed}</div></div>
-          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Cancelled</span></div><div class="stat-card-value">${d.monthly_summary.cancelled}</div></div>
-          <div class="stat-card red"><div class="stat-card-header"><span class="stat-card-label">No Shows</span></div><div class="stat-card-value">${d.monthly_summary.no_show}</div></div>
+          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Appointments</span></div><div class="stat-card-value">${d.monthly_summary.total}</div><div class="stat-card-change">All time</div></div>
+          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Completed</span></div><div class="stat-card-value">${d.monthly_summary.completed}</div><div class="stat-card-change">All time</div></div>
+          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Cancelled</span></div><div class="stat-card-value">${d.monthly_summary.cancelled}</div><div class="stat-card-change">All time</div></div>
+          <div class="stat-card red"><div class="stat-card-header"><span class="stat-card-label">No Shows</span></div><div class="stat-card-value">${d.monthly_summary.no_show}</div><div class="stat-card-change">All time</div></div>
         `;
         const deptDiv = document.getElementById('deptPerformance');
+        /* No satisfaction data source exists anywhere in the API, so no
+           satisfaction figure or percentage bar is rendered here. The counts
+           are appointment rows per department, not unique patients. */
         deptDiv.innerHTML = d.department_breakdown.length
-          ? d.department_breakdown.map(dept => `<div class="flex-between mb-sm"><span style="font-size:14px">${dept.dept}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${dept.patients} patients &middot; ${dept.satisfaction}%</span></div><div class="progress-bar mb-md"><div class="progress-bar-fill success" style="width:${dept.satisfaction}%"></div></div>`).join('')
-          : '<div class="empty-state"><p>Department performance data is not available.</p></div>';
+          ? d.department_breakdown.map(dept => `<div class="flex-between mb-sm"><span style="font-size:14px">${dept.dept}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${dept.appointments} appointment${dept.appointments === 1 ? '' : 's'}</span></div>`).join('')
+          : '<div class="empty-state"><p>Department appointment data is not available.</p></div>';
         const demographics = document.getElementById('patientDemographics');
         demographics.innerHTML = d.patient_demographics.length
           ? d.patient_demographics.map(group => `<div class="flex-between mb-sm"><span style="font-size:14px">${group.label}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${group.value} patients</span></div>`).join('')
           : '<div class="empty-state"><p>No patient demographic data available.</p></div>';
         const condDiv = document.getElementById('topConditions');
-        condDiv.innerHTML = '';
-        d.top_conditions.forEach(c => {
-          condDiv.innerHTML += `<span class="condition-tag">${c}</span>`;
-        });
+        condDiv.innerHTML = d.top_conditions.length
+          ? d.top_conditions.map(c => `<span class="condition-tag">${c}</span>`).join('')
+          : '<div class="empty-state"><p>No health condition data available.</p></div>';
         const maxPeak = Math.max(...d.peak_counts, 1);
         const peakChart = document.getElementById('peakHoursChart');
         peakChart.innerHTML = '';
-        d.peak_times.forEach((t, i) => {
-          const bar = document.createElement('div');
-          bar.className = 'bar';
-          bar.style.background = 'linear-gradient(180deg, #f59e0b, #d97706)';
-          const h = (d.peak_counts[i] / maxPeak * 100);
-          bar.style.setProperty('--bar-target', h + '%');
-          bar.style.height = '0';
-          bar.style.transition = 'height 0.6s cubic-bezier(0.34,1.56,0.64,1)';
-          bar.style.transitionDelay = (i * 0.08) + 's';
-          bar.innerHTML = `<div class="bar-value">${d.peak_counts[i]}</div><div class="bar-label">${t}</div>`;
-          peakChart.appendChild(bar);
-          requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.height = h + '%'; }));
-        });
+        if (!d.peak_times.length) {
+          peakChart.innerHTML = '<div class="empty-state" style="text-align:center;padding:16px 0"><p>No peak-hour data available.</p></div>';
+        } else {
+          d.peak_times.forEach((t, i) => {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            bar.style.background = 'linear-gradient(180deg, #f59e0b, #d97706)';
+            const h = (d.peak_counts[i] / maxPeak * 100);
+            bar.style.setProperty('--bar-target', h + '%');
+            bar.style.height = '0';
+            bar.style.transition = 'height 0.6s cubic-bezier(0.34,1.56,0.64,1)';
+            bar.style.transitionDelay = (i * 0.08) + 's';
+            bar.innerHTML = `<div class="bar-value">${d.peak_counts[i]}</div><div class="bar-label">${t}</div>`;
+            peakChart.appendChild(bar);
+            requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.height = h + '%'; }));
+          });
+        }
       } catch(e) {}
     }
 
