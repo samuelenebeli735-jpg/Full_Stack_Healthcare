@@ -139,6 +139,15 @@ export async function checkInPatient(data, user) {
     throw new AppError("Patient has already checked in.", 409);
   }
 
+  const validPreCheckInStatuses = ["confirmed"];
+
+  if (!validPreCheckInStatuses.includes(appointment.status)) {
+    throw new AppError(
+      `Cannot check in: appointment is in "${appointment.status}" state. Only "confirmed" appointments can be checked in.`,
+      400
+    );
+  }
+
   let result;
 
   // Allocate the queue number inside a per-(organizationId, queueDate)

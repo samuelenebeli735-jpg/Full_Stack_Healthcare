@@ -170,6 +170,14 @@ export async function updateExistingPrescription(id, data, user) {
     throw new AppError("Prescription not found.", 404);
   }
 
+  // Stale-session guard: prescription can only be updated while the queue is in_progress.
+  if (prescription.consultation.queue.status !== "in_progress") {
+    throw new AppError(
+      `Cannot update prescription: queue is in "${prescription.consultation.queue.status}" state. Only "in_progress" prescriptions can be modified.`,
+      400
+    );
+  }
+
   if (
     !data.items ||
     !Array.isArray(data.items) ||

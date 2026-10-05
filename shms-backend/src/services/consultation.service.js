@@ -130,6 +130,14 @@ export async function updatePatientConsultation(id, data, user) {
     throw new AppError("Consultation not found.", 404);
   }
 
+  // Stale-session guard: consultation can only be updated while the queue is in_progress.
+  if (consultation.queue.status !== "in_progress") {
+    throw new AppError(
+      `Cannot update consultation: queue is in "${consultation.queue.status}" state. Only "in_progress" consultations can be modified.`,
+      400
+    );
+  }
+
   const updated = await withTenant(consultation.queue.organizationId, async (tx) => {
     return await updateConsultation(id, data, tx);
   });

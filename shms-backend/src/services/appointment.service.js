@@ -293,30 +293,33 @@ export async function getAppointmentById(id, organizationId, user) {
 }
 
 export async function updateExistingAppointment(id, data, user) {
-  const scoped = resolveUserScope(user);
-
-  const appointment = await scoped(async (tx) => {
-    return await findAppointmentById(id, tx);
-  });
-
-  if (!appointment) {
-    throw new AppError("Appointment not found.", 404);
-  }
-
   const organizationId =
     user.role === "super_admin"
-      ? (data.organizationId ?? appointment.organizationId)
+      ? (data.organizationId ?? (await resolveUserScope(user)(async (tx) => {
+          const appt = await findAppointmentById(id, tx);
+          return appt?.organizationId;
+        })))
       : user.organizationId;
 
-  if (appointment.organizationId !== organizationId) {
-    throw new AppError("Appointment not found.", 404);
-  }
-
-  if (data.status !== undefined) {
-    assertValidTransition(appointment.status, data.status);
+  if (!organizationId) {
+    throw new AppError("Organization ID is required.", 400);
   }
 
   return await withTenant(organizationId, async (tx) => {
+    const appointment = await findAppointmentById(id, tx);
+
+    if (!appointment) {
+      throw new AppError("Appointment not found.", 404);
+    }
+
+    if (appointment.organizationId !== organizationId) {
+      throw new AppError("Appointment not found.", 404);
+    }
+
+    if (data.status !== undefined) {
+      assertValidTransition(appointment.status, data.status);
+    }
+
     const updateData = {};
 
     if (data.appointmentDate !== undefined) {
@@ -355,13 +358,53 @@ export async function updateExistingAppointment(id, data, user) {
       await validateScheduleAndConflict(assignedStaffId, assignedDate, organizationId, id, service.estimatedDuration, tx);
     }
 
-    const updated = await updateAppointment(id, updateData, tx);
+    // For status changes, use compare-and-set to prevent race conditions:
+    // only update if the status hasn't changed since we validated it.
+    let updated;
+    if (data.status !== undefined && data.status !== appointment.status) {
+      const statusUpdated = await tx.appointment.updateMany({
+        where: {
+          id,
+          status: appointment.status,
+        },
+        data: { status: data.status },
+      });
 
-    // Keep the linked queue in sync when an appointment is cancelled or marked no-show.
-    if ((data.status === "cancelled" || data.status === "no_show") && appointment.queue) {
+      if (statusUpdated.count === 0) {
+        throw new AppError(
+          `Appointment status changed concurrently. Expected "${appointment.status}", please retry.`,
+          409
+        );
+      }
+
+      // Fetch the updated appointment with relations
+      updated = await findAppointmentById(id, tx);
+
+      // Apply non-status updates if any
+      const nonStatusData = { ...updateData };
+      delete nonStatusData.status;
+      if (Object.keys(nonStatusData).length > 0) {
+        updated = await updateAppointment(id, nonStatusData, tx);
+      }
+    } else {
+      updated = await updateAppointment(id, updateData, tx);
+    }
+
+    // Keep the linked queue in sync for ALL terminal states and in_progress.
+    const terminalStatuses = ["completed", "cancelled", "no_show"];
+    const queueSyncStatuses = [...terminalStatuses, "in_progress"];
+
+    if (data.status !== undefined && queueSyncStatuses.includes(data.status) && appointment.queue) {
+      const queueStatusMap = {
+        completed: "completed",
+        cancelled: "cancelled",
+        no_show: "cancelled",
+        in_progress: "in_progress",
+      };
+
       await tx.queue.update({
         where: { id: appointment.queue.id },
-        data: { status: "cancelled" },
+        data: { status: queueStatusMap[data.status] },
       });
     }
 
