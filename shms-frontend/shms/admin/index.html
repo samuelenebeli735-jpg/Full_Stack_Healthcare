@@ -682,9 +682,9 @@
       filtered.forEach(a => {
         tbody.innerHTML += `<tr>
           <td><span class="badge badge-neutral">#${a.id}</span></td>
-          <td>${a.doctor_name}</td>
-          <td>${a.doctor_name}</td>
-          <td>${a.service}</td>
+          <td>${a.patient_name ? Utils.sanitize(a.patient_name) : '—'}</td>
+          <td>${Utils.sanitize(a.doctor_name)}</td>
+          <td>${Utils.sanitize(a.service)}</td>
           <td>${Utils.formatDate(a.date)} ${Utils.formatTime(a.time)}</td>
           <td><span class="badge badge-${Utils.getStatusColor(a.status)}">${Utils.capitalize(a.status.replace('_',' '))}</span></td>
         </tr>`;
