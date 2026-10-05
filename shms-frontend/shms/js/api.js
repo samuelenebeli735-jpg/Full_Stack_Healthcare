@@ -679,15 +679,20 @@ const API = (() => {
 
       const nameParts = (data.name || '').split(/\s+/).filter(Boolean);
       if (nameParts.length < 2) throw new Error('Provide a full name (first and last).');
+      /* The login email and initial password come from the admin: never a
+         derived address or a shared default credential. */
+      if (!data.email) throw new Error('Email is required for a new doctor account.');
+      if (!data.password || String(data.password).length < 8) {
+        throw new Error('Initial password must be at least 8 characters.');
+      }
 
       const payload = {
         organizationId: orgId,
         departmentId: departments[0].id,
         positionId: positions[0].id,
-        email: data.email || `${nameParts[0].toLowerCase()}.${nameParts[nameParts.length - 1].toLowerCase()}@health.edu`,
-        password: 'Doctor@123',
+        email: data.email,
+        password: data.password,
         firstName: nameParts[0],
-        middleName: null,
         lastName: nameParts[nameParts.length - 1],
         gender: 'Male',
         dateOfBirth: '1985-01-01',

@@ -282,6 +282,7 @@
             <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="docEmail"></div>
             <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="docPhone"></div>
           </div>
+          <div class="form-group" id="docPasswordGroup"><label class="form-label">Initial Password</label><input type="password" class="form-input" id="docPassword" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></div>
           <div class="form-group"><label class="form-label">Max Patients/Day</label><input type="number" class="form-input" id="docMaxPatients" value="15" min="1" max="40"></div>
         </form>
       </div>
@@ -300,7 +301,7 @@
     </div>
   </div>
   <script src="../js/config.js"></script>
-  <script src="../js/api.js?v=3"></script>
+  <script src="../js/api.js?v=6"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/auth.js?v=3"></script>
   <script>
@@ -448,10 +449,13 @@
         document.getElementById('docEmail').value = doc.email || '';
         document.getElementById('docPhone').value = doc.phone || '';
         document.getElementById('docMaxPatients').value = doc.max_patients || 15;
+        document.getElementById('docPassword').value = '';
+        document.getElementById('docPasswordGroup').style.display = 'none';
       } else {
         document.getElementById('doctorModalTitle').textContent = 'Add Doctor';
         document.getElementById('doctorId').value = '';
         document.getElementById('doctorForm').reset();
+        document.getElementById('docPasswordGroup').style.display = '';
       }
       overlay.classList.add('active');
     }
@@ -469,12 +473,24 @@
         Utils.showToast('Name and specialization are required', 'error');
         return;
       }
+      const password = document.getElementById('docPassword').value;
+      if (!id) {
+        if (!data.email) {
+          Utils.showToast('Email is required for a new doctor account', 'error');
+          return;
+        }
+        if (password.length < 8) {
+          Utils.showToast('Initial password must be at least 8 characters', 'error');
+          return;
+        }
+      }
       try {
         if (id) {
           await API.updateDoctor(id, data);
           Utils.showToast('Doctor updated successfully', 'success');
         } else {
-          await API.addDoctor(data);
+          await API.addDoctor(Object.assign({}, data, { password }));
+          document.getElementById('docPassword').value = '';
           Utils.showToast('Doctor added successfully', 'success');
         }
         closeModal('doctorModal');
