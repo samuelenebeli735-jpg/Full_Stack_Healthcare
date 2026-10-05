@@ -421,17 +421,24 @@
         return;
       }
       filtered.forEach(d => {
-        const initials = Utils.getInitials(d.name);
-        container.innerHTML += `<div class="doctor-card">
+        /* Build the card as an element: text is escaped with Utils.sanitize and
+           the actions are bound with the doctor's real (string) id instead of
+           being interpolated into inline onclick handlers. */
+        const card = document.createElement('div');
+        card.className = 'doctor-card';
+        card.innerHTML = `
           <img src="../assets/images/doctor-avatar.svg" alt="" class="dc-avatar-img">
-          <div class="dc-info"><h4>${d.name} <span class="badge badge-${d.availability ? 'success' : 'danger'}">${d.availability ? 'Available' : 'Unavailable'}</span></h4>
-            <p>${d.specialization} &middot; ${d.email || 'No email'} &middot; Max: ${d.max_patients || 15}/day</p></div>
+          <div class="dc-info"><h4>${Utils.sanitize(d.name)} <span class="badge badge-${d.availability ? 'success' : 'danger'}">${d.availability ? 'Available' : 'Unavailable'}</span></h4>
+            <p>${Utils.sanitize(d.specialization)} &middot; ${d.email ? Utils.sanitize(d.email) : 'No email'} &middot; Max: ${Number(d.max_patients) || 15}/day</p></div>
           <div class="dc-actions">
-            <button class="btn btn-sm btn-secondary" onclick="toggleDoctorAvailability(${d.id})">${d.availability ? 'Deactivate' : 'Activate'}</button>
-            <button class="btn btn-sm btn-secondary" onclick="openDoctorModal(${d.id})">Edit</button>
-            <button class="btn btn-sm btn-danger" onclick="deleteDoctor(${d.id})">Delete</button>
-          </div>
-        </div>`;
+            <button class="btn btn-sm btn-secondary" data-action="toggle">${d.availability ? 'Deactivate' : 'Activate'}</button>
+            <button class="btn btn-sm btn-secondary" data-action="edit">Edit</button>
+            <button class="btn btn-sm btn-danger" data-action="delete">Delete</button>
+          </div>`;
+        card.querySelector('[data-action="toggle"]').addEventListener('click', () => toggleDoctorAvailability(d.id));
+        card.querySelector('[data-action="edit"]').addEventListener('click', () => openDoctorModal(d.id));
+        card.querySelector('[data-action="delete"]').addEventListener('click', () => deleteDoctor(d.id));
+        container.appendChild(card);
       });
     }
 
