@@ -580,7 +580,11 @@
         const select = document.getElementById('scheduleDoctor');
         select.innerHTML = '<option value="">Select Doctor</option>';
         adminDoctors.forEach(d => {
-          select.innerHTML += `<option value="${d.id}">${d.name} (${d.specialization})</option>`;
+          // Doctor names are data, not markup: set the option label as text.
+          const option = document.createElement('option');
+          option.value = d.id;
+          option.textContent = `${d.name} (${d.specialization})`;
+          select.appendChild(option);
         });
         document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
         loadSchedules();
