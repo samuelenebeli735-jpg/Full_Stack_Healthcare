@@ -207,6 +207,9 @@ const API = (() => {
       service: (q.appointment && q.appointment.service && q.appointment.service.name) || 'General',
       doctor: q.appointment && q.appointment.staff ? _staffName(q.appointment.staff) : '',
       status,
+      /* Raw backend QueueStatus (waiting | called | in_progress | completed |
+         cancelled). `status` above is a display alias kept for existing pages. */
+      queueStatus: q.status,
       estimated_wait_minutes: q.estimatedWaitMinutes || 0,
     };
     queueIdByTicket[ticket] = q.id;

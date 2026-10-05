@@ -413,7 +413,7 @@
   </div>
 
   <script src="../js/config.js"></script>
-  <script src="../js/api.js?v=4"></script>
+  <script src="../js/api.js?v=5"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/auth.js?v=3"></script>
   <script>
@@ -671,36 +671,44 @@
     function renderQueue() {
       const list = document.getElementById('patientList');
       list.innerHTML = '';
+      /* The backend calls the earliest `waiting` ticket and skips the earliest
+         `called` ticket (organization-level, by queue number); start and
+         complete act on one ticket. Call/Skip are therefore offered only on
+         the ticket the backend will act on. Decisions use the raw backend
+         queue status (`queueStatus`), not the display alias `status`. */
+      const nextWaiting = queueData.find((p) => p.queueStatus === 'waiting');
+      const currentCalled = queueData.find((p) => p.queueStatus === 'called');
+      document.getElementById('callNext').disabled = !nextWaiting;
       if (queueData.length === 0) {
         list.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128101;</div><h3>No patients in queue</h3><p>Waiting for patients to check in.</p></div>';
         return;
       }
-      const statusOrder = { 'in_consultation': 0, 'checked_in': 1, 'waiting': 2, 'confirmed': 3 };
-      const sorted = [...queueData].sort((a, b) => (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99));
-      let hasCheckedIn = false;
+      const statusOrder = { in_progress: 0, called: 1, waiting: 2 };
+      const sorted = [...queueData].sort((a, b) => (statusOrder[a.queueStatus] ?? 99) - (statusOrder[b.queueStatus] ?? 99));
       const avatarColors = ['green','blue','purple','amber','rose','teal'];
       sorted.forEach((p, i) => {
-        const isConsult = p.status === 'in_consultation';
-        const isCheckedIn = p.status === 'checked_in';
-        const isWaiting = p.status === 'waiting';
-        if (isCheckedIn) hasCheckedIn = true;
+        const isConsult = p.queueStatus === 'in_progress';
+        const isCalled = p.queueStatus === 'called';
+        const isWaiting = p.queueStatus === 'waiting';
         const color = avatarColors[i % avatarColors.length];
         const initials = p.patient ? p.patient.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase() : '??';
         const div = document.createElement('div');
         div.className = 'sf-patient-card' + (isConsult ? ' in-consultation' : '');
-        const badgeLabel = isConsult ? 'In Progress' : isCheckedIn ? 'Called' : (isWaiting ? 'Checked In' : 'Closed');
-        const badgeClass = isConsult ? 'in-progress' : isCheckedIn ? 'called' : (isWaiting ? 'checked' : 'scheduled');
+        const badgeLabel = isConsult ? 'In Progress' : isCalled ? 'Called' : (isWaiting ? 'Checked In' : 'Closed');
+        const badgeClass = isConsult ? 'in-progress' : isCalled ? 'called' : (isWaiting ? 'checked' : 'scheduled');
         const actions = [];
         if (isConsult) {
           actions.push(`<button class="btn btn-sm btn-success" onclick="markComplete('${p.ticket}', this)">Complete</button>`);
           actions.push(`<button class="btn btn-sm btn-primary" onclick="openConsultation('${p.ticket}')">Document</button>`);
         }
-        if (isCheckedIn) {
+        if (isCalled) {
           actions.push(`<button class="btn btn-sm btn-primary" onclick="startConsultation('${p.ticket}', this)">Start Consultation</button>`);
-          actions.push(`<button class="btn btn-sm btn-secondary" onclick="callPatient('${p.ticket}')">Call</button>`);
         }
-        if (!isConsult) {
+        if (p === currentCalled) {
           actions.push(`<button class="btn btn-sm btn-secondary" onclick="skipPatient('${p.ticket}')">Skip</button>`);
+        }
+        if (p === nextWaiting) {
+          actions.push(`<button class="btn btn-sm btn-primary" onclick="callPatient('${p.ticket}')">Call</button>`);
         }
         div.innerHTML = `
           <div class="sf-pc-ticket">${p.ticket}</div>
@@ -714,17 +722,15 @@
         `;
         list.appendChild(div);
       });
-      if (!hasCheckedIn) {
-        document.getElementById('callNext').disabled = true;
-      } else {
-        document.getElementById('callNext').disabled = false;
-      }
     }
 
     async function callPatient(ticket) {
       try {
-        await API.updateQueue(ticket, 'call');
-        Utils.showToast('Calling ' + ticket, 'success');
+        /* call-next is organization-level: report the ticket the backend
+           actually called (it may differ if another staff member called first). */
+        const res = await API.updateQueue(ticket, 'call');
+        const called = res && res.data && res.data.queueNumber != null ? '#' + res.data.queueNumber : ticket;
+        Utils.showToast('Calling ' + called, 'success');
         await loadStaffDashboard();
       } catch(e) { Utils.showToast(e.message, 'error'); }
     }
@@ -1085,25 +1091,25 @@
     }
 
     document.getElementById('callNext')?.addEventListener('click', async () => {
-      const nextCheckedIn = queueData.find(p => p.status === 'checked_in');
-      if (nextCheckedIn) {
-        await callPatient(nextCheckedIn.ticket);
+      const nextWaiting = queueData.find(p => p.queueStatus === 'waiting');
+      if (nextWaiting) {
+        await callPatient(nextWaiting.ticket);
       } else {
-        Utils.showToast('No checked-in patients to call', 'info');
+        Utils.showToast('No waiting patients to call', 'info');
       }
     });
 
     document.getElementById('skipPatient')?.addEventListener('click', async () => {
-      const nextWaiting = queueData.find(p => p.status === 'waiting' || p.status === 'checked_in');
-      if (nextWaiting) {
-        await skipPatient(nextWaiting.ticket);
+      const currentCalled = queueData.find(p => p.queueStatus === 'called');
+      if (currentCalled) {
+        await skipPatient(currentCalled.ticket);
       } else {
-        Utils.showToast('No patients to skip', 'info');
+        Utils.showToast('No called patient to skip', 'info');
       }
     });
 
     document.getElementById('startNextPatient')?.addEventListener('click', async function () {
-      const next = queueData.find(p => p.status === 'checked_in');
+      const next = queueData.find(p => p.queueStatus === 'called');
       if (!next) {
         Utils.showToast('No called patients to start', 'info');
         return;
