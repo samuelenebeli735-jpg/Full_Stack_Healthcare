@@ -509,7 +509,7 @@
       }
       el.innerHTML = named.map((b) => {
         const n = b.count || 0;
-        return `<div class="sf-alert yellow"><span class="sf-alert-icon">&#9888;</span><div class="sf-alert-text"><strong>${n} consultation${n === 1 ? '' : 's'} recorded for ${b.name} this month.</strong><p>Review affected patients in Patient Lookup.</p></div></div>`;
+        return `<div class="sf-alert yellow"><span class="sf-alert-icon">&#9888;</span><div class="sf-alert-text"><strong>${n} consultation${n === 1 ? '' : 's'} recorded for ${Utils.sanitize(b.name)} this month.</strong><p>Review affected patients in Patient Lookup.</p></div></div>`;
       }).join('');
     }
 
@@ -550,8 +550,8 @@
         const when = _recordDate(r.created_at);
         return `<div class="sf-record-row">
                   <div class="sf-record-avatar" style="background:#eef2ff;color:#4f46e5">&#128100;</div>
-                  <div class="sf-record-info"><div class="sf-record-name">${r.full_name || 'Unnamed student'}</div><div class="sf-record-meta">${meta ? meta + ' · ' : ''}Record ${r.recordNumber || '–'}</div></div>
-                  <span class="sf-record-date">${when || '–'}</span>
+                  <div class="sf-record-info"><div class="sf-record-name">${Utils.sanitize(r.full_name || 'Unnamed student')}</div><div class="sf-record-meta">${meta ? Utils.sanitize(meta) + ' · ' : ''}Record ${Utils.sanitize(r.recordNumber || '–')}</div></div>
+                  <span class="sf-record-date">${Utils.sanitize(when || '–')}</span>
                 </div>`;
       }).join('');
     }
@@ -711,11 +711,11 @@
           actions.push(`<button class="btn btn-sm btn-primary" onclick="callPatient('${p.ticket}')">Call</button>`);
         }
         div.innerHTML = `
-          <div class="sf-pc-ticket">${p.ticket}</div>
-          <div class="sf-pc-avatar" style="background:var(--${color === 'green' ? 'success' : color === 'blue' ? 'info' : color === 'purple' ? 'primary' : color === 'amber' ? 'warning' : color === 'rose' ? 'danger' : 'primary'})">${initials}</div>
+          <div class="sf-pc-ticket">${Utils.sanitize(p.ticket)}</div>
+          <div class="sf-pc-avatar" style="background:var(--${color === 'green' ? 'success' : color === 'blue' ? 'info' : color === 'purple' ? 'primary' : color === 'amber' ? 'warning' : color === 'rose' ? 'danger' : 'primary'})">${Utils.sanitize(initials)}</div>
           <div class="sf-pc-info">
-            <h4>${p.patient}</h4>
-            <p>${p.service || 'General'} ${p.doctor ? '&middot; ' + p.doctor : ''}</p>
+            <h4>${Utils.sanitize(p.patient)}</h4>
+            <p>${Utils.sanitize(p.service || 'General')} ${p.doctor ? '&middot; ' + Utils.sanitize(p.doctor) : ''}</p>
           </div>
           <span class="sf-pc-badge ${badgeClass}">${badgeLabel}</span>
           <div class="sf-pc-actions">${actions.join('')}</div>
@@ -1173,15 +1173,21 @@
             return;
           }
           results.forEach(p => {
-            container.innerHTML += `<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;transition:all 0.2s">
-              <span class="avatar avatar-sm">${Utils.getInitials(p.full_name)}</span>
-              <div style="flex:1"><strong>${p.full_name}</strong><br><span style="font-size:13px;color:var(--text-secondary)">${p.matric || 'N/A'} &middot; ${p.email}</span></div>
-              <span class="badge badge-neutral">${p.faculty || ''} L${p.level || ''}</span>
-              <button class="btn btn-sm btn-primary" onclick="showPatientDetail(${p.id})">View</button>
-            </div>`;
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius);margin-bottom:8px;transition:all 0.2s';
+            row.innerHTML = `
+              <span class="avatar avatar-sm">${Utils.sanitize(Utils.getInitials(p.full_name))}</span>
+              <div style="flex:1"><strong>${Utils.sanitize(p.full_name)}</strong><br><span style="font-size:13px;color:var(--text-secondary)">${Utils.sanitize(p.matric || 'N/A')} &middot; ${Utils.sanitize(p.email)}</span></div>
+              <span class="badge badge-neutral">${Utils.sanitize(p.faculty || '')} L${Utils.sanitize(p.level || '')}</span>
+              <button class="btn btn-sm btn-primary" data-action="view">View</button>`;
+            // Bind with the record's real (string) id rather than an inline handler.
+            row.querySelector('[data-action="view"]').addEventListener('click', () => showPatientDetail(p.id, p));
+            container.appendChild(row);
           });
         }
-      } catch(e) {}
+      } catch(e) {
+        document.getElementById('patientsResults').innerHTML = '<div class="empty-state"><h3>Search failed</h3><p>Could not search patients. Please try again.</p></div>';
+      }
     }, 400);
 
     document.getElementById('patientSearchInput')?.addEventListener('input', (e) => {
@@ -1193,7 +1199,7 @@
       if (!matric) { Utils.showToast('Enter a matric number', 'warning'); return; }
       try {
         const res = await API.lookupPatient(matric);
-        if (res.success) {
+        if (res.success && res.data) {
           showPatientDetail(res.data.id, res.data);
         } else {
           Utils.showToast('Patient not found', 'error');
@@ -1216,17 +1222,17 @@
         if (!data) { Utils.showToast('Could not load patient details', 'error'); return; }
         body.innerHTML = `
           <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
-            <span class="avatar avatar-lg">${Utils.getInitials(data.full_name)}</span>
+            <span class="avatar avatar-lg">${Utils.sanitize(Utils.getInitials(data.full_name))}</span>
             <div>
-              <h3 style="font-size:18px;font-weight:600">${data.full_name}</h3>
-              <p style="color:var(--text-secondary)">${data.matric || 'N/A'} &middot; ${data.email}</p>
+              <h3 style="font-size:18px;font-weight:600">${Utils.sanitize(data.full_name)}</h3>
+              <p style="color:var(--text-secondary)">${Utils.sanitize(data.matric || 'N/A')} &middot; ${Utils.sanitize(data.email)}</p>
             </div>
           </div>
           <div class="staff-detail-grid">
-            <div class="profile-meta-item"><span class="label">Phone</span><span class="value">${data.phone || '-'}</span></div>
-            <div class="profile-meta-item"><span class="label">Faculty</span><span class="value">${data.faculty || '-'}</span></div>
-            <div class="profile-meta-item"><span class="label">Department</span><span class="value">${data.department || '-'}</span></div>
-            <div class="profile-meta-item"><span class="label">Level</span><span class="value">${data.level || '-'}</span></div>
+            <div class="profile-meta-item"><span class="label">Phone</span><span class="value">${Utils.sanitize(data.phone || '-')}</span></div>
+            <div class="profile-meta-item"><span class="label">Faculty</span><span class="value">${Utils.sanitize(data.faculty || '-')}</span></div>
+            <div class="profile-meta-item"><span class="label">Department</span><span class="value">${Utils.sanitize(data.department || '-')}</span></div>
+            <div class="profile-meta-item"><span class="label">Level</span><span class="value">${Utils.sanitize(data.level || '-')}</span></div>
           </div>
         `;
         card.style.display = 'block';

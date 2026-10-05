@@ -549,11 +549,11 @@
       }
       filtered.forEach(s => {
         tbody.innerHTML += `<tr>
-          <td><span class="badge badge-neutral">${s.matric || 'N/A'}</span></td>
-          <td><strong>${s.full_name}</strong></td>
-          <td>${s.email}</td>
-          <td>${s.faculty || '-'}</td>
-          <td><span class="badge badge-primary">${s.level || '-'}</span></td>
+          <td><span class="badge badge-neutral">${Utils.sanitize(s.matric || 'N/A')}</span></td>
+          <td><strong>${Utils.sanitize(s.full_name)}</strong></td>
+          <td>${Utils.sanitize(s.email)}</td>
+          <td>${Utils.sanitize(s.faculty || '-')}</td>
+          <td><span class="badge badge-primary">${Utils.sanitize(s.level || '-')}</span></td>
           <td><button class="btn btn-sm btn-danger" onclick="deactivateStudent('${s.id}')">Deactivate</button></td>
         </tr>`;
       });
@@ -712,11 +712,11 @@
           : '<div class="empty-state"><p>Department appointment data is not available.</p></div>';
         const demographics = document.getElementById('patientDemographics');
         demographics.innerHTML = d.patient_demographics.length
-          ? d.patient_demographics.map(group => `<div class="flex-between mb-sm"><span style="font-size:14px">${group.label}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${group.value} patients</span></div>`).join('')
+          ? d.patient_demographics.map(group => `<div class="flex-between mb-sm"><span style="font-size:14px">${Utils.sanitize(group.label)}</span><span style="font-size:13px;font-weight:500;color:var(--text-secondary)">${Utils.sanitize(group.value)} patients</span></div>`).join('')
           : '<div class="empty-state"><p>No patient demographic data available.</p></div>';
         const condDiv = document.getElementById('topConditions');
         condDiv.innerHTML = d.top_conditions.length
-          ? d.top_conditions.map(c => `<span class="condition-tag">${c}</span>`).join('')
+          ? d.top_conditions.map(c => `<span class="condition-tag">${Utils.sanitize(c)}</span>`).join('')
           : '<div class="empty-state"><p>No health condition data available.</p></div>';
         const maxPeak = Math.max(...d.peak_counts, 1);
         const peakChart = document.getElementById('peakHoursChart');

@@ -121,10 +121,16 @@ const Utils = {
     return /^[A-Za-z0-9/-]{5,20}$/.test(matric);
   },
 
+  /* Escape a value for use in HTML text AND quoted attribute values.
+     null/undefined render as an empty string, never the word "undefined". */
   sanitize(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    if (str === null || str === undefined) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   },
 
   generateId() {
@@ -182,7 +188,9 @@ const Utils = {
       color:${type === 'success' ? '#166534' : type === 'error' ? '#c62828' : type === 'warning' ? '#92400e' : '#075985'};
       border:1px solid ${type === 'success' ? '#bbf7d0' : type === 'error' ? '#f8bbd0' : type === 'warning' ? '#fde68a' : '#bae6fd'};
     `;
-    toast.innerHTML = `<span style="font-size:18px">${icons[type] || 'info'}</span><span>${message}</span>`;
+    toast.innerHTML = `<span style="font-size:18px">${icons[type] || 'info'}</span><span></span>`;
+    // Messages can carry server text or user-entered values: always plain text.
+    toast.lastElementChild.textContent = message == null ? '' : String(message);
     const containerEl = document.getElementById('toast-container');
     containerEl.appendChild(toast);
     setTimeout(() => {
@@ -216,12 +224,23 @@ const Utils = {
     prevBtn.addEventListener('click', () => onChange(currentPage - 1));
     container.appendChild(prevBtn);
 
+    // Window the page buttons (first, last, current +/- 2) so large result
+    // sets do not render hundreds of buttons.
+    let last = 0;
     for (let i = 1; i <= totalPages; i++) {
+      if (i !== 1 && i !== totalPages && Math.abs(i - currentPage) > 2) continue;
+      if (last && i - last > 1) {
+        const gap = document.createElement('span');
+        gap.textContent = '…';
+        gap.style.padding = '0 6px';
+        container.appendChild(gap);
+      }
       const btn = document.createElement('button');
       btn.textContent = i;
       if (i === currentPage) btn.className = 'active';
       btn.addEventListener('click', () => onChange(i));
       container.appendChild(btn);
+      last = i;
     }
 
     const nextBtn = document.createElement('button');
@@ -232,9 +251,7 @@ const Utils = {
   },
 
   escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
+    return this.sanitize(str);
   },
 
   isInSubdirectory() {

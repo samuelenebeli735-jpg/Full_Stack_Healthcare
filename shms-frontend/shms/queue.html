@@ -386,7 +386,7 @@
         }
       }
       document.getElementById('qPatientName').textContent = patientName;
-      document.getElementById('qPatientDetails').innerHTML = patientDetails;
+      document.getElementById('qPatientDetails').textContent = patientDetails;
 
       // Elapsed session time and estimated finish are not provided by the queue API.
       document.getElementById('qSessionTimer').textContent = '–';
@@ -441,7 +441,7 @@
         div.className = 'queue-list-item' + (item.patient === 'You' ? ' highlight' : '');
         const statusColors = { serving: 'success', in_consultation: 'success', waiting: 'warning', checked_in: 'info' };
         div.innerHTML = `
-          <span class="qli-ticket">${item.ticket}</span>
+          <span class="qli-ticket">${Utils.sanitize(item.ticket)}</span>
           <span class="qli-patient">${Utils.sanitize(item.patient)}</span>
           <span class="qli-status badge badge-${statusColors[item.status] || 'neutral'}">${Utils.capitalize(item.status || '').replace('_', ' ')}</span>
         `;

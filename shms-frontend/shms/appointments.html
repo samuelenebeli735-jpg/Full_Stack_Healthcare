@@ -295,7 +295,7 @@
           [...new Set((res.data || []).filter(Boolean))].forEach(s => {
             const div = document.createElement('div');
             div.className = 'doctor-card';
-            div.innerHTML = `<div class="doc-info"><h4>${s}</h4></div>`;
+            div.innerHTML = `<div class="doc-info"><h4>${Utils.sanitize(s)}</h4></div>`;
             div.addEventListener('click', () => {
               document.querySelectorAll('#serviceOptions .doctor-card').forEach(c => c.classList.remove('selected'));
               div.classList.add('selected');
@@ -331,10 +331,10 @@
           const div = document.createElement('div');
           div.className = 'doctor-card';
           div.innerHTML = `
-            <div class="doc-avatar">${Utils.getInitials(d.name)}</div>
+            <div class="doc-avatar">${Utils.sanitize(Utils.getInitials(d.name))}</div>
             <div class="doc-info">
-              <h4>${d.name}</h4>
-              <p>${d.specialization}</p>
+              <h4>${Utils.sanitize(d.name)}</h4>
+              <p>${Utils.sanitize(d.specialization)}</p>
             </div>
             <div class="doc-status ${d.availability ? 'available' : 'unavailable'}">${d.availability ? 'Available' : 'Unavailable'}</div>
           `;
@@ -364,7 +364,7 @@
             doctor = resolve.data[0];
             selectedData.doctor = doctor;
           } else {
-            container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:20px">${resolve.message || 'No doctors are available on this date.'}</div>`;
+            container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:20px">${Utils.sanitize(resolve.message || 'No doctors are available on this date.')}</div>`;
             return;
           }
         }
@@ -372,7 +372,7 @@
         if (seq !== slotLoadSeq) return;
         container.innerHTML = '';
         if (res.success && !res.hasSchedule) {
-          container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:20px">${res.message || 'No schedule available for this doctor.'}</div>`;
+          container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:20px">${Utils.sanitize(res.message || 'No schedule available for this doctor.')}</div>`;
           return;
         }
         if (res.success && res.data.length === 0) {
@@ -452,8 +452,8 @@
             <div class="appointment-card">
               <div class="apt-icon" style="background:var(--${color}-light,var(--bg-tertiary));color:var(--${color},var(--text-primary))">📋</div>
               <div class="apt-info">
-                <h4>${a.service}</h4>
-                <p>${a.doctor_name} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</p>
+                <h4>${Utils.sanitize(a.service)}</h4>
+                <p>${Utils.sanitize(a.doctor_name)} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</p>
               </div>
               <span class="badge badge-${color}">${Utils.capitalize(a.status.replace(/_/g, ' '))}</span>
               ${actions}
@@ -489,9 +489,9 @@
             <div class="appointment-card">
               <div class="apt-icon" style="background:#dcfce7;color:#166534">✓</div>
               <div class="apt-info">
-                <h4>${a.service}</h4>
-                <p>${a.doctor_name} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</p>
-                ${a.diagnosis ? `<p style="font-size:12px;color:var(--text-light)">Diagnosis: ${a.diagnosis}</p>` : ''}
+                <h4>${Utils.sanitize(a.service)}</h4>
+                <p>${Utils.sanitize(a.doctor_name)} &bull; ${Utils.formatDate(a.date)} at ${Utils.formatTime(a.time)}</p>
+                ${a.diagnosis ? `<p style="font-size:12px;color:var(--text-light)">Diagnosis: ${Utils.sanitize(a.diagnosis)}</p>` : ''}
               </div>
               <span class="badge badge-${color}">${Utils.capitalize(a.status.replace(/_/g, ' '))}</span>
             </div>
@@ -549,7 +549,7 @@
         if (seq !== reschedSlotSeq) return;
         container.innerHTML = '';
         if (res.success && !res.hasSchedule) {
-          container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:14px">${res.message || 'No schedule available for this doctor.'}</div>`;
+          container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:14px">${Utils.sanitize(res.message || 'No schedule available for this doctor.')}</div>`;
           syncRescheduleButton();
           return;
         }
@@ -601,16 +601,23 @@
 
       const sel = document.getElementById('reschedDoctor');
       sel.innerHTML = '';
+      // Option labels are data (doctor names), so they are set as text.
+      const addOption = (value, label) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        sel.appendChild(opt);
+      };
       if (appt.staffId) {
-        sel.innerHTML += `<option value="${appt.staffId}">Keep current doctor (${appt.doctor_name})</option>`;
+        addOption(appt.staffId, `Keep current doctor (${appt.doctor_name})`);
       }
-      sel.innerHTML += '<option value="">No preference (any available doctor)</option>';
+      addOption('', 'No preference (any available doctor)');
       try {
         const res = await API.getAvailableDoctors();
         const doctors = res.success ? res.data : [];
         doctors.forEach(d => {
           if (d.id && d.id !== appt.staffId) {
-            sel.innerHTML += `<option value="${d.id}">${d.name}${d.specialization ? ` - ${d.specialization}` : ''}</option>`;
+            addOption(d.id, `${d.name}${d.specialization ? ` - ${d.specialization}` : ''}`);
           }
         });
       } catch (e) { /* ignore doctor list failures */ }

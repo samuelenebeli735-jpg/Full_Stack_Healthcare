@@ -54,11 +54,11 @@
               <div class="appointment-card" style="margin:0;border-radius:0;border-left:none;border-right:none">
                 <div class="apt-icon" style="background:#f3e8ff;color:#6d28d9">🧪</div>
                 <div class="apt-info">
-                  <h4>${item.test}</h4>
-                  <p>Ordered by ${item.ordered_by} &bull; ${Utils.formatDate(item.date)}</p>
-                  ${item.result ? `<p style="font-size:13px;font-weight:500;color:var(--text-primary);margin-top:4px">Result: ${item.result}</p>` : ''}
+                  <h4>${Utils.sanitize(item.test)}</h4>
+                  <p>Ordered by ${Utils.sanitize(item.ordered_by)} &bull; ${Utils.formatDate(item.date)}</p>
+                  ${item.result ? `<p style="font-size:13px;font-weight:500;color:var(--text-primary);margin-top:4px">Result: ${Utils.sanitize(item.result)}</p>` : ''}
                 </div>
-                <span class="badge badge-${statusColor}">${Utils.capitalize(item.status)}</span>
+                <span class="badge badge-${statusColor}">${Utils.sanitize(Utils.capitalize(item.status))}</span>
               </div>
             `;
           });

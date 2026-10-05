@@ -54,11 +54,11 @@
               <div class="appointment-card" style="margin:0;border-radius:0;border-left:none;border-right:none">
                 <div class="apt-icon" style="background:#fce7f3;color:#be185d">💊</div>
                 <div class="apt-info">
-                  <h4>${item.medication}</h4>
-                  <p>${item.dosage} &bull; Prescribed by ${item.prescribed_by}</p>
+                  <h4>${Utils.sanitize(item.medication)}</h4>
+                  <p>${Utils.sanitize(item.dosage)} &bull; Prescribed by ${Utils.sanitize(item.prescribed_by)}</p>
                   <p style="font-size:12px;color:var(--text-light)">${Utils.formatDate(item.date)}</p>
                 </div>
-                <span class="badge badge-${statusColor}">${Utils.capitalize(item.status)}</span>
+                <span class="badge badge-${statusColor}">${Utils.sanitize(Utils.capitalize(item.status))}</span>
               </div>
             `;
           });

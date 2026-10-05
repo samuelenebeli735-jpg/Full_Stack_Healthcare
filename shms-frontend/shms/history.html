@@ -100,10 +100,10 @@
             <div class="month">${month}</div>
           </div>
           <div class="hi-body">
-            <h4>${a.service}</h4>
-            <p>${a.doctor_name} &bull; ${Utils.formatTime(a.time)}</p>
-            ${a.diagnosis ? `<p class="hi-diagnosis">Diagnosis: ${a.diagnosis} ${a.treatment ? '| Treatment: ' + a.treatment : ''}</p>` : ''}
-            ${a.notes ? `<p class="hi-diagnosis">Notes: ${Utils.truncate(a.notes, 80)}</p>` : ''}
+            <h4>${Utils.sanitize(a.service)}</h4>
+            <p>${Utils.sanitize(a.doctor_name)} &bull; ${Utils.formatTime(a.time)}</p>
+            ${a.diagnosis ? `<p class="hi-diagnosis">Diagnosis: ${Utils.sanitize(a.diagnosis)} ${a.treatment ? '| Treatment: ' + Utils.sanitize(a.treatment) : ''}</p>` : ''}
+            ${a.notes ? `<p class="hi-diagnosis">Notes: ${Utils.sanitize(Utils.truncate(a.notes, 80))}</p>` : ''}
           </div>
           <div class="hi-status">
             <span class="badge badge-${Utils.getStatusColor(a.status)}">${Utils.capitalize(a.status)}</span>

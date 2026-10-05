@@ -87,11 +87,11 @@
           div.className = 'record-item';
           div.innerHTML = `
             <div class="ri-header">
-              <h4>${typeIcons[record.type] || '📋'} ${Utils.capitalize(record.type)}</h4>
+              <h4>${typeIcons[record.type] || '📋'} ${Utils.sanitize(Utils.capitalize(record.type))}</h4>
               <span class="badge badge-${typeColors[record.type] || 'neutral'}">${Utils.formatDate(record.date)}</span>
             </div>
-            <div class="ri-meta">${record.doctor} ${record.diagnosis ? '&bull; ' + record.diagnosis : ''}</div>
-            <div class="ri-notes">${record.notes || 'No notes recorded.'}</div>
+            <div class="ri-meta">${Utils.sanitize(record.doctor)} ${record.diagnosis ? '&bull; ' + Utils.sanitize(record.diagnosis) : ''}</div>
+            <div class="ri-notes">${Utils.sanitize(record.notes || 'No notes recorded.')}</div>
           `;
           timeline.appendChild(div);
         });
