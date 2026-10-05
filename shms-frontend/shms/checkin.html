@@ -137,8 +137,13 @@
       if (a.status === 'cancelled') return 'cancelled';
       if (a.status === 'no_show') return 'no_show';
       if (a.status === 'checked_in' || a.status === 'in_progress' || a.queueNumber != null) return 'checked_in';
-      if (a.date === today) return 'eligible';
-      return a.date < today ? 'past' : 'upcoming';
+      if (a.date < today) return 'past';
+      // The backend only checks in `confirmed` appointments: a `scheduled`
+      // one is still waiting for staff confirmation, and any other status
+      // is never offered for check-in.
+      if (a.status === 'scheduled') return 'awaiting_confirmation';
+      if (a.status !== 'confirmed') return 'unavailable';
+      return a.date === today ? 'eligible' : 'upcoming';
     }
 
     const CHECKIN_STATE = {
@@ -146,6 +151,11 @@
         badge: 'success',
         label: 'Ready',
         note: 'You can check in now and join the queue.',
+      },
+      awaiting_confirmation: {
+        badge: 'warning',
+        label: 'Awaiting Confirmation',
+        note: 'The clinic has not confirmed this appointment yet. You can check in on your appointment day once it is confirmed.',
       },
       upcoming: {
         badge: 'primary',
@@ -176,6 +186,11 @@
         badge: 'danger',
         label: 'No Show',
         note: 'This appointment was marked as a no-show.',
+      },
+      unavailable: {
+        badge: 'neutral',
+        label: 'Unavailable',
+        note: 'This appointment cannot be checked in.',
       },
     };
 
