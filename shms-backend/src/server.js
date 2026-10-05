@@ -5,9 +5,9 @@ import prisma from "./config/db.js";
 
 const PORT = env.PORT;
 
-const server = app.listen(PORT, () => {
+const server = app.listen(PORT, "127.0.0.1", () => {
   logger.info(
-    `Server running — Environment: ${env.NODE_ENV}, Port: ${PORT}`
+    `Server running — Environment: ${env.NODE_ENV}, Port: ${PORT}, Host: 127.0.0.1`
   );
 });
 
