@@ -3,7 +3,11 @@ module.exports = {
     {
       name: "shms-api",
       script: "./src/server.js",
-      instances: "max",
+      // Rate-limit counters (login brute-force protection included) live in
+      // each process's memory, so N cluster workers would allow N times the
+      // configured limits. Run one instance unless a shared rate-limit store
+      // is added; PM2_INSTANCES can still raise it deliberately.
+      instances: process.env.PM2_INSTANCES || 1,
       exec_mode: "cluster",
       autorestart: true,
       max_memory_restart: "512M",

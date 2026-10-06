@@ -9,9 +9,8 @@ const webhookUrl = env.EMAIL_WEBHOOK_URL;
  * Delivery is abstracted so the backend never depends on a specific email
  * vendor. When `EMAIL_WEBHOOK_URL` is set, the message is POSTed to that
  * endpoint (e.g. a Mailgun/SendGrid-style webhook or a mail gateway).
- * Otherwise the message is logged at `info` level so the flow remains
- * testable in development. Password-reset tokens must only ever be included
- * in the delivery payload, never in API responses.
+ * Otherwise nothing is sent and only the subject is logged: the body can
+ * carry a password-reset link, which must never reach logs or API responses.
  */
 export async function sendEmail({ to, subject, text, html }) {
   if (!to) return;
@@ -33,7 +32,14 @@ export async function sendEmail({ to, subject, text, html }) {
     return;
   }
 
-  logger.info(`[EMAIL] To: ${to} | Subject: ${subject} | Body: ${text}`);
+  logger.warn(`[EMAIL] Not delivered, EMAIL_WEBHOOK_URL is not configured. Subject: ${subject}`);
+}
+
+/**
+ * True when an email provider is configured, i.e. emails are actually sent.
+ */
+export function isEmailDeliveryConfigured() {
+  return Boolean(webhookUrl);
 }
 
 /**

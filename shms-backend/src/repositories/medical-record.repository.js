@@ -84,9 +84,9 @@ export async function nextMedicalRecordSeq(
 ) {
   const rows = await db.$queryRawUnsafe(
     `INSERT INTO "MedicalRecordCounter" ("id", "organizationId", "recordYear", "nextSeq", "createdAt", "updatedAt")
-     VALUES (gen_random_uuid()::text, $1, $2, 1, now(), now())
+     VALUES (gen_random_uuid()::text, $1, $2, 1, now() AT TIME ZONE 'UTC', now() AT TIME ZONE 'UTC')
      ON CONFLICT ("organizationId", "recordYear")
-     DO UPDATE SET "nextSeq" = "MedicalRecordCounter"."nextSeq" + 1, "updatedAt" = now()
+     DO UPDATE SET "nextSeq" = "MedicalRecordCounter"."nextSeq" + 1, "updatedAt" = now() AT TIME ZONE 'UTC'
      RETURNING "nextSeq"`,
     organizationId,
     recordYear

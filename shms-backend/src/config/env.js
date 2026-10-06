@@ -17,6 +17,9 @@ if (missing.length > 0) {
 
 const env = {
   PORT: Number.parseInt(process.env.PORT, 10) || 5000,
+  // Interface to listen on. Loopback by default so a local run is not exposed
+  // to the network; containers set HOST=0.0.0.0 so the port mapping works.
+  HOST: (process.env.HOST || "").trim() || "127.0.0.1",
   NODE_ENV: process.env.NODE_ENV || "development",
 
   JWT_SECRET: process.env.JWT_SECRET,

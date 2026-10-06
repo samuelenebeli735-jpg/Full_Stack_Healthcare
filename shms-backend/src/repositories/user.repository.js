@@ -101,12 +101,21 @@ export async function updateResetToken(userId, resetToken, resetTokenExpiry, db 
 /**
  * Global pre-auth lookup of a user by a hashed, unexpired reset token.
  * Resolved through the shms_user_by_reset_token SECURITY DEFINER function.
+ *
+ * The function compares "resetTokenExpiry" (timestamp without time zone,
+ * written by Prisma in UTC) with now(), which PostgreSQL converts using the
+ * session TimeZone. Under a non-UTC database zone (Africa/Lagos, UTC+1) every
+ * fresh one-hour token would already look expired, so the lookup runs with
+ * the transaction's TimeZone set to UTC.
  */
 export async function findUserByResetToken(resetToken, db = prisma) {
-  const rows = await db.$queryRaw`
-    SELECT *
-    FROM public.shms_user_by_reset_token(${resetToken})
-  `;
+  const rows = await db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe("SET LOCAL TIME ZONE 'UTC'");
+    return await tx.$queryRaw`
+      SELECT *
+      FROM public.shms_user_by_reset_token(${resetToken})
+    `;
+  });
 
   if (!rows || rows.length === 0) {
     return null;

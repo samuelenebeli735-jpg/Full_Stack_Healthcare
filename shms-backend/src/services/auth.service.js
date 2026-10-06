@@ -26,7 +26,7 @@ import {
 } from "../utils/password.js";
 
 import generateToken from "../utils/generateToken.js";
-import { sendPasswordResetEmail } from "../utils/email.js";
+import { isEmailDeliveryConfigured, sendPasswordResetEmail } from "../utils/email.js";
 import crypto from "crypto";
 
 /**
@@ -196,6 +196,16 @@ export async function loginStudent(data) {
 }
 
 export async function forgotPassword(email) {
+  // Without an email provider the reset link could never arrive. Say so
+  // instead of claiming a link was sent. The answer is the same for every
+  // address, so it does not reveal which accounts exist.
+  if (!isEmailDeliveryConfigured()) {
+    throw new AppError(
+      "Password reset by email is not available on this server yet. Please contact your clinic administrator.",
+      503
+    );
+  }
+
   // Pre-auth global lookup so the reset token can be written even though the
   // tenant context is unknown at this point.
   const user = await findUserByEmail(email);

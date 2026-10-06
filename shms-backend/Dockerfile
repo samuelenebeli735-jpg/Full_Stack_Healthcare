@@ -11,6 +11,7 @@ COPY src ./src
 COPY ecosystem.config.cjs ./
 
 ENV NODE_ENV=production
+ENV HOST=0.0.0.0
 EXPOSE 5000
 
 CMD ["node", "src/server.js"]

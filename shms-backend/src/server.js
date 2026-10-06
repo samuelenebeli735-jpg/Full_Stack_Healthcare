@@ -4,10 +4,11 @@ import logger from "./utils/logger.js";
 import prisma from "./config/db.js";
 
 const PORT = env.PORT;
+const HOST = env.HOST;
 
-const server = app.listen(PORT, "127.0.0.1", () => {
+const server = app.listen(PORT, HOST, () => {
   logger.info(
-    `Server running — Environment: ${env.NODE_ENV}, Port: ${PORT}, Host: 127.0.0.1`
+    `Server running — Environment: ${env.NODE_ENV}, Port: ${PORT}, Host: ${HOST}`
   );
 });
 
