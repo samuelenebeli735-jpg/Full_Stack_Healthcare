@@ -4,3 +4,7 @@ QA_HANDOFF.md
 # OS junk
 .DS_Store
 Thumbs.db
+
+# Local test-data drop (large; its README documents shared test credentials).
+# Never commit it.
+incoming-data/

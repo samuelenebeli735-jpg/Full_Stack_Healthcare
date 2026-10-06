@@ -1,5 +1,7 @@
 # SHMS Tier-3 Authorization Upgrade — Final Report
 
+> **Superseded in part (note added 2026-10-06).** This report records the state on 2026-09-13. Its RLS sections (§6, and the "RLS absent / not active" items) are out of date: PostgreSQL Row-Level Security was enabled and forced on all tenant tables the next day, and the application now connects as the non-superuser `shms_app` role. See `SHMS4_RLS_IMPLEMENTATION_REPORT.md` and `SHMS6_PHASE3A_TENANCY_HARDENING_REPORT.md` for the current tenancy design. The rate limiting described here was also reworked: limits are now per signed-in user, and sign-in limits count failed attempts only (`src/middleware/rateLimiter.middleware.js`).
+
 **Date:** 2026-09-13
 **Scope:** 16-phase Tier-3 authorization upgrade: ABAC, zero-trust endpoint audit, continuous (lightweight) session-risk evaluation, PostgreSQL RLS evaluation, tenant-aware database isolation and query/index hardening.
 **Constraint honored:** RBAC retained as the base layer; ABAC layers on top of it. Cross-tenant and other sensitive behaviors were analyzed rigorously; nothing is claimed as working unless verified.

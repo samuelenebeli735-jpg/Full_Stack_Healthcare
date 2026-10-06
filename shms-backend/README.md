@@ -1,3 +1,17 @@
+# SHMS backend
+
+> **Status (2026-10-06).** All modules listed below are implemented, including
+> notifications, dashboards (with health analytics), reports, list
+> search/pagination/filtering via query parameters, tenant isolation (PostgreSQL RLS, runtime role `shms_app`) and security
+> hardening. The current work is defect remediation and deployment readiness;
+> section **9. Operations** at the end describes how to run it.
+>
+> Everything between this note and section 9 is the original build log and
+> planning notes, kept for history. Its "next step" and "roadmap" items
+> (for example "Notifications ← Next") are **not** the current plan.
+
+---
+
 Perfect. We're still on track.
 
 From what we've built so far, your backend now contains:
@@ -662,7 +676,7 @@ Before deployment, every endpoint should be tested for:
 
 ---
 
-## Current roadmap
+## Current roadmap (historical — superseded, see the status note at the top)
 
 I'd recommend this order:
 
@@ -883,18 +897,35 @@ If you want the next response to be built on this reconstructed baseline, I’ll
 
 The application is a single Node process (Node 22+ / PM2) backed by a single
 PostgreSQL database. State is in-process (in-memory rate-limit counters via
-express-rate-limit), so run ONE instance per database. If you later need
-multi-instance, add a shared rate-limit/state store first.
+express-rate-limit), so run ONE instance per database (`ecosystem.config.cjs`
+defaults to one; `PM2_INSTANCES` overrides it). If you later need
+multi-instance, add a shared rate-limit/state store first: with N processes
+every limit, including failed sign-ins, becomes N times larger.
+
+Times are interpreted in the server's local time zone, which must be the
+clinic's wall-clock zone (`TZ=Africa/Lagos` for the current deployment).
+Containers default to UTC, so `docker-compose.yml` sets `TZ`.
 
 ### Environment (`.env`)
 - `DATABASE_URL` — PostgreSQL connection string (required).
 - `JWT_SECRET` — token signing secret (required).
 - `JWT_EXPIRES_IN` — JWT lifetime (e.g. `24h`); defaults to `1h` if unset or empty.
-- `PORT` (default 5000), `NODE_ENV`, `CORS_ORIGINS`, `FRONTEND_URL`, `EMAIL_WEBHOOK_URL`.
+- `PORT` (default 5000), `NODE_ENV`, `CORS_ORIGINS`, `FRONTEND_URL`.
+- `HOST` — listen address, default `127.0.0.1` (local only). Use `0.0.0.0`
+  in containers or when a proxy on another host forwards to the API.
+- `EMAIL_WEBHOOK_URL` — email provider endpoint. While it is empty no email is
+  sent, nothing sensitive is logged, and "forgot password" answers that reset by
+  email is not available yet (HTTP 503) instead of claiming a link was sent.
+- `TRUST_PROXY` — set (e.g. `1`) only behind a reverse proxy, so rate limits
+  and audit see the real client IP.
+- `API_RATE_LIMIT_MAX`, `LOGIN_RATE_LIMIT_MAX`, `REGISTER_RATE_LIMIT_MAX` —
+  per-15-minute limits (per signed-in user; failed sign-ins per IP and account;
+  registrations per IP).
 
 ### Run
 - `npm start` or `npm run dev`.
-- PM2 cluster: `npm run cluster` (note: per-process in-memory rate limiting).
+- PM2: `npm run cluster` (one instance by default; see the note above on
+  per-process rate limiting before raising `PM2_INSTANCES`).
 - **Docker:** `docker compose up -d` builds and runs the single API image. It
   connects to the host PostgreSQL through the `DATABASE_URL` you set in `.env`
   (use a host-gateway address such as `host.docker.internal` from the container).

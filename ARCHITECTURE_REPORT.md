@@ -1,7 +1,7 @@
 # SHMS Current-State Architecture Report
 
 **Project:** Student Health Management System (SHMS)
-**Date:** 2026-09-22
+**Date:** 2026-09-22 (corrected 2026-10-06: audit-log enforcement mechanism and which pages are stubs; see the notes marked *Correction*)
 **Scope:** Full read-only inspection of backend, frontend, database, and infrastructure
 
 ---
@@ -56,9 +56,9 @@ C:\Users\samue\Desktop\TO\
 │   ├── analytics/                   # Analytics page
 │   ├── ai/                          # AI Symptom Checker (frontend stub)
 │   ├── lab/                         # Lab Results (frontend stub)
-│   ├── pharmacy/                    # Pharmacy (frontend stub)
+│   ├── pharmacy/                    # Pharmacy (prescriptions from the API)
 │   ├── telecom/                     # Telemedicine (frontend stub)
-│   ├── records/                     # Records (frontend stub)
+│   ├── records/                     # Records (student medical records from the API)
 │   ├── components/                  # Reusable HTML components
 │   ├── js/
 │   │   ├── config.js                # Base URL resolution
@@ -106,9 +106,9 @@ C:\Users\samue\Desktop\TO\
 | `analytics/index.html` | Admin/SA | Analytics dashboard |
 | `ai/index.html` | All | AI Symptom Checker (frontend stub) |
 | `lab/index.html` | All | Lab Results (frontend stub) |
-| `pharmacy/index.html` | All | Pharmacy (frontend stub) |
+| `pharmacy/index.html` | All | Pharmacy: prescriptions from the API (no dispensing workflow) |
 | `telecom/index.html` | All | Telemedicine (frontend stub) |
-| `records/index.html` | All | Records (frontend stub) |
+| `records/index.html` | All | Records: the student's own medical records from the API |
 
 ### 2.3 JS Module Architecture
 
@@ -240,7 +240,7 @@ Key performance indexes added in migration `20260913133128`:
 
 ### 4.5 Migrations (28 total)
 
-Chronological (Jul–Sep 2026): Organization → User → Profile → User email unique → MedicalRecords → Departments → Positions → Staff → Services → Appointments → Queue → Schedule → Consultation → AuditLogs → Prescription → Notifications → ResetToken → QueueDateUnique → Multitenant Indexes → Ensure `shms_app` role → **RLS Enable** → **RLS Fix Functions** → **Route Context Function** → Harden Tenant Reproducibility → **Medical Record Numbering** (adds `MedicalRecordCounter` + per-org `/ORG{Y}/{MM}` counter) → Align Counter Seed → **AuditLog Append-Only** (20260925120000 + 20260925120001 — table/function/trigger contract, forbids UPDATE/DELETE on `AuditLog`)
+Chronological (Jul–Sep 2026): Organization → User → Profile → User email unique → MedicalRecords → Departments → Positions → Staff → Services → Appointments → Queue → Schedule → Consultation → AuditLogs → Prescription → Notifications → ResetToken → QueueDateUnique → Multitenant Indexes → Ensure `shms_app` role → **RLS Enable** → **RLS Fix Functions** → **Route Context Function** → Harden Tenant Reproducibility → **Medical Record Numbering** (adds `MedicalRecordCounter` + per-org `/ORG{Y}/{MM}` counter) → Align Counter Seed → **AuditLog Append-Only** (20260925120000 + 20260925120001 — REVOKE of UPDATE/DELETE from `shms_app`; the first migration also added a trigger, which the second one drops)
 
 ---
 
@@ -341,7 +341,7 @@ All routes under `/api/v1/`. `*` = see note below the table:
 | **Dashboard** | `/dashboard/` (GET), `/dashboard/appointments`, `/dashboard/queue`, `/dashboard/health` | GET, GET, GET, GET | Staff/Admin/SA, Staff/Admin/SA, Staff/Admin/SA, Staff/Admin/SA |
 | **Reports** | `/reports/appointments`, `/reports/consultations`, `/reports/patients`, `/reports/staff` | GET, GET, GET, GET | Admin/SA, Admin/SA, Admin/SA, Admin/SA |
 
-\* `AuditLog` is **append-only** (enforced by application `removeAuditLog` throwing 403 and by database trigger/contract from migrations `20260925120000`/`20260925120001`); the `DELETE /audit/:id` route exists but always fails.
+\* `AuditLog` is **append-only** (enforced by application `removeAuditLog` throwing 403 and by the REVOKE of UPDATE/DELETE on `AuditLog` from the `shms_app` role in `20260925120000`. *Correction:* there is no database trigger; `20260925120001` drops the one `20260925120000` created, because it blocked the `ON DELETE SET NULL` foreign-key maintenance); the `DELETE /audit/:id` route exists but always fails.
 
 ---
 
@@ -454,13 +454,13 @@ All routes under `/api/v1/`. `*` = see note below the table:
 2. **`tenant.middleware.js` is dead code** — Defined but never imported or mounted on any route. Tenant validation happens in the service layer (`withTenant`/`resolveUserScope`). The middleware file is inert.
 3. **In-process rate limiting only** — `apiLimiter` (200 req/15 min global), `authLimiter` (30 req/15 min on `/api/v1/auth`), `passwordResetLimiter` (5 req/h on forgot/reset). No distributed limiter (no Redis).
 4. **JWT expiry default 1h** — no refresh token mechanism.
-5. **Audit log deletion blocked (append-only)** — The `DELETE /audit/:id` route exists but `removeAuditLog` throws 403 ("Audit log is append-only and cannot be deleted."), reinforced by DB trigger/contract migrations `20260925120000`/`20260925120001`.
+5. **Audit log deletion blocked (append-only)** — The `DELETE /audit/:id` route exists but `removeAuditLog` throws 403 ("Audit log is append-only and cannot be deleted."), reinforced at the database by the REVOKE of UPDATE/DELETE from `shms_app` (`20260925120000`; the trigger it created is dropped by `20260925120001`).
 
 ### 12.3 Architecture
 1. **No automated tests** — Zero test coverage.
 2. **No TypeScript** — No static type checking.
 3. **Frontend is vanilla JS** — No framework, no build step, no component system.
-4. **Several frontend pages are stubs** — AI, Lab, Pharmacy, Telemedicine, Records are placeholder UIs with no backend.
+4. **Several frontend pages are stubs** — AI, Lab and Telemedicine are placeholder UIs with no backend (they are labelled as not available yet). *Correction:* Pharmacy and Records read real prescriptions and medical records.
 5. **No WebSocket/real-time** — Queue updates require manual refresh or 30s polling.
 6. **No background job processing** — `jobs/` directory is empty. Notifications are synchronous.
 7. **No email service** — `email.js` exists but `EMAIL_WEBHOOK_URL` is optional and likely unconfigured.
@@ -481,7 +481,7 @@ All routes under `/api/v1/`. `*` = see note below the table:
 | No automated tests | High | Add test suite before any refactoring |
 | No refresh tokens | Medium | Implement token rotation or refresh flow |
 | Dashboard perf at scale (10k+ users/org) | Medium | Consider materialized counts, caching, or `Profile.organizationId` |
-| Frontend stubs (AI, Lab, Pharmacy, Telecom) | Medium | Complete or remove before production |
+| Frontend stubs (AI, Lab, Telecom) | Medium | Complete or remove before production |
 | No real-time queue updates | Medium | Add WebSocket or SSE for live queue |
 | In-process rate limiting only (not distributed, no Redis) | Medium | Add Redis-backed limiter if load grows past a single instance |
 | Single-process deployment (no clustering) | Low | PM2 cluster mode or Kubernetes |
