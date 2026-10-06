@@ -4,6 +4,10 @@ import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantCon
 import { findUserOrgHint } from "../repositories/user.repository.js";
 import { getPagination, buildPaginationMeta } from "../utils/pagination.js";
 
+// Identical medical-record list reads by the same user within this window
+// are audited once (see getOrganizationMedicalRecords).
+const READ_AUDIT_DEDUPE_MS = 10 * 60 * 1000;
+
 import {
   findMedicalRecordByProfileId,
   findMedicalRecordById,
@@ -157,13 +161,34 @@ export async function getOrganizationMedicalRecords(user, query = {}) {
      succeeded, so a rejected read can never produce a misleading READ event.
      Cross-organization super_admin reads carry no organizationId, and the audit
      schema requires one, so they are intentionally not logged here. */
-  if (organizationId) {
+  /* Each distinct list read (page, limit, search) is audited. An identical
+     read by the same user within the dedupe window (for example an automatic
+     dashboard refresh of the same view) is not written again, so the
+     append-only trail records real access without per-poll noise. */
+  const searchNote = query.search ? `, search "${String(query.search).slice(0, 100)}"` : "";
+  const description = `Medical records list read (${total} record${total === 1 ? "" : "s"} returned, page ${page}, limit ${limit}${searchNote}).`;
+  const alreadyAudited = organizationId
+    ? await withTenant(organizationId, (tx) =>
+        tx.auditLog.findFirst({
+          where: {
+            userId: user.id,
+            action: "READ",
+            entity: "MedicalRecord",
+            description,
+            createdAt: { gte: new Date(Date.now() - READ_AUDIT_DEDUPE_MS) },
+          },
+          select: { id: true },
+        })
+      )
+    : null;
+
+  if (organizationId && !alreadyAudited) {
     await auditLogger({
       organizationId,
       userId: user.id,
       action: "READ",
       entity: "MedicalRecord",
-      description: `Medical records list read (${total} record${total === 1 ? "" : "s"} returned, page ${page}, limit ${limit}).`,
+      description,
     });
   }
 

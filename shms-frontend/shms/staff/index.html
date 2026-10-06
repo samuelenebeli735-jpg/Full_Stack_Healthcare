@@ -452,16 +452,21 @@
             document.getElementById('longWait').textContent = max + ' min';
           }
         }
+        // "Currently serving" comes from the queue already loaded above (in
+        // consultation first, else called) instead of a second queue request.
+        const serving = queueData.find((p) => p.queueStatus === 'in_progress') || queueData.find((p) => p.queueStatus === 'called');
+        document.getElementById('currentServingStaff').textContent = serving ? serving.ticket : '--';
       } catch(e) {}
-      try {
-        const queueRes = await API.getQueue();
-        if (queueRes.success) {
-          document.getElementById('currentServingStaff').textContent = queueRes.data.current_serving || '--';
-        }
-      } catch(e) {}
-      loadHealthAnalytics();
-      loadRecentPatientRecords();
+      /* Health analytics and the recent-records list change slowly; refresh
+         them every few minutes rather than on every 15-second queue poll. */
+      if (Date.now() - lastSlowRefresh >= SLOW_REFRESH_MS) {
+        lastSlowRefresh = Date.now();
+        loadHealthAnalytics();
+        loadRecentPatientRecords();
+      }
     }
+    const SLOW_REFRESH_MS = 5 * 60 * 1000;
+    let lastSlowRefresh = 0;
 
     async function loadHealthAnalytics() {
       const donutEl = document.getElementById('healthDonut');
@@ -1274,7 +1279,9 @@
       document.getElementById('viewWaiting')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('queue'); });
       document.getElementById('viewInConsultation')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('queue'); });
       document.getElementById('viewAllRecords')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('patients'); });
-      setInterval(loadStaffDashboard, 15000);
+      // Live queue refresh; paused while the tab is hidden, refreshed on return.
+      setInterval(() => { if (!document.hidden) loadStaffDashboard(); }, 15000);
+      document.addEventListener('visibilitychange', () => { if (!document.hidden) loadStaffDashboard(); });
     });
   </script>
 </body>

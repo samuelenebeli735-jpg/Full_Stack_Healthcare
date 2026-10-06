@@ -334,7 +334,7 @@
       updateGreeting();
       loadComponents();
       loadDashboard();
-      setInterval(loadDashboard, 60000);
+      setInterval(() => { if (!document.hidden) loadDashboard(); }, 60000);
     });
   </script>
 </body>

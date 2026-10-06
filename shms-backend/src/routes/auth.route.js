@@ -2,7 +2,11 @@ import { Router } from "express";
 
 import validate from "../middleware/validate.middleware.js";
 import authenticate from "../middleware/auth.middleware.js";
-import { passwordResetLimiter } from "../middleware/rateLimiter.middleware.js";
+import {
+  loginLimiter,
+  registerLimiter,
+  passwordResetLimiter,
+} from "../middleware/rateLimiter.middleware.js";
 
 import {
   register,
@@ -29,16 +33,20 @@ const router = Router();
 
 router.post(
   "/register",
+  registerLimiter,
   validate({ body: registerSchema }),
   register
 );
 
 router.post(
   "/login",
+  loginLimiter,
   validate({ body: loginSchema }),
   login
 );
 
+// Called on every page load; authenticated, so covered by the per-user API
+// limiter rather than an auth bucket that would log people out.
 router.get(
   "/verify",
   authenticate,

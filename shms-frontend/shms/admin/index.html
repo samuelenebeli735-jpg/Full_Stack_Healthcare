@@ -868,7 +868,7 @@
         document.addEventListener('click', (e) => { if (!e.target.closest('.dropdown')) document.querySelectorAll('.dropdown-menu.active').forEach(m => m.classList.remove('active')); });
       }, 100);
       await loadOverview();
-      setInterval(loadOverview, 30000);
+      setInterval(() => { if (!document.hidden) loadOverview(); }, 30000);
     });
   </script>
 </body>

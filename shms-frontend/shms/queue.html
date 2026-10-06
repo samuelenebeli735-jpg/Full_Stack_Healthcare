@@ -518,7 +518,7 @@
           });
         }
       }
-      setInterval(loadQueueData, 15000);
+      setInterval(() => { if (!document.hidden) loadQueueData(); }, 15000);
     });
   </script>
 </body>

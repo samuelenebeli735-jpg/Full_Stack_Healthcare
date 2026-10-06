@@ -472,7 +472,7 @@
         });
       }, 100);
       await refreshNotifications();
-      setInterval(pollNotifications, 30000);
+      setInterval(() => { if (!document.hidden) pollNotifications(); }, 30000);
       document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           document.querySelectorAll('.filter-btn').forEach(b => {

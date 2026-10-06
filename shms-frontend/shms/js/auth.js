@@ -398,7 +398,7 @@ const Auth = {
     if (!isNotificationCenter) {
       fetchNotifs();
       setInterval(() => {
-        if (this.isAuthenticated()) fetchNotifs();
+        if (!document.hidden && this.isAuthenticated()) fetchNotifs();
       }, 30000);
     }
   },
