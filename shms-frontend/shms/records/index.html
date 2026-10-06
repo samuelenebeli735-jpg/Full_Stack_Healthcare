@@ -74,6 +74,10 @@
       try {
         const res = await API.getMedicalRecords();
         const container = document.getElementById('recordsContainer');
+        if (res.unavailable) {
+          container.innerHTML = `<div class="empty-state"><div class="empty-state-icon">📄</div><h3>Not available for this account</h3><p>${Utils.sanitize(res.message || '')}</p></div>`;
+          return;
+        }
         if (!res.success || res.data.length === 0) {
           container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📄</div><h3>No Records Found</h3><p>Your medical records will appear here after your first visit.</p></div>';
           return;

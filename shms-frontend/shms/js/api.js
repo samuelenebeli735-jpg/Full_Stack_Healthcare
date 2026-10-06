@@ -30,7 +30,6 @@ const API = (() => {
 
   /* Cache of resolved master data used by the booking flow. */
   let servicesCache = [];
-  let staffCache = [];
   let queueIdByTicket = {};
 
   const _request = async (method, endpoint, body) => {
@@ -84,7 +83,9 @@ const API = (() => {
       const params = [];
       if (page > 1) params.push(`page=${page}`);
       if (limit) params.push(`limit=${limit}`);
-      const suffix = params.length ? `?${params.join('&')}` : '';
+      // The endpoint may already carry a query string (filters/search).
+      const sep = endpoint.includes('?') ? '&' : '?';
+      const suffix = params.length ? `${sep}${params.join('&')}` : '';
       const res = await _request('GET', `${endpoint}${suffix}`);
       const data = res.data || {};
       const items = (data && data.items) || res.data || [];
@@ -97,6 +98,29 @@ const API = (() => {
   };
 
   /* ---------- small helpers ---------- */
+
+  /* Build "?a=1&b=2" from defined, non-empty values (URL-encoded). */
+  const _qs = (params = {}) => {
+    const parts = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== null && v !== '')
+      .map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`);
+    return parts.length ? `?${parts.join('&')}` : '';
+  };
+
+  /* One page of a paginated list, returned with its pagination metadata so
+     views can show page controls instead of silently stopping at page 1. */
+  const _page = async (endpoint, params = {}) => {
+    const res = await _request('GET', `${endpoint}${_qs(params)}`);
+    const data = res.data || {};
+    return {
+      items: (data && data.items) || [],
+      pagination: (data && data.pagination) || { page: 1, totalPages: 1, total: ((data && data.items) || []).length },
+    };
+  };
+
+  /* Today's date as YYYY-MM-DD in the browser's local time (not UTC). */
+  const _localDate = (d = new Date()) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
   const _staffName = (staff) => {
     if (!staff) return 'Any available doctor';
@@ -272,23 +296,10 @@ const API = (() => {
     const orgId = _orgId();
     if (!orgId) return {};
     if (servicesCache.length === 0) {
-      const res = await _request('GET', `/services/organization/${orgId}`);
-      servicesCache = (res.data && res.data.items) || res.data || [];
+      servicesCache = await _allPages(`/services/organization/${orgId}`, 100);
     }
     const map = {};
     servicesCache.forEach((s) => { map[s.name.toLowerCase()] = s; });
-    return map;
-  };
-
-  const _staffById = async () => {
-    const orgId = _orgId();
-    if (!orgId) return {};
-    if (staffCache.length === 0) {
-      const res = await _request('GET', `/staff/organization/${orgId}`);
-      staffCache = (res.data && res.data.items) || res.data || [];
-    }
-    const map = {};
-    staffCache.forEach((s) => { map[s.id] = s; });
     return map;
   };
 
@@ -481,16 +492,33 @@ const API = (() => {
     },
 
     /* ---------- Appointments ---------- */
-    async getAppointments() {
+    /* Students: all of their own appointments.
+       Staff/admin: organization appointments with optional server-side
+       filters { status, date (YYYY-MM-DD), search, sort, order }. With
+       `page` set, one page is returned with its pagination metadata;
+       otherwise every matching page is fetched, so nothing is silently cut
+       off at the backend's default page size. */
+    async getAppointments(options = {}) {
       const role = _role();
       const orgId = _orgId();
-      let items = [];
       if (role === 'student') {
-        items = await _allPages('/appointments/my');
-      } else {
-        const res = await _request('GET', `/appointments/organization/${orgId}`);
-        items = (res.data && res.data.items) || [];
+        const items = await _allPages('/appointments/my');
+        return { success: true, data: items.map(_mapAppointment) };
       }
+      const filters = {
+        status: options.status,
+        appointmentDate: options.date,
+        search: options.search,
+        sort: options.sort,
+        order: options.order,
+      };
+      if (options.page) {
+        const { items, pagination } = await _page(`/appointments/organization/${orgId}`, {
+          ...filters, page: options.page, limit: options.limit || 20,
+        });
+        return { success: true, data: items.map(_mapAppointment), pagination };
+      }
+      const items = await _allPages(`/appointments/organization/${orgId}${_qs(filters)}`, 100);
       return { success: true, data: items.map(_mapAppointment) };
     },
     async bookAppointment(data) {
@@ -509,9 +537,10 @@ const API = (() => {
         throw new Error('Complete your medical profile first before booking.');
       }
 
-      const staffMap = await _staffById();
-      const staffId = data.doctor_id || data.staffId || data.doctorId || null;
-      const resolvedStaffId = staffId && staffMap[staffId] ? staffId : null;
+      /* A chosen doctor is always sent; the backend validates that the staff
+         member exists, is active and belongs to this organization. It is never
+         silently dropped because a local cache was incomplete. */
+      const resolvedStaffId = data.doctor_id || data.staffId || data.doctorId || null;
 
       const date = data.date || data.appointmentDate || '';
       const time = data.time || '09:00';
@@ -546,20 +575,24 @@ const API = (() => {
       const res = await _request('PATCH', `/appointments/${id}`, body);
       return { success: true, data: _mapAppointment(res.data) };
     },
-    async getAppointmentHistory() {
+    /* Students: their full appointment history. Staff/admin: an explicit,
+       paginated view of completed organization appointments (newest first)
+       rather than the old silent first-page-only slice. */
+    async getAppointmentHistory(options = {}) {
       const role = _role();
-      let items = [];
       if (role === 'student') {
-        items = await _allPages('/appointments/my');
-      } else {
-        const orgId = _orgId();
-        const res = await _request('GET', `/appointments/organization/${orgId}`);
-        items = (res.data && res.data.items) || [];
+        const items = await _allPages('/appointments/my');
+        const history = items
+          .filter((a) => a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show')
+          .map(_mapAppointment);
+        return { success: true, data: history };
       }
-      const history = items
-        .filter((a) => a.status === 'completed' || a.status === 'cancelled' || a.status === 'no_show')
-        .map(_mapAppointment);
-      return { success: true, data: history };
+      const orgId = _orgId();
+      const { items, pagination } = await _page(`/appointments/organization/${orgId}`, {
+        status: options.status || 'completed', sort: 'appointmentDate', order: 'desc',
+        page: options.page || 1, limit: options.limit || 20,
+      });
+      return { success: true, data: items.map(_mapAppointment), pagination };
     },
     async cancelAppointment(id, reason) {
       const res = await _request('POST', `/appointments/${id}/cancel`, { reason });
@@ -660,8 +693,7 @@ const API = (() => {
     /* ---------- Doctors / Staff ---------- */
     async getDoctors() {
       const orgId = _orgId();
-      const all = await _allPages(`/staff/organization/${orgId}`);
-      staffCache = all;
+      const all = await _allPages(`/staff/organization/${orgId}`, 100);
       return { success: true, data: all.map(_mapStaffDoctor) };
     },
     async getAvailableDoctors() {
@@ -723,10 +755,18 @@ const API = (() => {
     deleteDoctor: (id) => _request('DELETE', `/staff/${id}`),
 
     /* ---------- Students ---------- */
-    async getStudents() {
-      const res = await _request('GET', '/medical-records');
-      const items = (res.data && res.data.items) || res.data || [];
-      return { success: true, data: items.map(_mapPatient) };
+    /* Organization patient records, server-side paginated and searchable
+       (name, matric, record number, email). Returns pagination metadata so
+       lists can page instead of stopping at the backend default of 20. */
+    async getStudents(options = {}) {
+      const { items, pagination } = await _page('/medical-records', {
+        search: options.search,
+        sort: options.sort || 'createdAt',
+        order: options.order || 'desc',
+        page: options.page || 1,
+        limit: options.limit || 20,
+      });
+      return { success: true, data: items.map(_mapPatient), pagination };
     },
     /* Genuinely most-recent medical records for this organization. The
        backend already supports `sort`, `order` and `limit` on
@@ -759,14 +799,12 @@ const API = (() => {
     /* ---------- Master data ---------- */
     async getDepartments() {
       const orgId = _orgId();
-      const res = await _request('GET', `/departments/organization/${orgId}`);
-      const items = (res.data && res.data.items) || res.data || [];
+      const items = await _allPages(`/departments/organization/${orgId}`, 100);
       return { success: true, data: items.map((d) => d.name) };
     },
     async getServices() {
       const orgId = _orgId();
-      const res = await _request('GET', `/services/organization/${orgId}`);
-      const items = (res.data && res.data.items) || res.data || [];
+      const items = await _allPages(`/services/organization/${orgId}`, 100);
       servicesCache = items;
       return { success: true, data: items.map((s) => s.name) };
     },
@@ -1112,7 +1150,7 @@ const API = (() => {
     },
 
     /* ---------- Clinical / ancillary ---------- */
-    async getPrescriptions() {
+    async getPrescriptions(options = {}) {
       const role = _role();
       if (role === 'student') {
         const items = await _allPages('/appointments/my');
@@ -1134,24 +1172,26 @@ const API = (() => {
         });
         return { success: true, data: out };
       }
-      const res = await _request('GET', '/prescriptions');
-      const items = (res.data && res.data.items) || res.data || [];
-      return {
-        success: true,
-        data: items.map((p) => {
-          const item = (p.items && p.items[0]) || {};
-          return {
+      /* Staff/admin: one page of organization prescriptions (newest first),
+         with every medication line of each prescription, plus pagination. */
+      const { items, pagination } = await _page('/prescriptions', {
+        page: options.page || 1, limit: options.limit || 20,
+      });
+      const out = [];
+      items.forEach((p) => {
+        const staff = p.consultation && p.consultation.queue && p.consultation.queue.appointment && p.consultation.queue.appointment.staff;
+        (p.items || []).forEach((item) => {
+          out.push({
             id: p.id,
             medication: item.medicationName || 'Medication',
             dosage: item.dosage || '',
             status: 'dispensed',
             date: p.createdAt || '',
-            prescribed_by: p.consultation && p.consultation.queue && p.consultation.queue.appointment && p.consultation.queue.appointment.staff
-              ? _staffName(p.consultation.queue.appointment.staff)
-              : 'Doctor',
-          };
-        }),
-      };
+            prescribed_by: staff ? _staffName(staff) : 'Doctor',
+          });
+        });
+      });
+      return { success: true, data: out, pagination };
     },
     getLabResults: async () => ({ success: true, data: [] }),
     getTelecomConsultations: async () => ({ success: true, data: [] }),
@@ -1174,17 +1214,15 @@ const API = (() => {
           }),
         };
       }
-      const res = await _request('GET', '/medical-records');
-      const items = (res.data && res.data.items) || res.data || [];
+      /* This timeline is a student's own consultation history. For staff and
+         admin there is no such personal timeline; instead of fabricating
+         "checkup by Health Center" entries from a first page of records, say
+         so plainly (patient records are under Staff > Patients). */
       return {
-        success: true,
-        data: items.map((r) => ({
-          type: 'checkup',
-          date: r.createdAt || '',
-          doctor: 'Health Center',
-          diagnosis: '',
-          notes: `Record ${r.recordNumber || ''}`.trim(),
-        })),
+        success: false,
+        data: [],
+        unavailable: true,
+        message: 'This page shows a student’s own consultation records. Staff can look up patient records under Patients.',
       };
     },
 
@@ -1194,8 +1232,10 @@ const API = (() => {
        an existing consultation/prescription is found even when it falls after
        the first page. The backend uniqueness constraints remain final. */
     async getConsultationByQueueId(queueId) {
-      const items = await _allPages('/consultations', 100);
-      const found = items.find((c) => c.queue && c.queue.id === queueId) || null;
+      // Server-side filter (one consultation per queue entry) instead of
+      // downloading every consultation in the organization.
+      const { items } = await _page('/consultations', { queueId, limit: 1 });
+      const found = items.find((c) => c.queue && c.queue.id === queueId) || items.find((c) => c.queueId === queueId) || null;
       return { success: true, data: found ? _mapConsultation(found) : null };
     },
     async createConsultation(data) {
@@ -1205,8 +1245,9 @@ const API = (() => {
       return _request('PATCH', `/consultations/${id}`, data);
     },
     async getPrescriptionByConsultation(consultationId) {
-      const items = await _allPages('/prescriptions', 100);
-      const found = items.find((p) => p.consultation && p.consultation.id === consultationId) || null;
+      // Server-side filter (one prescription per consultation).
+      const { items } = await _page('/prescriptions', { consultationId, limit: 1 });
+      const found = items.find((p) => (p.consultation && p.consultation.id === consultationId) || p.consultationId === consultationId) || null;
       return { success: true, data: found ? _mapPrescription(found) : null };
     },
     async createPrescription(data) {
@@ -1217,26 +1258,30 @@ const API = (() => {
     },
 
     /* ---------- Patient search (staff) ---------- */
-    async searchPatients(query) {
-      const res = await this.getStudents();
-      const q = String(query || '').toLowerCase();
-      const filtered = res.data.filter((p) =>
-        p.full_name.toLowerCase().includes(q) ||
-        p.matric.toLowerCase().includes(q) ||
-        p.email.toLowerCase().includes(q)
-      );
-      return { success: true, data: filtered };
+    /* Server-side search across the whole organization (name, matric,
+       record number, email), not a filter over the first page of records. */
+    async searchPatients(query, options = {}) {
+      return this.getStudents({ search: String(query || '').trim(), page: options.page || 1, limit: options.limit || 20 });
     },
     async lookupPatient(matric) {
-      const res = await this.getStudents();
-      const found = res.data.find((p) => p.matric.toLowerCase() === String(matric || '').toLowerCase());
+      const wanted = String(matric || '').trim().toLowerCase();
+      if (!wanted) return { success: true, data: null };
+      const res = await this.getStudents({ search: wanted, limit: 100 });
+      const found = res.data.find((p) => p.matric.toLowerCase() === wanted);
       return { success: true, data: found || null };
     },
 
     /* ---------- Legacy admin lists ---------- */
-    async getAllAppointments() {
-      const res = await this.getAppointments();
-      return { success: true, data: res.data };
+    /* Admin appointments table: one server-side page (optionally filtered by
+       status), newest first, with pagination metadata. */
+    async getAllAppointments(options = {}) {
+      return this.getAppointments({
+        page: options.page || 1,
+        limit: options.limit || 20,
+        status: options.status,
+        sort: 'appointmentDate',
+        order: 'desc',
+      });
     },
   };
 })();

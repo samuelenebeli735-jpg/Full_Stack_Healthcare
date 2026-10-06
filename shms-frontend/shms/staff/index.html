@@ -440,7 +440,8 @@
           document.getElementById('sChecked').textContent = d.checked_in;
           document.getElementById('sWaiting').textContent = d.waiting;
           document.getElementById('sConsult').textContent = d.in_consultation;
-          document.getElementById('queueCount').textContent = d.queue_list.length + ' waiting';
+          // Only entries the backend reports as waiting (not called/served/closed).
+          document.getElementById('queueCount').textContent = d.queue_list.filter((p) => p.queueStatus === 'waiting').length + ' waiting';
           queueData = d.queue_list;
           renderQueue();
           const waits = queueData.filter((p) => p.estimated_wait_minutes > 0).map((p) => p.estimated_wait_minutes);
@@ -632,11 +633,21 @@
     async function loadStaffAppointments() {
       const container = document.getElementById('staffAppointmentsList');
       try {
-        const res = await API.getAppointments();
-        staffAppointments = res.success ? res.data : [];
+        /* Everything still awaiting confirmation plus everything booked for
+           today, fetched in full with server-side filters, so an appointment
+           that needs confirming before check-in can never fall off a page. */
+        const now = new Date();
+        const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const [pending, todays] = await Promise.all([
+          API.getAppointments({ status: 'scheduled', sort: 'appointmentDate', order: 'asc' }),
+          API.getAppointments({ date: today, sort: 'appointmentDate', order: 'asc' }),
+        ]);
+        const byId = new Map();
+        [...(pending.success ? pending.data : []), ...(todays.success ? todays.data : [])].forEach((a) => byId.set(a.id, a));
+        staffAppointments = [...byId.values()].sort((a, b) => new Date(a.appointmentDate) - new Date(b.appointmentDate));
         container.innerHTML = '';
         if (!staffAppointments.length) {
-          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128197;</div><h3>No appointments found</h3></div>';
+          container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">&#128197;</div><h3>No appointments awaiting confirmation or booked for today</h3></div>';
           return;
         }
         staffAppointments.forEach(appointment => {

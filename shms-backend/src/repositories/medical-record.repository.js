@@ -105,7 +105,7 @@ export async function findMedicalRecords(
   const prismaQuery = buildPrismaQuery(query, {
     allowedSortFields: ["recordNumber", "recordYear", "status", "createdAt"],
     defaultSort: { recordNumber: "asc" },
-    searchFields: ["recordNumber", "profile.firstName", "profile.lastName", "profile.matricNumber"],
+    searchFields: ["recordNumber", "profile.firstName", "profile.lastName", "profile.matricNumber", "profile.user.email"],
   });
 
   if (organizationId) {

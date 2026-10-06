@@ -161,6 +161,7 @@
             <span class="badge badge-primary" id="studentCount">0 students</span>
           </div>
           <div class="table-container"><table class="table"><thead><tr><th>Matric</th><th>Name</th><th>Email</th><th>Faculty</th><th>Level</th><th>Actions</th></tr></thead><tbody id="studentsTableBody"></tbody></table></div>
+          <div class="pagination" id="studentsPagination"></div>
         </div>
 
         <!-- SCHEDULES TAB -->
@@ -188,12 +189,13 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap">
               <button class="btn btn-sm btn-primary filter-btn" data-filter="all" onclick="filterAdminAppts('all',this)">All</button>
               <button class="btn btn-sm btn-secondary filter-btn" data-filter="confirmed" onclick="filterAdminAppts('confirmed',this)">Confirmed</button>
-              <button class="btn btn-sm btn-secondary filter-btn" data-filter="pending" onclick="filterAdminAppts('pending',this)">Pending</button>
+              <button class="btn btn-sm btn-secondary filter-btn" data-filter="scheduled" title="Booked, awaiting staff confirmation" onclick="filterAdminAppts('scheduled',this)">Pending</button>
               <button class="btn btn-sm btn-secondary filter-btn" data-filter="completed" onclick="filterAdminAppts('completed',this)">Completed</button>
               <button class="btn btn-sm btn-secondary filter-btn" data-filter="cancelled" onclick="filterAdminAppts('cancelled',this)">Cancelled</button>
             </div>
           </div>
           <div class="table-container"><table class="table"><thead><tr><th>ID</th><th>Patient</th><th>Doctor</th><th>Service</th><th>Date</th><th>Status</th></tr></thead><tbody id="adminApptsBody"></tbody></table></div>
+          <div class="pagination" id="adminApptsPagination"></div>
         </div>
 
         <!-- REPORTS TAB -->
@@ -524,23 +526,30 @@
     }
 
     // ==================== STUDENTS ====================
-    async function loadStudents() {
+    /* Students are paged and searched on the server (the organization can
+       hold tens of thousands of records); the count is the real total. */
+    let studentsPage = 1;
+    let studentsSeq = 0;
+    async function loadStudents(page) {
+      if (page) studentsPage = page;
+      const seq = ++studentsSeq;
+      const search = (document.getElementById('studentSearch').value || '').trim();
       try {
-        const res = await API.getStudents();
-        if (!res.success) return;
+        const res = await API.getStudents({ page: studentsPage, search });
+        if (seq !== studentsSeq || !res.success) return;
         adminStudents = res.data;
-        renderStudents();
-      } catch(e) {}
+        renderStudents(res.pagination);
+      } catch(e) {
+        if (seq !== studentsSeq) return;
+        document.getElementById('studentsTableBody').innerHTML = '<tr><td colspan="6" class="text-center" style="padding:32px;color:var(--danger)">Could not load students. Please try again.</td></tr>';
+      }
     }
 
-    function renderStudents() {
-      const query = (document.getElementById('studentSearch').value || '').toLowerCase();
-      const filtered = adminStudents.filter(s =>
-        s.full_name.toLowerCase().includes(query) ||
-        (s.matric && s.matric.toLowerCase().includes(query)) ||
-        s.email.toLowerCase().includes(query)
-      );
-      document.getElementById('studentCount').textContent = filtered.length + ' students';
+    function renderStudents(pagination) {
+      const filtered = adminStudents;
+      const total = pagination && pagination.total != null ? pagination.total : filtered.length;
+      document.getElementById('studentCount').textContent = total + (total === 1 ? ' student' : ' students');
+      Utils.renderPagination(document.getElementById('studentsPagination'), studentsPage, (pagination && pagination.totalPages) || 1, (p) => loadStudents(p));
       const tbody = document.getElementById('studentsTableBody');
       tbody.innerHTML = '';
       if (filtered.length === 0) {
@@ -559,7 +568,7 @@
       });
     }
 
-    document.getElementById('studentSearch')?.addEventListener('input', renderStudents);
+    document.getElementById('studentSearch')?.addEventListener('input', Utils.debounce(() => loadStudents(1), 350));
 
     async function deactivateStudent(id) {
       if (!confirm('Deactivate this student account?')) return;
@@ -654,16 +663,30 @@
     }
 
     // ==================== APPOINTMENTS ====================
+    /* Server-side paging and status filtering: every appointment is
+       reachable, not just the first page of the newest 20. */
     let allAdminAppts = [];
+    let adminApptsFilter = 'all';
+    let adminApptsPage = 1;
+    let adminApptsSeq = 0;
 
-    async function loadAdminAppointments() {
+    async function loadAdminAppointments(page) {
+      if (page) adminApptsPage = page;
+      const seq = ++adminApptsSeq;
+      const tbody = document.getElementById('adminApptsBody');
       try {
-        const res = await API.getAllAppointments();
-        if (res.success) {
-          allAdminAppts = res.data;
-          filterAdminAppts('all');
-        }
-      } catch(e) {}
+        const res = await API.getAllAppointments({
+          page: adminApptsPage,
+          status: adminApptsFilter === 'all' ? undefined : adminApptsFilter,
+        });
+        if (seq !== adminApptsSeq || !res.success) return;
+        allAdminAppts = res.data;
+        Utils.renderPagination(document.getElementById('adminApptsPagination'), adminApptsPage, (res.pagination && res.pagination.totalPages) || 1, (p) => loadAdminAppointments(p));
+        renderAdminAppts();
+      } catch(e) {
+        if (seq !== adminApptsSeq) return;
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center" style="padding:32px;color:var(--danger)">Could not load appointments. Please try again.</td></tr>';
+      }
     }
 
     function filterAdminAppts(filter, btn) {
@@ -671,8 +694,12 @@
         b.className = b.className.replace('btn-primary', 'btn-secondary');
       });
       if (btn) btn.className = btn.className.replace('btn-secondary', 'btn-primary');
-      let filtered = allAdminAppts;
-      if (filter !== 'all') filtered = allAdminAppts.filter(a => a.status === filter);
+      adminApptsFilter = filter;
+      loadAdminAppointments(1);
+    }
+
+    function renderAdminAppts() {
+      const filtered = allAdminAppts;
       const tbody = document.getElementById('adminApptsBody');
       tbody.innerHTML = '';
       if (filtered.length === 0) {

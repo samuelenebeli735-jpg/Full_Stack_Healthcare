@@ -29,6 +29,7 @@
           <div class="card-body p-0" id="rxList">
             <div class="empty-state"><div class="empty-state-icon">💊</div><h3>No Prescriptions</h3><p>Prescribed medications will appear here.</p></div>
           </div>
+          <div class="pagination" id="rxPagination"></div>
         </div>
       </div>
     </div>
@@ -38,12 +39,19 @@
   <script src="../js/utils.js"></script>
   <script src="../js/auth.js"></script>
   <script>
-    async function loadPrescriptions() {
+    /* Staff/admin see organization prescriptions one server page at a time;
+       students see all of their own. */
+    let rxPage = 1;
+    async function loadPrescriptions(page) {
+      if (page) rxPage = page;
       try {
-        const res = await API.getPrescriptions();
+        const res = await API.getPrescriptions({ page: rxPage });
         if (res.success) {
           const data = res.data;
-          document.getElementById('totalRx').textContent = data.length;
+          const pg = document.getElementById('rxPagination');
+          if (res.pagination) Utils.renderPagination(pg, rxPage, res.pagination.totalPages || 1, (p) => loadPrescriptions(p));
+          else pg.innerHTML = '';
+          document.getElementById('totalRx').textContent = res.pagination && res.pagination.total != null ? res.pagination.total : data.length;
           document.getElementById('dispensedRx').textContent = data.filter(d => d.status === 'dispensed').length;
           document.getElementById('pendingRx').textContent = data.filter(d => d.status === 'pending').length;
           const container = document.getElementById('rxList');
@@ -63,7 +71,9 @@
             `;
           });
         }
-      } catch (e) {}
+      } catch (e) {
+        document.getElementById('rxList').innerHTML = '<div class="empty-state"><h3>Could not load prescriptions</h3><p>Please try again.</p></div>';
+      }
     }
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -78,7 +88,7 @@
         document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });
       }, 100);
       loadPrescriptions();
-      setInterval(loadPrescriptions, 30000);
+      setInterval(() => loadPrescriptions(), 30000);
     });
   </script>
 </body>
