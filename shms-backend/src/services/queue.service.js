@@ -184,11 +184,23 @@ export async function checkInPatient(data, user) {
           tx
         );
 
-        await updateAppointment(
-          appointment.id,
-          { status: "checked_in" },
-          tx
-        );
+        /* Compare-and-set: only a still-confirmed appointment, still at the
+           date validated above as today, becomes checked_in. If a concurrent
+           cancel/reschedule changed it after the pre-check, the queue row
+           created here is rolled back with this transaction instead of
+           leaving a live queue entry for a cancelled or moved appointment. */
+        const moved = await tx.appointment.updateMany({
+          where: {
+            id: appointment.id,
+            status: "confirmed",
+            appointmentDate: appointment.appointmentDate,
+          },
+          data: { status: "checked_in" },
+        });
+
+        if (moved.count === 0) {
+          throw new AppError("Cannot check in: the appointment was changed or cancelled. Refresh and try again.", 409);
+        }
 
         return queue;
       });
@@ -446,10 +458,28 @@ export async function skipPatient(organizationId, user) {
       tx
     );
 
-    return updated;
+    return {
+      updated,
+      patientUserId: currentPatient.appointment?.medicalRecord?.profile?.userId || null,
+      queueNumber: currentPatient.queueNumber,
+    };
   });
 
-  return result;
+  // Best-effort notification: the skipped patient's appointment was cancelled.
+  if (result.patientUserId) {
+    try {
+      await sendNotification(
+        result.patientUserId,
+        "Missed queue call",
+        `Queue number ${result.queueNumber} was called but not answered, so the appointment was cancelled. Please book a new appointment if you still need to be seen.`,
+        NOTIFICATION_TYPES.QUEUE
+      );
+    } catch (error) {
+      console.error("Failed to send queue skip notification:", error.message);
+    }
+  }
+
+  return result.updated;
 }
 
 export async function startConsultation(queueId, user) {

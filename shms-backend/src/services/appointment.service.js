@@ -7,6 +7,7 @@ import { auditLogger } from "../utils/auditLogger.js";
 import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantContext.js";
 import { NOTIFICATION_TYPES } from "../types/notificationType.js";
 import { sendNotification } from "./notification.service.js";
+import { formatLocalDateTime } from "../utils/dateFormat.js";
 
 import validateSchedule from "../utils/scheduleValidator.js";
 
@@ -22,10 +23,6 @@ import {
 import {
   findMedicalRecordById,
 } from "../repositories/medical-record.repository.js";
-
-import {
-  findProfileByUserId,
-} from "../repositories/profile.repository.js";
 
 import {
   findServiceById,
@@ -63,6 +60,9 @@ const ALLOWED_TRANSITIONS = {
 };
 
 const SELF_SERVICE_STATUSES = ["scheduled", "confirmed"];
+
+// Set only by check-in / the queue workflow, never by a direct status PATCH.
+const QUEUE_DRIVEN_STATUSES = ["checked_in", "in_progress"];
 
 function validateAppointmentDate(date) {
   if (Number.isNaN(date.getTime())) {
@@ -266,7 +266,7 @@ export async function createNewAppointment(data, user) {
       await sendNotification(
         patientUserId,
         "Appointment booked",
-        `Your appointment has been booked for ${appointmentDate.toISOString()}.`,
+        `Your appointment has been booked for ${formatLocalDateTime(appointmentDate)}.`,
         NOTIFICATION_TYPES.APPOINTMENT
       );
     } catch (error) {
@@ -291,7 +291,9 @@ export async function getAppointmentById(id, organizationId, user) {
     return await findAppointmentById(id, tx);
   });
 
-  if (!appointment || appointment.organizationId !== resolvedOrgId) {
+  // A super_admin without an organization filter reads in the global scope;
+  // everyone else must match their (resolved) organization.
+  if (!appointment || (resolvedOrgId && appointment.organizationId !== resolvedOrgId)) {
     throw new AppError("Appointment not found.", 404);
   }
 
@@ -311,7 +313,7 @@ export async function updateExistingAppointment(id, data, user) {
     throw new AppError("Organization ID is required.", 400);
   }
 
-  return await withTenant(organizationId, async (tx) => {
+  const result = await withTenant(organizationId, async (tx) => {
     const appointment = await findAppointmentById(id, tx);
 
     if (!appointment) {
@@ -322,8 +324,32 @@ export async function updateExistingAppointment(id, data, user) {
       throw new AppError("Appointment not found.", 404);
     }
 
+    /* checked_in and in_progress are owned by the queue workflow (check-in
+       creates the queue entry; starting a consultation moves it). Setting
+       them directly would leave the patient with no queue entry, so a
+       manual PATCH cannot use them. */
+    if (data.status !== undefined && data.status !== appointment.status && QUEUE_DRIVEN_STATUSES.includes(data.status)) {
+      throw new AppError(
+        `Status "${data.status}" is set by the check-in/queue workflow and cannot be applied directly.`,
+        400
+      );
+    }
+
     if (data.status !== undefined) {
       assertValidTransition(appointment.status, data.status);
+    }
+
+    /* Moving or reassigning is only meaningful before check-in. Once a
+       patient is in the queue (or the visit is over) a new date, doctor or
+       service would put the appointment out of step with its queue entry. */
+    const reschedules =
+      data.appointmentDate !== undefined || data.staffId !== undefined || data.serviceId !== undefined;
+
+    if (reschedules && !SELF_SERVICE_STATUSES.includes(appointment.status)) {
+      throw new AppError(
+        `The date, doctor or service of a ${appointment.status} appointment cannot be changed.`,
+        409
+      );
     }
 
     const updateData = {};
@@ -368,6 +394,12 @@ export async function updateExistingAppointment(id, data, user) {
     // only update if the status hasn't changed since we validated it.
     let updated;
     if (data.status !== undefined && data.status !== appointment.status) {
+      // Lock order queue -> appointment, the same order skip and
+      // start-consultation use, so these transactions cannot deadlock.
+      if (appointment.queue) {
+        await tx.$queryRaw`SELECT id FROM "Queue" WHERE id = ${appointment.queue.id} FOR UPDATE`;
+      }
+
       const statusUpdated = await tx.appointment.updateMany({
         where: {
           id,
@@ -393,7 +425,21 @@ export async function updateExistingAppointment(id, data, user) {
         updated = await updateAppointment(id, nonStatusData, tx);
       }
     } else {
-      updated = await updateAppointment(id, updateData, tx);
+      // Compare-and-set on the status read above: a concurrent check-in or
+      // status change makes this edit fail instead of overwriting it.
+      const edited = await tx.appointment.updateMany({
+        where: { id, status: appointment.status },
+        data: updateData,
+      });
+
+      if (edited.count === 0) {
+        throw new AppError(
+          `Appointment status changed concurrently. Expected "${appointment.status}", please retry.`,
+          409
+        );
+      }
+
+      updated = await findUpdatedAppointment(id, tx);
     }
 
     // Keep the linked queue in sync for ALL terminal states and in_progress.
@@ -414,17 +460,43 @@ export async function updateExistingAppointment(id, data, user) {
       });
     }
 
+    const statusChanged = data.status !== undefined && data.status !== appointment.status;
+
     await auditLogger({
       organizationId,
       userId: user.id,
       action: "UPDATE",
       entity: "Appointment",
       entityId: id,
-      description: `Appointment ${id} updated.`,
+      description: statusChanged
+        ? `Appointment ${id} updated (status ${appointment.status} -> ${data.status}).`
+        : `Appointment ${id} updated.`,
     });
 
-    return updated;
+    return {
+      updated,
+      newStatus: statusChanged ? data.status : null,
+      patientUserId: appointment.medicalRecord?.profile?.user?.id || null,
+      appointmentDate: updated?.appointmentDate || appointment.appointmentDate,
+    };
   });
+
+  // Best-effort patient notifications for status changes made by the clinic.
+  const message = {
+    confirmed: ["Appointment confirmed", `Your appointment on ${formatLocalDateTime(result.appointmentDate)} is confirmed. You can check in on the day of your appointment.`],
+    cancelled: ["Appointment cancelled", `Your appointment on ${formatLocalDateTime(result.appointmentDate)} was cancelled by the clinic.`],
+    no_show: ["Missed appointment", `Your appointment on ${formatLocalDateTime(result.appointmentDate)} was marked as missed.`],
+  }[result.newStatus];
+
+  if (message && result.patientUserId) {
+    try {
+      await sendNotification(result.patientUserId, message[0], message[1], NOTIFICATION_TYPES.APPOINTMENT);
+    } catch (error) {
+      console.error("Failed to send appointment status notification:", error.message);
+    }
+  }
+
+  return result.updated;
 }
 
 export async function removeAppointment(id, user) {
@@ -921,6 +993,14 @@ export async function getDoctorsAvailableOnDate(date, user, query = {}) {
 /**
  * Cancel an appointment by the owning student.
  */
+// Same shape updateAppointment() returns, read after a compare-and-set write.
+async function findUpdatedAppointment(id, tx) {
+  return await tx.appointment.findUnique({
+    where: { id },
+    include: { medicalRecord: true, service: true, staff: true },
+  });
+}
+
 export async function cancelAppointment(id, data, user) {
   const scoped = resolveUserScope(user);
 
@@ -959,18 +1039,31 @@ export async function cancelAppointment(id, data, user) {
   const organizationId = appointment.organizationId;
 
   const updated = await withTenant(organizationId, async (tx) => {
-    const updated = await updateAppointment(
-      id,
-      { status: "cancelled" },
-      tx
-    );
+    /* Compare-and-set: the status check above ran outside this transaction,
+       so a concurrent check-in or status change could have moved the
+       appointment since. Only cancel if it is still self-service. */
+    const moved = await tx.appointment.updateMany({
+      where: { id, status: { in: SELF_SERVICE_STATUSES } },
+      data: { status: "cancelled" },
+    });
 
-    if (appointment.queue) {
+    if (moved.count === 0) {
+      throw new AppError(
+        "Appointment cannot be cancelled: its status changed. Refresh and try again.",
+        409
+      );
+    }
+
+    const queue = await tx.queue.findUnique({ where: { appointmentId: id } });
+
+    if (queue && queue.status !== "cancelled") {
       await tx.queue.update({
-        where: { id: appointment.queue.id },
+        where: { id: queue.id },
         data: { status: "cancelled" },
       });
     }
+
+    const updated = await findUpdatedAppointment(id, tx);
 
     await auditLogger({
       organizationId,
@@ -1071,7 +1164,20 @@ export async function rescheduleAppointment(id, data, user) {
       updateData.staffId = data.staffId;
     }
 
-    const updated = await updateAppointment(id, updateData, tx);
+    // Compare-and-set, as in cancelAppointment.
+    const moved = await tx.appointment.updateMany({
+      where: { id, status: { in: SELF_SERVICE_STATUSES } },
+      data: updateData,
+    });
+
+    if (moved.count === 0) {
+      throw new AppError(
+        "Appointment cannot be rescheduled: its status changed. Refresh and try again.",
+        409
+      );
+    }
+
+    const updated = await findUpdatedAppointment(id, tx);
 
     await auditLogger({
       organizationId,
@@ -1093,7 +1199,7 @@ export async function rescheduleAppointment(id, data, user) {
       await sendNotification(
         patientUserId,
         "Appointment rescheduled",
-        `Your appointment has been rescheduled to ${newDate.toISOString()}.`,
+        `Your appointment has been rescheduled to ${formatLocalDateTime(newDate)}.`,
         NOTIFICATION_TYPES.APPOINTMENT
       );
     } catch (error) {

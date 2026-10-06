@@ -36,6 +36,11 @@ const errorMiddleware = (err, req, res, _next) => {
         message = "This record cannot be deleted because it is still in use.";
         break;
 
+      case "P2034":
+        statusCode = 409;
+        message = "The record was changed by another request. Please retry.";
+        break;
+
       default:
         statusCode = 500;
         message = "Database operation failed.";
