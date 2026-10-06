@@ -244,6 +244,7 @@
         <div class="form-section">
           <div class="form-section-title">Doctor</div>
           <select class="form-select" id="reschedDoctor"></select>
+          <p id="reschedDoctorNote" style="font-size:13px;color:var(--text-secondary);margin-top:6px" hidden></p>
         </div>
         <div class="form-section">
           <div class="form-section-title">Select Date (max 2 days ahead)</div>
@@ -272,6 +273,8 @@
     let upcomingById = {};
     let slotLoadSeq = 0;
     let reschedSlotSeq = 0;
+    let reschedResolvedStaffId = null;
+    let reschedResolving = false;
 
     function initTabs() {
       document.querySelectorAll('.tabs .tab').forEach(tab => {
@@ -526,7 +529,11 @@
     }
 
     function syncRescheduleButton() {
+      // "No preference" needs a resolved doctor; never submit an unassigned time.
+      const noDoctor = !document.getElementById('reschedDoctor').value && !reschedResolvedStaffId;
       document.getElementById('confirmReschedule').disabled =
+        reschedResolving ||
+        noDoctor ||
         !document.getElementById('reschedDate').value ||
         !document.getElementById('reschedTime').value;
     }
@@ -536,16 +543,48 @@
       const doctorId = document.getElementById('reschedDoctor').value;
       const container = document.getElementById('reschedSlots');
       const timeEl = document.getElementById('reschedTime');
-      if (!date) return;
-      if (!doctorId) {
-        container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:14px">No preference selected - pick a doctor to see available times, or enter a time manually below.</div>';
+      const noteEl = document.getElementById('reschedDoctorNote');
+      // A new doctor or date makes the old slot choice and the old
+      // "first available" doctor invalid.
+      const seq = ++reschedSlotSeq;
+      reschedResolvedStaffId = null;
+      reschedResolving = false;
+      noteEl.textContent = '';
+      noteEl.hidden = true;
+      timeEl.value = '';
+      if (!date) {
+        container.innerHTML = '';
         syncRescheduleButton();
         return;
       }
+      reschedResolving = !doctorId;
       container.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--text-light);padding:14px">Loading available slots...</div>';
-      const seq = ++reschedSlotSeq;
+      syncRescheduleButton();
       try {
-        const res = await API.getAvailableSlots(date, doctorId, reschedCtx.service);
+        let slotDoctorId = doctorId;
+        if (!doctorId) {
+          // Same "No preference" path as booking: find a real doctor who works
+          // on this date (only doctors with free slots are returned).
+          let resolve;
+          try {
+            resolve = await API.getAvailableDoctorsForDate(date, reschedCtx.service);
+          } finally {
+            if (seq === reschedSlotSeq) reschedResolving = false;
+          }
+          if (seq !== reschedSlotSeq) return;
+          if (!resolve.success || !resolve.data.length) {
+            container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--warning);padding:14px">${Utils.sanitize(resolve.message || 'No doctors are available on this date.')} Please choose another date.</div>`;
+            syncRescheduleButton();
+            return;
+          }
+          const first = resolve.data[0];
+          slotDoctorId = first.id;
+          reschedResolvedStaffId = first.id;
+          noteEl.textContent = `First available doctor: ${first.name}`;
+          noteEl.hidden = false;
+          syncRescheduleButton();
+        }
+        const res = await API.getAvailableSlots(date, slotDoctorId, reschedCtx.service);
         if (seq !== reschedSlotSeq) return;
         container.innerHTML = '';
         if (res.success && !res.hasSchedule) {
@@ -683,7 +722,10 @@
         const date = document.getElementById('reschedDate').value;
         const time = document.getElementById('reschedTime').value;
         const staffSel = document.getElementById('reschedDoctor');
-        const staffId = staffSel.value === '' ? null : staffSel.value;
+        // "No preference" sends the doctor found for the chosen date, as booking
+        // does; the button stays disabled until one is found.
+        const staffId = staffSel.value !== '' ? staffSel.value : reschedResolvedStaffId;
+        if (!staffId) { Utils.showToast('Choose a date with an available doctor.', 'warning'); return; }
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner"></span> Rescheduling...';
         try {

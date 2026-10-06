@@ -25,6 +25,7 @@ import {
 } from "../repositories/appointment.repository.js";
 
 import calculateQueueEstimate from "../utils/calculateQueueEstimate.js";
+import { withPublicStaff } from "../utils/publicStaff.js";
 
 /**
  * Deterministic 32-bit FNV-1a hash. Stable across processes, so every
@@ -235,7 +236,11 @@ export async function checkInPatient(data, user) {
     description: `Patient checked in with queue number ${result.queueNumber}.`,
   });
 
-  return result;
+  // Check-in is student-only (queue.route.js:29-35); createQueue embeds the
+  // full staff row + login email, so return the public projection.
+  return result && result.appointment
+    ? { ...result, appointment: withPublicStaff(result.appointment) }
+    : result;
 }
 
 export async function getTodayQueue(organizationId, user, query = {}) {

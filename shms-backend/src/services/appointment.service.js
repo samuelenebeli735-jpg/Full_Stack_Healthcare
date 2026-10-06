@@ -8,6 +8,7 @@ import { withTenant, withSuperAdmin, resolveUserScope } from "../utils/tenantCon
 import { NOTIFICATION_TYPES } from "../types/notificationType.js";
 import { sendNotification } from "./notification.service.js";
 import { formatLocalDateTime } from "../utils/dateFormat.js";
+import { toPublicStaff, withPublicStaff } from "../utils/publicStaff.js";
 
 import validateSchedule from "../utils/scheduleValidator.js";
 
@@ -274,7 +275,7 @@ export async function createNewAppointment(data, user) {
     }
   }
 
-  return appointment;
+  return user.role === "student" ? withPublicStaff(appointment) : appointment;
 }
 
 /**
@@ -609,7 +610,7 @@ export async function getMyAppointments(user, query = {}) {
     );
 
     return {
-      items,
+      items: items.map((appointment) => withPublicStaff(appointment)),
       pagination: buildPaginationMeta({
         page,
         limit,
@@ -974,7 +975,7 @@ export async function getDoctorsAvailableOnDate(date, user, query = {}) {
       const availableSlots = slots.filter((slot) => slot.available);
 
       doctors.push({
-        ...staff,
+        ...(user.role === "student" ? toPublicStaff(staff) : staff),
         hasAvailableSlots: availableSlots.length > 0,
         availableSlotCount: availableSlots.length,
       });
@@ -1093,7 +1094,7 @@ export async function cancelAppointment(id, data, user) {
     }
   }
 
-  return updated;
+  return withPublicStaff(updated);
 }
 
 /**
@@ -1207,5 +1208,5 @@ export async function rescheduleAppointment(id, data, user) {
     }
   }
 
-  return updated;
+  return withPublicStaff(updated);
 }

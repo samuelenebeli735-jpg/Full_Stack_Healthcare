@@ -31,6 +31,8 @@ import {
   hashPassword,
 } from "../utils/password.js";
 
+import { toPublicStaff } from "../utils/publicStaff.js";
+
 export async function createNewStaff(data, user) {
   const organizationId =
     user.role === "super_admin"
@@ -148,27 +150,17 @@ export async function getOrganizationStaff(organizationId, user, query = {}) {
 
   const { page, limit } = getPagination(query);
 
+  const isStudent = user.role === "student";
+
   const { items, total } = await runner(async (tx) => {
-    return await findStaffByOrganization(resolvedOrgId, query, tx);
+    return await findStaffByOrganization(resolvedOrgId, query, tx, {
+      publicView: isStudent,
+    });
   });
 
-  if (user.role === "student") {
-    const safeItems = items.map((staff) => ({
-      id: staff.id,
-      firstName: staff.firstName,
-      middleName: staff.middleName,
-      lastName: staff.lastName,
-      gender: staff.gender,
-      qualification: staff.qualification,
-      licenseNumber: staff.licenseNumber,
-      employmentStatus: staff.employmentStatus,
-      profilePhotoUrl: staff.profilePhotoUrl,
-      department: staff.department,
-      position: staff.position,
-    }));
-
+  if (isStudent) {
     return {
-      items: safeItems,
+      items: items.map((staff) => toPublicStaff(staff)),
       pagination: buildPaginationMeta({ page, limit, total }),
     };
   }

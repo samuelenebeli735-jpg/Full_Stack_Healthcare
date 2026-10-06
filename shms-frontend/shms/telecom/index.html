@@ -17,7 +17,9 @@
       <div class="main-body">
         <div class="page-header">
           <h1>Telemedicine</h1>
-          <p>Consult with doctors remotely via video calls.</p>
+          <p>Remote video consultations with clinic doctors.</p>
+        </div>
+        <div class="alert alert-warning" role="status"><span><strong>Not available yet.</strong> Video consultations are not part of SHMS yet. To see a doctor, book an in-person appointment from the Appointments page.</span>
         </div>
         <div class="grid grid-2 mb-lg">
           <div class="card">
@@ -26,14 +28,14 @@
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
               </div>
               <h3 style="font-size:20px;font-weight:700;margin-bottom:8px">Start a Consultation</h3>
-              <p style="color:var(--text-secondary);margin-bottom:24px">Connect with a doctor via video call from anywhere.</p>
-              <button class="btn btn-primary btn-lg" id="startConsult">Start New Consultation</button>
+              <p style="color:var(--text-secondary);margin-bottom:24px">Video consultations are not available yet. <a href="../appointments.html">Book an in-person appointment</a> instead.</p>
+              <button type="button" class="btn btn-primary btn-lg" id="startConsult" disabled aria-disabled="true" title="Video consultations are not available yet">Start New Consultation</button>
             </div>
           </div>
           <div class="card">
             <div class="card-header"><h3>Upcoming Consultations</h3></div>
             <div class="card-body" id="telecomList">
-              <div class="empty-state"><div class="empty-state-icon">📹</div><h3>No Consultations</h3><p>Schedule a telemedicine appointment.</p></div>
+              <div class="empty-state"><div class="empty-state-icon">📹</div><h3>Not available yet</h3><p>Telemedicine consultations are not part of SHMS yet.</p></div>
             </div>
           </div>
         </div>
@@ -49,6 +51,7 @@
       try {
         const res = await API.getTelecomConsultations();
         const container = document.getElementById('telecomList');
+        if (res.unavailable) return; // keep the static 'not available yet' markup
         if (!res.success || res.data.length === 0) {
           container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📹</div><h3>No Consultations</h3><p>Your telemedicine appointments will appear here.</p></div>';
           return;

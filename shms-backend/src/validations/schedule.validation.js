@@ -49,14 +49,17 @@ export const updateScheduleSchema = z.object({
     .datetime("End time must be valid.")
     .optional(),
 
+  // null clears an existing break (columns are already nullable; no migration).
   breakStart: z
     .string()
     .datetime("Break start must be valid.")
+    .nullable()
     .optional(),
 
   breakEnd: z
     .string()
     .datetime("Break end must be valid.")
+    .nullable()
     .optional(),
 
   isActive: z

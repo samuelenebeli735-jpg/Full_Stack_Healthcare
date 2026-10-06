@@ -77,6 +77,7 @@ const Utils = {
       serving: 'success',
       scheduled: 'primary',
       dispensed: 'success',
+      prescribed: 'info',
       read: 'neutral',
       unread: 'primary',
     };
@@ -254,6 +255,13 @@ const Utils = {
     return this.sanitize(str);
   },
 
+  /* A calendar date as YYYY-MM-DD in the browser's LOCAL time zone (not UTC),
+     e.g. the value for <input type="date">. toISOString() would give
+     yesterday's date between 00:00 and 01:00 Africa/Lagos. */
+  localDate(d = new Date()) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  },
+
   isInSubdirectory() {
     const path = window.location.pathname;
     const parts = path.split('/').filter(p => p);
@@ -291,8 +299,8 @@ const Utils = {
         ]},
         { title: 'Intelligence', links: [
           { page: 'analytics', href: 'analytics/index.html', icon: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>', label: 'Analytics' },
-          { page: 'ai', href: 'ai/index.html', icon: '<path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M17 10h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h2"/><line x1="12" y1="18" x2="12" y2="22"/>', label: 'AI Symptom Checker' },
-          { page: 'lab', href: 'lab/index.html', icon: '<path d="M10 2v7.31l-6 9.2A2 2 0 0 0 5.64 22h12.72a2 2 0 0 0 1.64-3.49l-6-9.2V2"/><line x1="10" y1="2" x2="14" y2="2"/>', label: 'Laboratory' },
+          { page: 'ai', href: 'ai/index.html', icon: '<path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M17 10h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h2"/><line x1="12" y1="18" x2="12" y2="22"/>', label: 'Symptom Checker' },
+          { page: 'lab', href: 'lab/index.html', icon: '<path d="M10 2v7.31l-6 9.2A2 2 0 0 0 5.64 22h12.72a2 2 0 0 0 1.64-3.49l-6-9.2V2"/><line x1="10" y1="2" x2="14" y2="2"/>', label: 'Laboratory', soon: true },
           { page: 'pharmacy', href: 'pharmacy/index.html', icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>', label: 'Pharmacy' },
           { page: '', href: 'notifications.html', icon: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>', label: 'Health Alerts', badge: true },
         ]},
@@ -328,7 +336,7 @@ const Utils = {
           title: 'Medical',
           links: [
             { page: 'history', href: 'history.html', icon: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>', label: 'History' },
-            { page: 'lab', href: 'lab/index.html', icon: '<path d="M10 2v7.31l-6 9.2A2 2 0 0 0 5.64 22h12.72a2 2 0 0 0 1.64-3.49l-6-9.2V2"/><line x1="10" y1="2" x2="14" y2="2"/>', label: 'Lab Results' },
+            { page: 'lab', href: 'lab/index.html', icon: '<path d="M10 2v7.31l-6 9.2A2 2 0 0 0 5.64 22h12.72a2 2 0 0 0 1.64-3.49l-6-9.2V2"/><line x1="10" y1="2" x2="14" y2="2"/>', label: 'Lab Results', soon: true },
             { page: 'pharmacy', href: 'pharmacy/index.html', icon: '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>', label: 'Pharmacy' },
             { page: 'records', href: 'records/index.html', icon: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>', label: 'Records' },
           ],
@@ -336,8 +344,8 @@ const Utils = {
         {
           title: 'Services',
           links: [
-            { page: 'telecom', href: 'telecom/index.html', icon: '<polyline points="4 4 20 4 20 20 4 20"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/>', label: 'Telemedicine' },
-            { page: 'ai', href: 'ai/index.html', icon: '<path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M17 10h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h2"/><line x1="12" y1="18" x2="12" y2="22"/>', label: 'AI Symptom Checker' },
+            { page: 'telecom', href: 'telecom/index.html', icon: '<polyline points="4 4 20 4 20 20 4 20"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/>', label: 'Telemedicine', soon: true },
+            { page: 'ai', href: 'ai/index.html', icon: '<path d="M12 2a4 4 0 0 1 4 4v2a4 4 0 0 1-8 0V6a4 4 0 0 1 4-4z"/><path d="M17 10h2a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h2"/><line x1="12" y1="18" x2="12" y2="22"/>', label: 'Symptom Checker' },
           ],
         },
         {
@@ -356,7 +364,9 @@ const Utils = {
       html += '\n    <div class="sidebar-section">\n      <div class="sidebar-section-title">' + section.title + '</div>';
       section.links.forEach(link => {
         const active = link.page === currentPage ? ' active' : '';
-        const badgeHtml = link.badge ? '<span class="link-badge" id="sidebarNotifCount">0</span>' : '';
+        const badgeHtml = link.badge
+          ? '<span class="link-badge" id="sidebarNotifCount">0</span>'
+          : (link.soon ? '<span class="link-soon" title="Not available yet">Soon</span>' : '');
         html += '\n      <a href="' + base + link.href + '" class="sidebar-link' + active + '" data-page="' + link.page + '">\n        <svg class="link-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + link.icon + '</svg>\n        ' + link.label + '\n        ' + badgeHtml + '\n      </a>';
       });
       html += '\n    </div>';

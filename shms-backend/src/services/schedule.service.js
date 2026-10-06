@@ -16,6 +16,7 @@ import {
 
 import { findOrganizationById } from "../repositories/organization.repository.js";
 import { findStaffById } from "../repositories/staff.repository.js";
+import { toPublicStaff } from "../utils/publicStaff.js";
 
 /**
  * Create schedule.
@@ -151,7 +152,14 @@ export async function getStaffSchedules(staffId, user) {
       throw new AppError("Staff not found.", 404);
     }
 
-    return await findSchedulesByStaff(staffId, tx);
+    const schedules = await findSchedulesByStaff(staffId, tx);
+
+    return user.role === "student"
+      ? schedules.map((schedule) => ({
+          ...schedule,
+          staff: toPublicStaff(schedule.staff),
+        }))
+      : schedules;
   });
 }
 
@@ -219,8 +227,18 @@ export async function updateStaffSchedule(id, data, user) {
 
   const nextStart = data.startTime !== undefined ? new Date(data.startTime) : null;
   const nextEnd = data.endTime !== undefined ? new Date(data.endTime) : null;
-  const nextBreakStart = data.breakStart !== undefined ? new Date(data.breakStart) : null;
-  const nextBreakEnd = data.breakEnd !== undefined ? new Date(data.breakEnd) : null;
+  if (
+    (data.breakStart === null || data.breakEnd === null) &&
+    !(data.breakStart === null && data.breakEnd === null)
+  ) {
+    throw new AppError(
+      "Clear break start and break end together.",
+      400
+    );
+  }
+
+  const nextBreakStart = data.breakStart != null ? new Date(data.breakStart) : null;
+  const nextBreakEnd = data.breakEnd != null ? new Date(data.breakEnd) : null;
 
   if (nextBreakStart && nextBreakEnd) {
     if (nextBreakStart >= nextBreakEnd) {

@@ -168,17 +168,26 @@
         <div class="tab-panel" id="panel-schedules">
           <div class="action-bar">
             <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
-              <select class="form-select" id="scheduleDoctor" style="width:auto;min-width:200px"></select>
-              <input type="date" class="form-input" id="scheduleDate" style="width:auto">
-              <button class="btn btn-primary btn-sm" onclick="loadSchedules()">View</button>
-              <button class="btn btn-secondary btn-sm" onclick="openScheduleModal()">Set Slots</button>
+              <select class="form-select" id="scheduleDoctor" style="width:auto;min-width:200px" onchange="renderWeeklySchedule();loadSchedules()"></select>
+              <button class="btn btn-primary btn-sm" onclick="openScheduleModal()">Add / Edit Working Day</button>
             </div>
           </div>
           <div class="card">
-            <div class="card-header"><h3>Available Time Slots</h3><span id="slotCount" class="badge badge-info">0 slots</span></div>
+            <div class="card-header"><h3>Weekly Schedule</h3><span id="weeklyCount" class="badge badge-info">0 days</span></div>
             <div class="card-body">
+              <p style="margin:0 0 12px;font-size:13px">Each doctor has one recurring row per weekday: working hours plus an optional break. Patients can book 30-minute slots inside these hours.</p>
+              <div class="table-container"><table class="table"><thead><tr><th>Day</th><th>Hours</th><th>Break</th><th>Status</th><th>Actions</th></tr></thead><tbody id="weeklyScheduleBody"></tbody></table></div>
+            </div>
+          </div>
+          <div class="card mt-md">
+            <div class="card-header"><h3>Preview Slots for a Date</h3><span id="slotCount" class="badge badge-info">0 slots</span></div>
+            <div class="card-body">
+              <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+                <input type="date" class="form-input" id="scheduleDate" style="width:auto">
+                <button class="btn btn-secondary btn-sm" onclick="loadSchedules()">View</button>
+              </div>
               <div id="slotsGrid" style="display:flex;flex-wrap:wrap;gap:8px"></div>
-              <div id="slotsEmpty" class="empty-state mt-md" style="display:none"><div class="empty-state-icon">📅</div><h3>No Slots Set</h3><p>Select a doctor and date, then click "Set Slots" to manage available times.</p></div>
+              <div id="slotsEmpty" class="empty-state mt-md" style="display:none"><div class="empty-state-icon">📅</div><h3>No Slots</h3><p>This doctor has no active working hours on that date's weekday. Add or activate the weekday in the weekly schedule above.</p></div>
             </div>
           </div>
         </div>
@@ -281,7 +290,7 @@
           <div class="form-group"><label class="form-label">Full Name</label><input type="text" class="form-input" id="docName" required></div>
           <div class="form-group"><label class="form-label">Specialization</label><select class="form-select" id="docSpecialization"><option value="">Select</option><option>General Practitioner</option><option>Pediatrician</option><option>Cardiologist</option><option>Gynecologist</option><option>Orthopedic Surgeon</option><option>Dermatologist</option><option>Optometrist</option><option>Dentist</option></select></div>
           <div class="form-row">
-            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="docEmail"></div>
+            <div class="form-group"><label class="form-label">Email</label><input type="email" class="form-input" id="docEmail"><div class="form-hint" id="docEmailHint" hidden>The login email cannot be changed after the account is created.</div></div>
             <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="docPhone"></div>
           </div>
           <div class="form-group" id="docPasswordGroup"><label class="form-label">Initial Password</label><input type="password" class="form-input" id="docPassword" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></div>
@@ -294,12 +303,26 @@
   <!-- Schedule Modal -->
   <div class="modal-overlay" id="scheduleModal">
     <div class="modal">
-      <div class="modal-header"><h3>Set Time Slots</h3><button class="modal-close" onclick="closeModal('scheduleModal')">&times;</button></div>
+      <div class="modal-header"><h3 id="scheduleModalTitle">Working Day</h3><button class="modal-close" onclick="closeModal('scheduleModal')">&times;</button></div>
       <div class="modal-body">
-        <div class="form-group"><label class="form-label">Select Time Slots</label></div>
-        <div id="slotCheckboxes" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px"></div>
+        <input type="hidden" id="scheduleId">
+        <div class="form-group"><label class="form-label" for="scheduleDay">Weekday (repeats every week)</label>
+          <select class="form-select" id="scheduleDay" onchange="fillScheduleForm(this.value)">
+            <option value="monday">Monday</option><option value="tuesday">Tuesday</option><option value="wednesday">Wednesday</option><option value="thursday">Thursday</option><option value="friday">Friday</option><option value="saturday">Saturday</option><option value="sunday">Sunday</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="scheduleStart">Start time</label><input type="time" class="form-input" id="scheduleStart" step="1800" required></div>
+          <div class="form-group"><label class="form-label" for="scheduleEnd">End time</label><input type="time" class="form-input" id="scheduleEnd" step="1800" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label class="form-label" for="scheduleBreakStart">Break start (optional)</label><input type="time" class="form-input" id="scheduleBreakStart" step="1800"></div>
+          <div class="form-group"><label class="form-label" for="scheduleBreakEnd">Break end (optional)</label><input type="time" class="form-input" id="scheduleBreakEnd" step="1800"></div>
+        </div>
+        <div class="form-group" id="scheduleActiveGroup" style="display:none"><label class="form-checkbox"><input type="checkbox" id="scheduleActive"> Active (bookable)</label></div>
+        <p id="scheduleModeNote" style="font-size:13px;margin:0"></p>
       </div>
-      <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('scheduleModal')">Cancel</button><button class="btn btn-primary" onclick="saveSchedule()">Save Slots</button></div>
+      <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('scheduleModal')">Cancel</button><button class="btn btn-primary" id="scheduleSaveBtn" onclick="saveSchedule()">Save</button></div>
     </div>
   </div>
   <script src="../js/config.js"></script>
@@ -456,6 +479,11 @@
         document.getElementById('docName').value = doc.name;
         document.getElementById('docSpecialization').value = doc.specialization;
         document.getElementById('docEmail').value = doc.email || '';
+        /* The login email lives on the linked User account and PATCH /staff/:id
+           does not accept it (updateStaffSchema has no email), so it is shown
+           read-only instead of letting an edit be silently dropped. */
+        document.getElementById('docEmail').readOnly = true;
+        document.getElementById('docEmailHint').hidden = false;
         document.getElementById('docPhone').value = doc.phone || '';
         document.getElementById('docMaxPatients').value = doc.max_patients || 15;
         document.getElementById('docPassword').value = '';
@@ -464,6 +492,8 @@
         document.getElementById('doctorModalTitle').textContent = 'Add Doctor';
         document.getElementById('doctorId').value = '';
         document.getElementById('doctorForm').reset();
+        document.getElementById('docEmail').readOnly = false;
+        document.getElementById('docEmailHint').hidden = true;
         document.getElementById('docPasswordGroup').style.display = '';
       }
       overlay.classList.add('active');
@@ -474,7 +504,8 @@
       const data = {
         name: document.getElementById('docName').value.trim(),
         specialization: document.getElementById('docSpecialization').value,
-        email: document.getElementById('docEmail').value.trim(),
+        // Email is only used when creating the account; it is not editable afterwards.
+        email: id ? undefined : document.getElementById('docEmail').value.trim(),
         phone: document.getElementById('docPhone').value.trim(),
         max_patients: document.getElementById('docMaxPatients').value,
       };
@@ -592,13 +623,22 @@
     }
 
     // ==================== SCHEDULES ====================
+    const WEEKDAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const JS_DAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayLabel = d => d ? d.charAt(0).toUpperCase() + d.slice(1) : '';
+
+    async function refreshAdminSchedules() {
+      const schedRes = await API.getSchedules();
+      if (schedRes.success) adminSchedules = schedRes.data;
+    }
+
     async function populateScheduleDropdown() {
       try {
         const docRes = await API.getDoctors();
-        const schedRes = await API.getSchedules();
         if (docRes.success) adminDoctors = docRes.data;
-        if (schedRes.success) adminSchedules = schedRes.data;
+        await refreshAdminSchedules();
         const select = document.getElementById('scheduleDoctor');
+        const previous = select.value;
         select.innerHTML = '<option value="">Select Doctor</option>';
         adminDoctors.forEach(d => {
           // Doctor names are data, not markup: set the option label as text.
@@ -607,9 +647,71 @@
           option.textContent = `${d.name} (${d.specialization})`;
           select.appendChild(option);
         });
-        document.getElementById('scheduleDate').value = new Date().toISOString().split('T')[0];
+        if (previous && adminDoctors.some(d => d.id === previous)) select.value = previous;
+        const dateInput = document.getElementById('scheduleDate');
+        if (!dateInput.value) {
+          const now = new Date();
+          dateInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        }
+        renderWeeklySchedule();
         loadSchedules();
-      } catch(e) {}
+      } catch(e) { Utils.showToast(e.message, 'error'); }
+    }
+
+    function doctorSchedules(doctorId) {
+      return adminSchedules
+        .filter(s => s.doctor_id === doctorId)
+        .sort((a, b) => WEEKDAYS.indexOf(a.dayOfWeek) - WEEKDAYS.indexOf(b.dayOfWeek));
+    }
+
+    function rangeLabel(start, end) {
+      if (!start || !end) return 'None';
+      return `${Utils.formatTime(start)} – ${end === '00:00' ? 'Midnight' : Utils.formatTime(end)}`;
+    }
+
+    function renderWeeklySchedule() {
+      const doctorId = document.getElementById('scheduleDoctor').value;
+      const tbody = document.getElementById('weeklyScheduleBody');
+      tbody.innerHTML = '';
+      const rows = doctorId ? doctorSchedules(doctorId) : [];
+      document.getElementById('weeklyCount').textContent = rows.length + (rows.length === 1 ? ' day' : ' days');
+      if (rows.length === 0) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.colSpan = 5;
+        td.className = 'text-center';
+        td.textContent = doctorId ? 'No working days set for this doctor yet.' : 'Select a doctor to see their weekly schedule.';
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        return;
+      }
+      rows.forEach(s => {
+        const tr = document.createElement('tr');
+        [dayLabel(s.dayOfWeek), rangeLabel(s.start_time, s.end_time), rangeLabel(s.break_start, s.break_end)].forEach(text => {
+          const td = document.createElement('td');
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        const statusTd = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = 'badge ' + (s.isActive ? 'badge-success' : 'badge-warning');
+        badge.textContent = s.isActive ? 'Active' : 'Inactive';
+        statusTd.appendChild(badge);
+        tr.appendChild(statusTd);
+        const actions = document.createElement('td');
+        const edit = document.createElement('button');
+        edit.className = 'btn btn-sm btn-secondary';
+        edit.textContent = 'Edit';
+        edit.addEventListener('click', () => openScheduleModal(s.dayOfWeek));
+        const del = document.createElement('button');
+        del.className = 'btn btn-sm btn-danger';
+        del.style.marginLeft = '6px';
+        del.textContent = 'Delete';
+        del.addEventListener('click', () => deleteScheduleRow(s));
+        actions.append(edit, del);
+        tr.appendChild(actions);
+        tbody.appendChild(tr);
+      });
     }
 
      async function loadSchedules() {
@@ -639,39 +741,88 @@
       } catch(e) {}
     }
 
-     function openScheduleModal() {
-       const doctorId = document.getElementById('scheduleDoctor').value;
-       if (!doctorId) { Utils.showToast('Select a doctor first', 'warning'); return; }
-      const overlay = document.getElementById('scheduleModal');
-      const checkboxes = document.getElementById('slotCheckboxes');
-      checkboxes.innerHTML = '';
-      const times = [];
-      for (let h = 8; h < 17; h++) {
-        times.push(`${h.toString().padStart(2,'0')}:00`);
-        times.push(`${h.toString().padStart(2,'0')}:30`);
+    /* Pick a weekday: if the doctor already has a row for it, the form edits
+       that row (PATCH); otherwise it creates one (POST). keepTimes leaves the
+       admin's typed values in place (used after a 409 race). */
+    function fillScheduleForm(day, keepTimes) {
+      const doctorId = document.getElementById('scheduleDoctor').value;
+      const existing = adminSchedules.find(s => s.doctor_id === doctorId && s.dayOfWeek === day);
+      document.getElementById('scheduleDay').value = day;
+      document.getElementById('scheduleId').value = existing ? existing.id : '';
+      if (!keepTimes) {
+        document.getElementById('scheduleStart').value = existing ? existing.start_time : '08:00';
+        document.getElementById('scheduleEnd').value = existing ? existing.end_time : '17:00';
+        document.getElementById('scheduleBreakStart').value = existing ? existing.break_start : '';
+        document.getElementById('scheduleBreakEnd').value = existing ? existing.break_end : '';
       }
-      times.forEach(t => {
-        const label = document.createElement('label');
-        label.className = 'form-checkbox';
-        label.style.padding = '6px 8px';
-        label.style.fontSize = '13px';
-        label.innerHTML = `<input type="checkbox" value="${t}" checked> ${Utils.formatTime(t)}`;
-        checkboxes.appendChild(label);
-      });
-      overlay.classList.add('active');
+      // Always mirror the stored row's status, even when keeping typed times,
+      // so a re-save after a 409 cannot silently reactivate an inactive day.
+      document.getElementById('scheduleActive').checked = existing ? existing.isActive : true;
+      document.getElementById('scheduleActiveGroup').style.display = existing ? '' : 'none';
+      document.getElementById('scheduleModalTitle').textContent = (existing ? 'Edit ' : 'Add ') + dayLabel(day) + ' hours';
+      document.getElementById('scheduleModeNote').textContent = existing
+        ? 'This doctor already works on ' + dayLabel(day) + '. Saving updates that weekly row.'
+        : 'Creates a new weekly row. These hours repeat every ' + dayLabel(day) + '.';
     }
 
-     async function saveSchedule() {
-       const doctorId = document.getElementById('scheduleDoctor').value;
-       const date = document.getElementById('scheduleDate').value;
-       const checked = document.querySelectorAll('#slotCheckboxes input[type="checkbox"]:checked');
-       const slots = Array.from(checked).map(cb => cb.value);
-       try {
-         await API.saveSchedule({ doctor_id: doctorId, date, slots });
-        Utils.showToast('Schedule saved', 'success');
+    function openScheduleModal(day) {
+      const doctorId = document.getElementById('scheduleDoctor').value;
+      if (!doctorId) { Utils.showToast('Select a doctor first', 'warning'); return; }
+      if (!day) {
+        // Default to the preview date's weekday, shown explicitly in the select.
+        const date = document.getElementById('scheduleDate').value;
+        day = JS_DAYS[(date ? new Date(date + 'T00:00:00') : new Date()).getDay()];
+      }
+      fillScheduleForm(day);
+      document.getElementById('scheduleModal').classList.add('active');
+    }
+
+    async function saveSchedule() {
+      const doctorId = document.getElementById('scheduleDoctor').value;
+      const day = document.getElementById('scheduleDay').value;
+      const id = document.getElementById('scheduleId').value;
+      const existing = id ? adminSchedules.find(s => s.id === id) : null;
+      const btn = document.getElementById('scheduleSaveBtn');
+      btn.disabled = true;
+      try {
+        await API.saveSchedule({
+          id: id || undefined,
+          doctor_id: doctorId,
+          dayOfWeek: day,
+          startTime: document.getElementById('scheduleStart').value,
+          endTime: document.getElementById('scheduleEnd').value,
+          breakStart: document.getElementById('scheduleBreakStart').value,
+          breakEnd: document.getElementById('scheduleBreakEnd').value,
+          isActive: id ? document.getElementById('scheduleActive').checked : undefined,
+          clearBreak: !!(existing && (existing.break_start || existing.break_end)),
+        });
+        Utils.showToast(id ? 'Working day updated' : 'Working day added', 'success');
         closeModal('scheduleModal');
+        await refreshAdminSchedules();
+        renderWeeklySchedule();
         loadSchedules();
-      } catch(e) { Utils.showToast(e.message, 'error'); }
+      } catch (e) {
+        if (!id && /already exists/i.test(e.message)) {
+          // Created elsewhere meanwhile: load that row and switch to edit mode, keeping the typed times.
+          try { await refreshAdminSchedules(); renderWeeklySchedule(); fillScheduleForm(day, true); } catch (_) {}
+          Utils.showToast('This doctor already has hours on that weekday. The existing row is now loaded: save again to update it.', 'warning');
+        } else {
+          Utils.showToast(e.message, 'error');
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteScheduleRow(s) {
+      if (!confirm('Remove ' + dayLabel(s.dayOfWeek) + ' from this doctor\'s weekly schedule? Existing appointments are not cancelled.')) return;
+      try {
+        await API.deleteSchedule(s.id);
+        Utils.showToast('Working day removed', 'success');
+        await refreshAdminSchedules();
+        renderWeeklySchedule();
+        loadSchedules();
+      } catch (e) { Utils.showToast(e.message, 'error'); }
     }
 
     // ==================== APPOINTMENTS ====================

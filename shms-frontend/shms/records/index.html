@@ -85,8 +85,8 @@
         container.innerHTML = '<div class="record-timeline"></div>';
         const timeline = container.querySelector('.record-timeline');
         res.data.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(record => {
-          const typeColors = { consultation: 'blue', lab: 'purple', pharmacy: 'pink', checkup: 'green' };
-          const typeIcons = { consultation: '🩺', lab: '🔬', pharmacy: '💊', checkup: '❤️' };
+          const typeColors = { consultation: 'blue' };
+          const typeIcons = { consultation: '🩺' };
           const div = document.createElement('div');
           div.className = 'record-item';
           div.innerHTML = `
@@ -94,7 +94,7 @@
               <h4>${typeIcons[record.type] || '📋'} ${Utils.sanitize(Utils.capitalize(record.type))}</h4>
               <span class="badge badge-${typeColors[record.type] || 'neutral'}">${Utils.formatDate(record.date)}</span>
             </div>
-            <div class="ri-meta">${Utils.sanitize(record.doctor)} ${record.diagnosis ? '&bull; ' + Utils.sanitize(record.diagnosis) : ''}</div>
+            <div class="ri-meta">${Utils.sanitize(record.doctor || 'Doctor not recorded')} ${record.diagnosis ? '&bull; ' + Utils.sanitize(record.diagnosis) : ''}</div>
             <div class="ri-notes">${Utils.sanitize(record.notes || 'No notes recorded.')}</div>
           `;
           timeline.appendChild(div);

@@ -62,9 +62,12 @@ const Auth = {
       role: rawUser.role,
       isActive: rawUser.isActive,
       organizationId: rawUser.organizationId,
-      full_name: rawUser.profile
-        ? (rawUser.profile.firstName + ' ' + (rawUser.profile.middleName || '') + ' ' + rawUser.profile.lastName).replace(/\s+/g, ' ').trim()
-        : rawUser.email,
+      // Non-student accounts carry profile = {} from /auth/verify and login
+      // (shms_user_route COALESCE), which is truthy; fall back to the email
+      // instead of rendering "undefined undefined".
+      full_name: (rawUser.profile && (rawUser.profile.firstName || rawUser.profile.lastName))
+        ? ((rawUser.profile.firstName || '') + ' ' + (rawUser.profile.middleName || '') + ' ' + (rawUser.profile.lastName || '')).replace(/\s+/g, ' ').trim()
+        : (rawUser.email || ''),
       matric_number: rawUser.profile?.matricNumber || '',
       faculty: rawUser.profile?.faculty || '',
       department: rawUser.profile?.department || '',

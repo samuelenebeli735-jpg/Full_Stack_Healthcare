@@ -223,9 +223,10 @@ const API = (() => {
     const profile = q.appointment && q.appointment.medicalRecord ? q.appointment.medicalRecord.profile : null;
     const patient = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : 'Patient';
     const ticket = '#' + String(q.queueNumber);
-    const status = q.status === 'in_progress'
-      ? 'in_consultation'
-      : (q.status === 'called' ? 'checked_in' : (q.status === 'waiting' ? 'waiting' : q.status));
+    /* Only in_progress gets a display alias; every other QueueStatus
+       (waiting | called | completed | cancelled) passes through so a called
+       patient is never shown as merely "checked in". */
+    const status = q.status === 'in_progress' ? 'in_consultation' : q.status;
     const mapped = {
       ticket,
       queueId: q.id,
@@ -237,6 +238,14 @@ const API = (() => {
          cancelled). `status` above is a display alias kept for existing pages. */
       queueStatus: q.status,
       estimated_wait_minutes: q.estimatedWaitMinutes || 0,
+      /* Raw Queue timestamps (ISO strings from GET /queues/today, which
+         returns every Queue scalar). checkedInAt is non-nullable in the
+         schema; createdAt is only a defensive fallback. Used by the staff
+         dashboard to measure real waits instead of showing estimates. */
+      checked_in_at: q.checkedInAt || q.createdAt || null,
+      called_at: q.calledAt || null,
+      started_at: q.startedAt || null,
+      completed_at: q.completedAt || null,
     };
     queueIdByTicket[ticket] = q.id;
     return mapped;
@@ -313,6 +322,59 @@ const API = (() => {
   };
 
   const DAY_INDEX = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+
+  /* Weekly schedule times. The backend stores one row per doctor per
+     weekday (Schedule @@unique([staffId, dayOfWeek])) and reads only the
+     LOCAL hours/minutes of startTime/endTime/breakStart/breakEnd
+     (scheduleValidator, buildDaySlots). Encode "HH:MM" as a local time on
+     today's date and decode with local getters, never toISOString(), which
+     would show UTC. */
+  const _HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+  const _pad2 = (n) => String(n).padStart(2, '0');
+  const _toMin = (hhmm) => { const p = hhmm.split(':').map(Number); return p[0] * 60 + p[1]; };
+  const _wallClockIso = (hhmm, addDays) => {
+    const p = hhmm.split(':').map(Number);
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + (addDays || 0));
+    d.setHours(p[0], p[1], 0, 0);
+    return d.toISOString();
+  };
+  const _wallClockHHMM = (value) => {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return '';
+    return `${_pad2(d.getHours())}:${_pad2(d.getMinutes())}`;
+  };
+  /* Validate working hours plus at most one break and encode them. An end
+     of 00:00 means "until midnight": the backend treats end <= start as
+     24:00, so it is encoded on the next day to pass the start < end check. */
+  const _scheduleTimes = (data) => {
+    const start = String(data.startTime || '');
+    const end = String(data.endTime || '');
+    if (!_HHMM.test(start) || !_HHMM.test(end)) throw new Error('Enter a valid start and end time.');
+    const startMin = _toMin(start);
+    const endMin = end === '00:00' ? 1440 : _toMin(end);
+    if (endMin <= startMin) throw new Error('End time must be after start time (use 12:00 AM for midnight).');
+    const out = {
+      startTime: _wallClockIso(start, 0),
+      endTime: _wallClockIso(end, end === '00:00' ? 1 : 0),
+      breakStart: null,
+      breakEnd: null,
+    };
+    const bs = String(data.breakStart || '');
+    const be = String(data.breakEnd || '');
+    if (bs || be) {
+      if (!_HHMM.test(bs) || !_HHMM.test(be)) throw new Error('Enter both break start and break end, or leave both empty.');
+      const bsMin = _toMin(bs);
+      const beMin = _toMin(be);
+      if (bsMin >= beMin) throw new Error('Break start must be before break end.');
+      if (bsMin < startMin || beMin > endMin) throw new Error('The break must fall within working hours.');
+      out.breakStart = _wallClockIso(bs, 0);
+      out.breakEnd = _wallClockIso(be, 0);
+    }
+    return out;
+  };
 
   /* ============================ PUBLIC API ============================ */
 
@@ -404,6 +466,34 @@ const API = (() => {
       currentPassword: data.currentPassword || data.current_password,
       newPassword: data.newPassword || data.new_password,
     }),
+    /* The signed-in user's own Staff row (read-only). There is no /staff/me;
+       the tenant-scoped staff list (authorize student/staff/admin/super_admin,
+       unredacted for non-students) filters on the generic `userId` query key,
+       and the match is re-checked here against the session user. Resolves
+       with data: null when the account has no staff record. */
+    async getMyStaffRecord() {
+      const u = _user();
+      const orgId = _orgId();
+      if (!u || !u.id || !orgId) return { success: true, data: null };
+      const res = await _request('GET', `/staff/organization/${encodeURIComponent(orgId)}${_qs({ userId: u.id })}`);
+      const items = (res.data && res.data.items) || [];
+      const s = items.find((it) => it && it.user && it.user.id === u.id);
+      if (!s) return { success: true, data: null };
+      return {
+        success: true,
+        data: {
+          id: s.id,
+          staff_number: s.staffNumber || '',
+          full_name: `${s.firstName || ''} ${s.middleName || ''} ${s.lastName || ''}`.replace(/\s+/g, ' ').trim(),
+          phone: s.phone || '',
+          department: (s.department && s.department.name) || '',
+          position: (s.position && s.position.name) || '',
+          qualification: s.qualification || '',
+          employment_status: s.employmentStatus || '',
+          employment_date: s.employmentDate || '',
+        },
+      };
+    },
 
     /* ---------- Notifications ---------- */
     /* `filters` supports: { page, limit, read: true|false, type }
@@ -653,7 +743,7 @@ const API = (() => {
         if (!q) return { success: true, data: [] };
         return {
           success: true,
-          data: [{ ticket: '#' + String(q.queueNumber), patient: 'You', service: '', doctor: '', status: 'waiting', queueId: q.id }],
+          data: [{ ticket: '#' + String(q.queueNumber), patient: 'You', service: '', doctor: '', status: q.status === 'in_progress' ? 'in_consultation' : (q.status || 'waiting'), queueStatus: q.status, queueId: q.id }],
         };
       }
       const { items, total } = await _todayQueue();
@@ -731,7 +821,7 @@ const API = (() => {
         gender: 'Male',
         dateOfBirth: '1985-01-01',
         phone: data.phone || '08000000000',
-        employmentDate: new Date().toISOString().slice(0, 10),
+        employmentDate: _localDate(),
         qualification: data.specialization || 'Medical Officer',
       };
       return _request('POST', '/staff', payload);
@@ -747,8 +837,11 @@ const API = (() => {
       }
       if (data.qualification !== undefined) body.qualification = data.qualification;
       if (data.specialization !== undefined) body.qualification = data.specialization;
-      if (data.email !== undefined) body.email = data.email;
-      if (data.phone !== undefined) body.phone = data.phone;
+      /* email is intentionally not forwarded: updateStaffSchema
+         (validations/staff.validation.js) has no email field, so it would be
+         silently stripped. The login email is fixed after account creation. */
+      // An empty phone would fail validation (min 5 chars); leave it unchanged instead.
+      if (data.phone) body.phone = data.phone;
       if (data.availability !== undefined) {
         body.employmentStatus = data.availability ? 'active' : 'suspended';
       }
@@ -828,8 +921,10 @@ const API = (() => {
           doctor: _staffName(s.staff),
           day: s.dayOfWeek ? s.dayOfWeek.charAt(0).toUpperCase() + s.dayOfWeek.slice(1) : '',
           dayOfWeek: s.dayOfWeek,
-          start_time: s.startTime ? new Date(s.startTime).toISOString().slice(11, 16) : '',
-          end_time: s.endTime ? new Date(s.endTime).toISOString().slice(11, 16) : '',
+          start_time: _wallClockHHMM(s.startTime),
+          end_time: _wallClockHHMM(s.endTime),
+          break_start: _wallClockHHMM(s.breakStart),
+          break_end: _wallClockHHMM(s.breakEnd),
           startTime: s.startTime,
           endTime: s.endTime,
           status: s.isActive === false ? 'inactive' : 'active',
@@ -837,26 +932,37 @@ const API = (() => {
         })),
       };
     },
+    /* data: { id?, doctor_id, dayOfWeek, startTime 'HH:MM', endTime 'HH:MM',
+       breakStart?, breakEnd?, isActive?, clearBreak? }. When `id` is set,
+       PATCH that existing weekly row (PATCH /schedules/:id); otherwise POST
+       a new one. dayOfWeek is never changed on PATCH: one row per weekday. */
     async saveSchedule(data) {
       const orgId = _orgId();
       const staffId = data.doctor_id || data.staffId;
       if (!staffId) throw new Error('Select a doctor first.');
-      const date = data.date || new Date().toISOString().slice(0, 10);
-      const dayOfWeek = DAY_INDEX[new Date(date + 'T00:00:00').getDay()];
-      const slots = (data.slots || []).sort();
-      const startTime = slots[0] || '08:00';
-      const endTime = slots[slots.length - 1] || '17:00';
-      const startIso = new Date(`${date}T${startTime}:00`).toISOString();
-      const endIso = new Date(`${date}T${endTime}:00`).toISOString();
-      return _request('POST', '/schedules', {
-        organizationId: orgId,
-        staffId,
-        dayOfWeek,
-        startTime: startIso,
-        endTime: endIso,
-      });
+      if (DAY_INDEX.indexOf(data.dayOfWeek) === -1) throw new Error('Choose a weekday.');
+      const times = _scheduleTimes(data);
+      if (data.id) {
+        const body = { startTime: times.startTime, endTime: times.endTime };
+        if (times.breakStart) {
+          body.breakStart = times.breakStart;
+          body.breakEnd = times.breakEnd;
+        } else if (data.clearBreak) {
+          // Removing an existing break needs the nullable update schema (backend change below).
+          body.breakStart = null;
+          body.breakEnd = null;
+        }
+        if (data.isActive !== undefined) body.isActive = !!data.isActive;
+        return _request('PATCH', `/schedules/${encodeURIComponent(data.id)}`, body);
+      }
+      const body = { organizationId: orgId, staffId, dayOfWeek: data.dayOfWeek, startTime: times.startTime, endTime: times.endTime };
+      if (times.breakStart) {
+        body.breakStart = times.breakStart;
+        body.breakEnd = times.breakEnd;
+      }
+      return _request('POST', '/schedules', body);
     },
-    deleteSchedule: (id) => _request('DELETE', `/schedules/${id}`),
+    deleteSchedule: (id) => _request('DELETE', `/schedules/${encodeURIComponent(id)}`),
     async getAvailableSlots(date, doctorId, serviceName) {
       const orgId = _orgId();
       if (!doctorId || !orgId) {
@@ -892,10 +998,15 @@ const API = (() => {
         if (svc) serviceQs = `&serviceId=${encodeURIComponent(svc.id)}`;
       }
       const res = await _request('GET', `/appointments/doctors/available?date=${date}${serviceQs}`);
+      const all = (res.data && res.data.doctors) || [];
+      // "No preference" must land on a doctor who can actually see the patient:
+      // the backend also lists scheduled doctors whose day is fully booked.
+      const free = all.filter((d) => d.hasAvailableSlots !== false);
       return {
         success: true,
-        data: ((res.data && res.data.doctors) || []).map(_mapStaffDoctor),
-        message: (res.data && res.data.message) || null,
+        data: free.map((d) => Object.assign(_mapStaffDoctor(d), { available_slot_count: d.availableSlotCount || 0 })),
+        message: (res.data && res.data.message)
+          || (all.length && !free.length ? 'No doctor has free time on this date.' : null),
       };
     },
 
@@ -1167,9 +1278,14 @@ const API = (() => {
                 id: rx.id,
                 medication: item.medicationName || 'Medication',
                 dosage: item.dosage || '',
-                status: 'dispensed',
+                /* No dispensing workflow exists (Prescription has no status
+                   column), so a stored prescription is only "prescribed". */
+                status: 'prescribed',
                 date: rx.createdAt || a.appointmentDate || '',
-                prescribed_by: a.staff ? _staffName(a.staff) : 'Doctor',
+                /* The schema records no prescriber; appointment.staff is only
+                   the doctor the visit was booked with. */
+                prescribed_by: 'Not recorded',
+                assigned_doctor: a.staff ? _staffName(a.staff) : '',
               });
             });
           }
@@ -1189,16 +1305,19 @@ const API = (() => {
             id: p.id,
             medication: item.medicationName || 'Medication',
             dosage: item.dosage || '',
-            status: 'dispensed',
+            status: 'prescribed',
             date: p.createdAt || '',
-            prescribed_by: staff ? _staffName(staff) : 'Doctor',
+            prescribed_by: 'Not recorded',
+            assigned_doctor: staff ? _staffName(staff) : '',
           });
         });
       });
       return { success: true, data: out, pagination };
     },
-    getLabResults: async () => ({ success: true, data: [] }),
-    getTelecomConsultations: async () => ({ success: true, data: [] }),
+    /* No laboratory or telemedicine backend exists yet (no models, no routes).
+       Report that instead of an empty list that reads as "you have no results". */
+    getLabResults: async () => ({ success: false, data: [], unavailable: true, message: 'Laboratory results are not available in SHMS yet.' }),
+    getTelecomConsultations: async () => ({ success: false, data: [], unavailable: true, message: 'Telemedicine is not available in SHMS yet.' }),
     async getMedicalRecords() {
       const role = _role();
       if (role === 'student') {
@@ -1211,7 +1330,9 @@ const API = (() => {
             return {
               type: 'consultation',
               date: m.date,
-              doctor: m.doctor_name,
+              // Only name a doctor the appointment actually recorded; never the
+              // booking-time 'Any available doctor' placeholder.
+              doctor: a.staff ? _staffName(a.staff) : '',
               diagnosis: m.diagnosis,
               notes: m.notes || m.treatment,
             };

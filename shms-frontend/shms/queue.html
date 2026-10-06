@@ -112,6 +112,8 @@
     .qm-queue-search svg { position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-light); width:16px; height:16px; }
 
     .qm-queue-list { flex:1; overflow-y:auto; }
+    .qm-called-alert { font-size:16px; border-width:2px; margin-bottom:24px; }
+    .qm-called-alert[hidden] { display:none; }
 
     .qm-section-title {
       font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.05em;
@@ -196,6 +198,11 @@
               Refresh
             </button>
           </div>
+        </div>
+
+        <div class="alert alert-success qm-called-alert" id="qCalledAlert" role="alert" hidden>
+          <strong>You have been called — please proceed in now.</strong>
+          <span id="qCalledAlertTicket"></span>
         </div>
 
         <div class="qm-stats">
@@ -375,9 +382,11 @@
       if (nowServing) {
         if (isStudent && queueData.ticket_number === nowServing) {
           patientName = 'You';
-          if (queueData.status) patientDetails = 'Current status: ' + Utils.capitalize(String(queueData.status).replace('_', ' '));
+          if (queueData.status) patientDetails = queueData.status === 'called'
+            ? 'Called — please proceed'
+            : 'Current status: ' + Utils.capitalize(String(queueData.status).replace('_', ' '));
         } else if (!isStudent) {
-          const servingEntry = listItems.find((it) => it.status === 'in_consultation' || it.status === 'checked_in')
+          const servingEntry = listItems.find((it) => it.status === 'in_consultation' || it.status === 'called')
             || listItems.find((it) => it.ticket === nowServing);
           if (servingEntry) {
             patientName = servingEntry.patient || '';
@@ -387,6 +396,18 @@
       }
       document.getElementById('qPatientName').textContent = patientName;
       document.getElementById('qPatientDetails').textContent = patientDetails;
+
+      // Prominent notice for a student whose own entry is 'called', whether or
+      // not they are the backend's currentServing (queue.service.js:286-289).
+      const calledAlert = document.getElementById('qCalledAlert');
+      if (calledAlert) {
+        const isCalled = isStudent && !queueEmpty && queueData.status === 'called';
+        const calledTicket = document.getElementById('qCalledAlertTicket');
+        const ticketText = isCalled ? 'Ticket ' + String(queueData.ticket_number || '') : '';
+        // Only touch the DOM on change so the 15s poll does not re-announce role=alert.
+        if (calledTicket && calledTicket.textContent !== ticketText) calledTicket.textContent = ticketText;
+        if (calledAlert.hidden === isCalled) calledAlert.hidden = !isCalled;
+      }
 
       // Elapsed session time and estimated finish are not provided by the queue API.
       document.getElementById('qSessionTimer').textContent = '–';
@@ -429,21 +450,26 @@
       // For a student the API reports their own queue status truthfully.
       if (isStudent && queueData && queueData.status && queueData.status !== 'none' && listItems.length > 0) {
         const st = queueData.status;
-        listItems[0].status = st === 'in_progress' ? 'in_consultation' : (st === 'called' ? 'checked_in' : st);
+        listItems[0].status = st === 'in_progress' ? 'in_consultation' : st;
       }
 
-      let completed = 0, inProgress = 0, waiting = 0;
+      let completed = 0, inProgress = 0, waiting = 0, cancelled = 0;
       listItems.forEach(item => {
         if (item.status === 'completed') completed++;
         else if (item.status === 'in_consultation' || item.status === 'serving') inProgress++;
+        // Skipped/cancelled tickets are closed, not waiting.
+        else if (item.status === 'cancelled') cancelled++;
         else waiting++;
         const div = document.createElement('div');
         div.className = 'queue-list-item' + (item.patient === 'You' ? ' highlight' : '');
-        const statusColors = { serving: 'success', in_consultation: 'success', waiting: 'warning', checked_in: 'info' };
+        const statusColors = { serving: 'success', in_consultation: 'success', waiting: 'warning', called: 'primary', checked_in: 'info', completed: 'success', cancelled: 'danger' };
+        const statusLabel = item.status === 'called'
+          ? (isStudent ? 'Called — please proceed' : 'Called')
+          : Utils.capitalize(String(item.status || '')).replace('_', ' ');
         div.innerHTML = `
           <span class="qli-ticket">${Utils.sanitize(item.ticket)}</span>
           <span class="qli-patient">${Utils.sanitize(item.patient)}</span>
-          <span class="qli-status badge badge-${statusColors[item.status] || 'neutral'}">${Utils.capitalize(item.status || '').replace('_', ' ')}</span>
+          <span class="qli-status badge badge-${statusColors[item.status] || 'neutral'}">${Utils.sanitize(statusLabel)}</span>
         `;
         container.appendChild(div);
       });
@@ -458,11 +484,14 @@
         : listItems.length;
       const shown = listItems.length;
       document.getElementById('qTotalToday').textContent = total;
-      document.getElementById('qTotalSub').textContent = completed + ' seen · ' + waiting + ' remaining';
+      document.getElementById('qTotalSub').textContent = completed + ' seen · ' + waiting + ' remaining'
+        + (cancelled ? ' · ' + cancelled + ' cancelled' : '');
       document.getElementById('qCompleted').textContent = completed;
       document.getElementById('qInProgress').textContent = inProgress;
       document.getElementById('qWaiting').textContent = waiting;
-      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+      // Completion among tickets that were not cancelled/skipped.
+      const servable = total - cancelled;
+      const pct = servable > 0 ? Math.round((completed / servable) * 100) : 0;
       document.getElementById('qCompletionRate').textContent = pct + '%';
       document.getElementById('qCompletionSub').textContent = total > 0 ? (total - completed) + ' remaining' : 'No data';
       document.getElementById('qProgressText').textContent = completed + ' / ' + total + ' completed';

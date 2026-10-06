@@ -48,12 +48,19 @@ export async function findStaffByUserId(userId, db = prisma) {
 export async function findStaffByOrganization(
   organizationId = null,
   query = {},
-  db = prisma
+  db = prisma,
+  { publicView = false } = {}
 ) {
+  // publicView (student callers): search/sort only on display names so the
+  // filter cannot be used as an oracle for staffNumber or login email.
   const prismaQuery = buildPrismaQuery(query, {
-    allowedSortFields: ["firstName", "lastName", "staffNumber", "employmentStatus", "createdAt", "updatedAt"],
+    allowedSortFields: publicView
+      ? ["firstName", "lastName"]
+      : ["firstName", "lastName", "staffNumber", "employmentStatus", "createdAt", "updatedAt"],
     defaultSort: { firstName: "asc" },
-    searchFields: ["firstName", "middleName", "lastName", "staffNumber", "user.email"],
+    searchFields: publicView
+      ? ["firstName", "middleName", "lastName"]
+      : ["firstName", "middleName", "lastName", "staffNumber", "user.email"],
   });
 
   const where = {
@@ -62,6 +69,12 @@ export async function findStaffByOrganization(
   };
 
   delete where.organizationId;
+
+  if (publicView) {
+    // buildPrismaQuery copies any *Id query key into where; do not let a
+    // student probe which user accounts belong to staff.
+    delete where.userId;
+  }
 
   if (query.employmentStatus) {
     where.employmentStatus = query.employmentStatus;

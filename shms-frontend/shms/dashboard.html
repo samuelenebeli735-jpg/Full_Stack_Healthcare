@@ -278,13 +278,17 @@
           const active = q.status === 'waiting' || q.status === 'called' || q.status === 'in_progress';
           document.getElementById('queueNumber').textContent = active ? q.ticket_number : '--';
           document.getElementById('currentServing').textContent = active ? q.current_serving : '--';
-          document.getElementById('patientsAhead').textContent = active ? q.patients_ahead : '--';
-          document.getElementById('estWait').textContent = active ? q.estimated_wait_minutes + 'm' : '--';
+          // Once called (or in consultation) the check-in estimate no longer applies.
+          const beingSeen = q.status === 'called' || q.status === 'in_progress';
+          document.getElementById('patientsAhead').textContent = !active ? '--' : (beingSeen ? '0' : q.patients_ahead);
+          document.getElementById('estWait').textContent = !active ? '--' : (beingSeen ? 'Now' : q.estimated_wait_minutes + 'm');
           const lbl = document.getElementById('queueLabel');
-          if (lbl) lbl.textContent = active ? 'Your Queue Number' : 'No active queue';
-          document.getElementById('queueProgress').style.width = active
-            ? Math.max(10, Math.min(95, (1 - q.patients_ahead / 20) * 100)) + '%'
-            : '0%';
+          if (lbl) lbl.textContent = active
+            ? (q.status === 'called' ? 'Called — please proceed' : 'Your Queue Number')
+            : 'No active queue';
+          document.getElementById('queueProgress').style.width = !active
+            ? '0%'
+            : (beingSeen ? '100%' : Math.max(10, Math.min(95, (1 - q.patients_ahead / 20) * 100)) + '%');
         } else {
           document.getElementById('queueCard').querySelector('.queue-number').textContent = '--';
         }

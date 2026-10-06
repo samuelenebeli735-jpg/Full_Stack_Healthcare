@@ -310,8 +310,8 @@
                 </div>
                 <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px;padding-top:16px;border-top:1px solid #f0f2f5">
                   <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Currently Serving</div><div style="font-size:18px;font-weight:700;color:#111827" id="currentServingStaff">--</div></div>
-                  <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avg Wait Time</div><div style="font-size:18px;font-weight:700;color:#111827" id="avgWait">12 min</div></div>
-                  <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Longest Wait</div><div style="font-size:18px;font-weight:700;color:#111827" id="longWait">25 min</div></div>
+                  <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Avg Wait Time</div><div style="font-size:18px;font-weight:700;color:#111827" id="avgWait" title="Today: check-in until called or seen; patients still waiting count up to now">--</div></div>
+                  <div style="text-align:center"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px">Longest Wait</div><div style="font-size:18px;font-weight:700;color:#111827" id="longWait" title="Today: check-in until called or seen; patients still waiting count up to now">--</div></div>
                 </div>
               </div>
             </div>
@@ -443,14 +443,18 @@
           // Only entries the backend reports as waiting (not called/served/closed).
           document.getElementById('queueCount').textContent = d.queue_list.filter((p) => p.queueStatus === 'waiting').length + ' waiting';
           queueData = d.queue_list;
+          // Measured from real queue timestamps and rewritten on every poll
+          // (before rendering, so a render error cannot leave them stale);
+          // never falls back to invented defaults.
+          const waits = queueWaitMinutes(queueData, Date.now());
+          const fmtWait = (m) => (m < 1 ? '<1 min' : Math.round(m) + ' min');
+          document.getElementById('avgWait').textContent = waits.length
+            ? fmtWait(waits.reduce((a, b) => a + b, 0) / waits.length)
+            : '--';
+          document.getElementById('longWait').textContent = waits.length
+            ? fmtWait(Math.max(...waits))
+            : '--';
           renderQueue();
-          const waits = queueData.filter((p) => p.estimated_wait_minutes > 0).map((p) => p.estimated_wait_minutes);
-          if (waits.length) {
-            const avg = Math.round(waits.reduce((a, b) => a + b, 0) / waits.length);
-            const max = Math.max(...waits);
-            document.getElementById('avgWait').textContent = avg + ' min';
-            document.getElementById('longWait').textContent = max + ' min';
-          }
         }
         // "Currently serving" comes from the queue already loaded above (in
         // consultation first, else called) instead of a second queue request.
@@ -467,6 +471,25 @@
     }
     const SLOW_REFRESH_MS = 5 * 60 * 1000;
     let lastSlowRefresh = 0;
+
+    /* Wait = check-in until the patient was seen (startedAt, else calledAt),
+       the same definition the backend reports use (report.service.js
+       computeWaitMetrics). Tickets still `waiting` accrue wait up to `now`.
+       Tickets never called or started (and not waiting), e.g. cancelled
+       before being called, carry no wait and are skipped. Returns fractional
+       minutes; negative spans (client/server clock skew) clamp to 0. */
+    function queueWaitMinutes(entries, now) {
+      const out = [];
+      (entries || []).forEach((p) => {
+        const checkedIn = Date.parse(p.checked_in_at);
+        if (!Number.isFinite(checkedIn)) return;
+        const seenAt = p.started_at || p.called_at;
+        const end = seenAt ? Date.parse(seenAt) : (p.queueStatus === 'waiting' ? now : NaN);
+        if (!Number.isFinite(end)) return;
+        out.push(Math.max(0, end - checkedIn) / 60000);
+      });
+      return out;
+    }
 
     async function loadHealthAnalytics() {
       const donutEl = document.getElementById('healthDonut');

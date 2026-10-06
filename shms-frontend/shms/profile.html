@@ -60,13 +60,18 @@
               <div class="profile-meta-item" id="pFacultyRow"><span class="label">Faculty</span><span class="value" id="pFaculty">-</span></div>
               <div class="profile-meta-item" id="pDeptRow"><span class="label">Department</span><span class="value user-department">-</span></div>
               <div class="profile-meta-item" id="pLevelRow"><span class="label">Level</span><span class="value" id="pLevel">-</span></div>
-              <div class="profile-meta-item"><span class="label">Phone</span><span class="value" id="pPhone">-</span></div>
+              <div class="profile-meta-item" id="pStaffNoRow" style="display:none"><span class="label">Staff Number</span><span class="value" id="pStaffNo">-</span></div>
+              <div class="profile-meta-item" id="pPositionRow" style="display:none"><span class="label">Position</span><span class="value" id="pPosition">-</span></div>
+              <div class="profile-meta-item" id="pStaffDeptRow" style="display:none"><span class="label">Department</span><span class="value" id="pStaffDept">-</span></div>
+              <div class="profile-meta-item" id="pPhoneRow"><span class="label">Phone</span><span class="value" id="pPhone">-</span></div>
+              <div class="profile-meta-item" id="pOrgRow" style="display:none"><span class="label">Organization</span><span class="value" id="pOrg">-</span></div>
               <div class="profile-meta-item"><span class="label">Member Since</span><span class="value" id="pJoined">-</span></div>
             </div>
           </div>
           <div class="card">
-            <div class="card-header"><h3>Edit Profile</h3></div>
+            <div class="card-header"><h3 id="editCardTitle">Edit Profile</h3></div>
             <div class="card-body">
+              <div class="alert alert-info" id="profileReadOnlyNote" style="display:none"></div>
               <form id="profileForm">
                 <div class="form-row">
                   <div class="form-group">
@@ -149,30 +154,103 @@
   <script>
     let currentUser = null;
 
+    const ROLE_LABELS = { student: 'Student', staff: 'Staff', admin: 'Administrator', super_admin: 'Super Administrator' };
+
     function applyProfileRole() {
       if (!currentUser) return;
       const role = currentUser.role || 'student';
       const isStudent = role === 'student';
+      const isStaff = role === 'staff';
+      const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? 'flex' : 'none'; };
 
-      document.getElementById('profileRole').textContent = Utils.capitalize(role === 'admin' ? 'Administrator' : role);
+      document.getElementById('profileRole').textContent = ROLE_LABELS[role] || Utils.capitalize(role);
       document.getElementById('profileRole').className = 'badge mt-sm badge-primary';
 
-      document.getElementById('pMatricRow').style.display = isStudent ? 'flex' : 'none';
-      document.getElementById('pFacultyRow').style.display = isStudent ? 'flex' : 'none';
-      document.getElementById('pDeptRow').style.display = isStudent ? 'flex' : 'none';
-      document.getElementById('pLevelRow').style.display = isStudent ? 'flex' : 'none';
-      document.getElementById('editFacultyRow').style.display = isStudent ? 'flex' : 'none';
-      document.getElementById('editStudentRow').style.display = isStudent ? 'flex' : 'none';
+      show('pMatricRow', isStudent);
+      show('pFacultyRow', isStudent);
+      show('pDeptRow', isStudent);
+      show('pLevelRow', isStudent);
+      show('editFacultyRow', isStudent);
+      show('editStudentRow', isStudent);
+      show('pStaffNoRow', isStaff);
+      show('pPositionRow', isStaff);
+      show('pStaffDeptRow', isStaff);
+      show('pPhoneRow', isStudent || isStaff);
+      show('pOrgRow', !isStudent);
+
+      // GET/PUT /profiles/me are student-only (profile.route.js). Other roles get
+      // read-only details; the password form (PUT /profiles/password) works for all.
+      document.getElementById('profileForm').style.display = isStudent ? '' : 'none';
+      document.getElementById('editCardTitle').textContent = isStudent ? 'Edit Profile' : 'Account Settings';
+      const note = document.getElementById('profileReadOnlyNote');
+      if (isStudent) {
+        note.textContent = '';
+        note.style.display = 'none';
+      } else {
+        note.textContent = isStaff
+          ? 'Your name, phone and employment details are managed by your administrator. Contact them if anything here needs to change.'
+          : 'Details for this account are managed by your organization and cannot be edited here.';
+        note.style.display = 'flex';
+      }
+    }
+
+    function formatJoined(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return isNaN(d.getTime()) ? '-' : d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    }
+
+    function appendProfileNote(text) {
+      const note = document.getElementById('profileReadOnlyNote');
+      note.textContent = (note.textContent ? note.textContent + ' ' : '') + text;
+      note.style.display = 'flex';
+    }
+
+    /* Staff, admin and super_admin: show what /auth/verify already returned
+       and, for staff, their own Staff row. Read-only, no error toasts. */
+    async function loadAccountProfile() {
+      const u = currentUser;
+      const setAll = (sel, text) => document.querySelectorAll(sel).forEach(el => { el.textContent = text; });
+      const name = u.full_name || u.email || '-';
+      setAll('.user-name', name);
+      setAll('.user-email', u.email || '-');
+      setAll('.user-initials', Utils.getInitials(name));
+      document.getElementById('editEmail').value = u.email || '';
+      document.getElementById('pOrg').textContent = (u.organization && u.organization.name) || '-';
+      document.getElementById('pJoined').textContent = formatJoined(u.createdAt);
+      if (u.role !== 'staff') return;
+      try {
+        const res = await API.getMyStaffRecord();
+        const s = res && res.data;
+        if (!s) {
+          appendProfileNote('No staff record is linked to this account yet.');
+          return;
+        }
+        const staffName = s.full_name || name;
+        setAll('.user-name', staffName);
+        setAll('.user-initials', Utils.getInitials(staffName));
+        document.getElementById('pStaffNo').textContent = s.staff_number || '-';
+        document.getElementById('pPosition').textContent = s.position || '-';
+        document.getElementById('pStaffDept').textContent = s.department || '-';
+        document.getElementById('pPhone').textContent = s.phone || '-';
+      } catch (e) {
+        appendProfileNote('Staff details could not be loaded right now.');
+      }
     }
 
     async function loadProfile() {
       const resetMeta = () => {
-        ['pFaculty', 'pLevel', 'pPhone', 'pJoined'].forEach(id => {
+        ['pFaculty', 'pLevel', 'pPhone', 'pJoined', 'pStaffNo', 'pPosition', 'pStaffDept', 'pOrg'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.textContent = '-';
         });
       };
       resetMeta();
+      applyProfileRole();
+      if (currentUser && currentUser.role !== 'student') {
+        await loadAccountProfile();
+        return;
+      }
       try {
         const res = await API.getProfile();
         if (!res.success) {

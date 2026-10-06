@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Symptom Checker - SHMS</title>
+  <title>Symptom Checker - SHMS</title>
   <link rel="stylesheet" href="../css/styles.css">
   <link rel="stylesheet" href="../css/dashboard.css">
   <link rel="stylesheet" href="../css/responsive.css">
@@ -90,20 +90,22 @@
       <div id="navbarContainer"></div>
       <div class="main-body">
         <div class="page-header">
-          <h1>AI Symptom Checker</h1>
+          <h1>Symptom Checker</h1>
           <p>Check your symptoms and get preliminary guidance before booking an appointment.</p>
+        </div>
+        <div class="alert alert-warning" role="status" style="max-width:700px;margin:0 auto 16px"><span><strong>Preview, not AI.</strong> This tool matches keywords in what you type against a short fixed list of general self-care tips. It does not analyse or diagnose, and nothing you type is sent to the clinic.</span>
         </div>
         <div class="chat-container">
           <div class="chat-header">
             <div style="width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:20px">🤖</div>
             <div>
               <h3>Health Assistant</h3>
-              <p>AI-powered symptom analysis</p>
+              <p>Keyword-matched general tips</p>
             </div>
-            <span class="badge" style="margin-left:auto;background:rgba(255,255,255,0.2);color:white">Beta</span>
+            <span class="badge" style="margin-left:auto;background:rgba(255,255,255,0.2);color:white">Preview</span>
           </div>
           <div class="chat-messages" id="chatMessages">
-            <div class="chat-msg bot">Hello! I'm your AI health assistant. I can help you understand your symptoms and recommend the best course of action. Please select any symptoms you're experiencing, or describe them below.</div>
+            <div class="chat-msg bot">Hello! I match common symptom keywords to general self-care tips. I am not an AI or a doctor and cannot diagnose. Select a symptom below or type one.</div>
           </div>
           <div style="padding:0 20px">
             <p style="font-size:12px;color:var(--text-light);margin-bottom:8px;font-weight:500">Common symptoms:</p>
@@ -167,7 +169,7 @@
       for (const [key, response] of Object.entries(responses)) {
         if (lower.includes(key)) return response;
       }
-      if (lower.includes('hello') || lower.includes('hi')) return 'Hello! How can I help you today? Please tell me your symptoms.';
+      if (/\b(hello|hi)\b/.test(lower)) return 'Hello! How can I help you today? Please tell me your symptoms.';
       if (lower.includes('thank')) return "You're welcome! Feel free to ask if you have more questions. Stay healthy!";
       if (lower.includes('book') || lower.includes('appointment')) return 'You can book an appointment from the Appointments page. I recommend choosing the appropriate service based on your symptoms.';
       return 'Thank you for sharing. Based on the information provided, I recommend monitoring your symptoms and booking a General Consultation if they persist. For specific concerns, please visit the health center.';
@@ -179,7 +181,7 @@
       if (!verify.success) { Auth.logout(); return; }
       Auth.updateUI(verify.user);
       document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('ai');
-      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('AI Symptom Checker');
+      document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Symptom Checker');
       setTimeout(() => {
         document.getElementById('sidebarToggle')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.toggle('open'); document.getElementById('sidebarOverlay')?.classList.toggle('active'); });
         document.getElementById('sidebarOverlay')?.addEventListener('click', () => { document.getElementById('sidebar')?.classList.remove('open'); document.getElementById('sidebarOverlay')?.classList.remove('active'); });

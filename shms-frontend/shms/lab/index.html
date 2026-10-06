@@ -19,15 +19,17 @@
           <h1>Laboratory Results</h1>
           <p>View your lab test results and reports.</p>
         </div>
+        <div class="alert alert-warning" role="status"><span><strong>Not available yet.</strong> Laboratory results are not connected to SHMS. Tests done at the health centre do not appear here; ask the health centre for your results.</span>
+        </div>
         <div class="grid grid-3 mb-lg">
-          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Tests</span></div><div class="stat-card-value" id="totalTests">0</div></div>
-          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Completed</span></div><div class="stat-card-value" id="completedTests">0</div></div>
-          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Pending</span></div><div class="stat-card-value" id="pendingTests">0</div></div>
+          <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Tests</span></div><div class="stat-card-value" id="totalTests">—</div></div>
+          <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Completed</span></div><div class="stat-card-value" id="completedTests">—</div></div>
+          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Pending</span></div><div class="stat-card-value" id="pendingTests">—</div></div>
         </div>
         <div class="card">
           <div class="card-header"><h3>Lab Reports</h3></div>
           <div class="card-body p-0" id="labResultsList">
-            <div class="empty-state"><div class="empty-state-icon">🔬</div><h3>No Lab Results</h3><p>Your lab results will appear here once processed.</p></div>
+            <div class="empty-state"><div class="empty-state-icon">🔬</div><h3>Lab results not available yet</h3><p>Laboratory results are not part of SHMS yet.</p></div>
           </div>
         </div>
       </div>
@@ -41,6 +43,7 @@
     async function loadLabResults() {
       try {
         const res = await API.getLabResults();
+        if (res.unavailable) return; // keep the static 'not available yet' markup
         if (res.success) {
           const data = res.data;
           document.getElementById('totalTests').textContent = data.length;
