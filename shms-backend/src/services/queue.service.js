@@ -273,31 +273,46 @@ export async function getMyQueue(user) {
       return null;
     }
 
-    const { items: todayQueue } = await findTodayQueue(
-      queue.organizationId,
-      startOfDay,
-      endOfDay,
-      { skip: 0, limit: 500 },
-      tx
-    );
+    // Counted directly instead of scanning a capped page of the day's tickets.
+    const today = {
+      organizationId: queue.organizationId,
+      createdAt: { gte: startOfDay, lte: endOfDay },
+    };
+    const OPEN = ["waiting", "called", "in_progress"];
 
-    const active = todayQueue
-      .filter((q) => q.status !== "completed" && q.status !== "cancelled")
-      .sort((a, b) => a.queueNumber - b.queueNumber);
+    const patientsAhead = queue.status === "waiting"
+      ? await tx.queue.count({
+          where: { ...today, status: { in: OPEN }, queueNumber: { lt: queue.queueNumber } },
+        })
+      : 0;
 
-    const myIndex = active.findIndex((q) => q.id === queue.id);
-    const patientsAhead = myIndex >= 0 ? myIndex : 0;
-
+    const pick = { queueNumber: true, status: true };
     const currentServing =
-      active.find((q) => q.status === "in_progress" || q.status === "called") ||
-      active[0] ||
-      null;
+      (await tx.queue.findFirst({
+        where: { ...today, status: { in: ["in_progress", "called"] } },
+        orderBy: { queueNumber: "asc" },
+        select: pick,
+      })) ||
+      (await tx.queue.findFirst({
+        where: { ...today, status: "waiting" },
+        orderBy: { queueNumber: "asc" },
+        select: pick,
+      }));
+
+    // Live estimate from the patients still ahead; the value stored at
+    // check-in also counted tickets that have since been served.
+    const duration = queue.appointment?.service?.estimatedDuration;
+    const estimatedWaitMinutes = queue.status !== "waiting"
+      ? 0
+      : Number.isFinite(duration)
+        ? patientsAhead * duration
+        : queue.estimatedWaitMinutes;
 
     return {
       id: queue.id,
       queueNumber: queue.queueNumber,
       status: queue.status,
-      estimatedWaitMinutes: queue.estimatedWaitMinutes,
+      estimatedWaitMinutes,
       appointmentId: queue.appointmentId,
       appointmentStatus: queue.appointment?.status || null,
       patientsAhead,
@@ -341,49 +356,50 @@ export async function callNextPatient(organizationId, user) {
   const { startOfDay, endOfDay } = getTodayRange();
 
   const updatedQueue = await runnable(resolvedOrgId)(async (tx) => {
-    const { items: queue } = await findTodayQueue(
-      resolvedOrgId,
-      startOfDay,
-      endOfDay,
-      { skip: 0, limit: 500 },
-      tx
-    );
-
-    const nextPatient = queue.find((item) => item.status === "waiting");
-
-    if (!nextPatient) {
-      throw new AppError(
-        "There are no patients waiting in the queue.",
-        404
-      );
-    }
-
-    // Atomically claim the entry so two concurrent calls never call the same patient.
-    const claimed = await tx.queue.updateMany({
-      where: { id: nextPatient.id, status: "waiting" },
-      data: { status: "called", calledAt: new Date() },
-    });
-
-    if (claimed.count === 0) {
-      throw new AppError(
-        "There are no patients waiting in the queue.",
-        404
-      );
-    }
-
-    await auditLogger({
+    const today = {
       organizationId: resolvedOrgId,
-      userId: user.id,
-      action: "CALL",
-      entity: "Queue",
-      entityId: nextPatient.id,
-      description: `Called queue number ${nextPatient.queueNumber}.`,
-    });
+      createdAt: { gte: startOfDay, lte: endOfDay },
+    };
 
-    return await updateQueue(nextPatient.id, {
-      status: "called",
-      calledAt: new Date(),
-    }, tx);
+    // Claim the lowest waiting ticket. If a concurrent call claimed it
+    // first, move on to the next one rather than reporting an empty queue.
+    for (let attempt = 0; attempt < 20; attempt++) {
+      const next = await tx.queue.findFirst({
+        where: { ...today, status: "waiting" },
+        orderBy: { queueNumber: "asc" },
+        select: { id: true },
+      });
+
+      if (!next) {
+        throw new AppError(
+          "There are no patients waiting in the queue.",
+          404
+        );
+      }
+
+      const calledAt = new Date();
+      const claimed = await tx.queue.updateMany({
+        where: { id: next.id, status: "waiting" },
+        data: { status: "called", calledAt },
+      });
+
+      if (claimed.count === 1) {
+        return await updateQueue(next.id, { status: "called", calledAt }, tx);
+      }
+    }
+
+    throw new AppError("The queue is busy. Please try again.", 409);
+  });
+
+  // Audit after commit, so it never needs a second connection while this
+  // transaction holds one and never records a call that rolled back.
+  await auditLogger({
+    organizationId: resolvedOrgId,
+    userId: user.id,
+    action: "CALL",
+    entity: "Queue",
+    entityId: updatedQueue.id,
+    description: `Called queue number ${updatedQueue.queueNumber}.`,
   });
 
   // Best-effort lifecycle notification to the patient (never blocks the queue call).
@@ -406,28 +422,39 @@ export async function callNextPatient(organizationId, user) {
   return updatedQueue;
 }
 
-export async function skipPatient(organizationId, user) {
+/**
+ * Skip (cancel) a called ticket. With `queueId` only that ticket is skipped,
+ * so a stale screen cannot cancel a different patient who was called in the
+ * meantime; without it, the lowest called ticket of the day is skipped.
+ */
+export async function skipPatient(organizationId, user, queueId = null) {
   const resolvedOrgId = resolveOrganizationId(organizationId, user);
 
   const { startOfDay, endOfDay } = getTodayRange();
 
   const result = await runnable(resolvedOrgId)(async (tx) => {
-    const { items: queue } = await findTodayQueue(
-      resolvedOrgId,
-      startOfDay,
-      endOfDay,
-      { skip: 0, limit: 500 },
-      tx
-    );
-
-    const currentPatient = queue.find(
-      (item) => item.status === "called"
-    );
+    const currentPatient = await tx.queue.findFirst({
+      where: queueId
+        ? { id: queueId, organizationId: resolvedOrgId, status: "called" }
+        : {
+            organizationId: resolvedOrgId,
+            createdAt: { gte: startOfDay, lte: endOfDay },
+            status: "called",
+          },
+      orderBy: { queueNumber: "asc" },
+      include: {
+        appointment: {
+          include: { medicalRecord: { include: { profile: true } } },
+        },
+      },
+    });
 
     if (!currentPatient) {
       throw new AppError(
-        "There is no patient currently called to skip.",
-        404
+        queueId
+          ? "That ticket is no longer called (it may have been started, skipped or completed)."
+          : "There is no patient currently called to skip.",
+        queueId ? 409 : 404
       );
     }
 
@@ -438,19 +465,10 @@ export async function skipPatient(organizationId, user) {
 
     if (skipped.count === 0) {
       throw new AppError(
-        "There is no patient currently called to skip.",
-        404
+        "That ticket is no longer called (it may have been started, skipped or completed).",
+        409
       );
     }
-
-    await auditLogger({
-      organizationId: resolvedOrgId,
-      userId: user.id,
-      action: "SKIP",
-      entity: "Queue",
-      entityId: currentPatient.id,
-      description: `Skipped queue number ${currentPatient.queueNumber}.`,
-    });
 
     const updated = await updateQueue(currentPatient.id, {
       status: "cancelled",
@@ -465,9 +483,19 @@ export async function skipPatient(organizationId, user) {
 
     return {
       updated,
+      queueId: currentPatient.id,
       patientUserId: currentPatient.appointment?.medicalRecord?.profile?.userId || null,
       queueNumber: currentPatient.queueNumber,
     };
+  });
+
+  await auditLogger({
+    organizationId: resolvedOrgId,
+    userId: user.id,
+    action: "SKIP",
+    entity: "Queue",
+    entityId: result.queueId,
+    description: `Skipped queue number ${result.queueNumber}.`,
   });
 
   // Best-effort notification: the skipped patient's appointment was cancelled.

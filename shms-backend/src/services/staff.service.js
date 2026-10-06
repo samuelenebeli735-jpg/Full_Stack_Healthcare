@@ -16,8 +16,44 @@ import {
 
 import {
   findUserByEmail,
+  findUserWithProfileByStaffNumber,
   createUser,
 } from "../repositories/user.repository.js";
+
+const STAFF_NUMBER_PREFIX = "RUN-STF-";
+
+/**
+ * Next free staff number. Staff numbers are unique across ALL organizations
+ * (and are a login identifier), so a per-organization count is not enough:
+ * it repeats after a deletion and collides with other tenants. Callers hold
+ * a transaction-scoped advisory lock, start after this organization's
+ * highest number and skip any number already taken anywhere (checked with
+ * the global SECURITY DEFINER identifier lookup, no RLS bypass needed).
+ */
+async function nextStaffNumber(tx) {
+  await tx.$executeRawUnsafe(
+    "SELECT pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('shms:staffNumber'))"
+  );
+
+  const rows = await tx.$queryRawUnsafe(
+    `SELECT COALESCE(MAX(CAST(SUBSTRING(s."staffNumber" FROM $1::int) AS INTEGER)), 0) AS max
+       FROM "Staff" s
+      WHERE s."staffNumber" ~ $2`,
+    STAFF_NUMBER_PREFIX.length + 1,
+    "^" + STAFF_NUMBER_PREFIX + "[0-9]{1,9}$"
+  );
+
+  let next = Number(rows?.[0]?.max || 0) + 1;
+
+  for (let i = 0; i < 1000; i++, next++) {
+    const candidate = STAFF_NUMBER_PREFIX + String(next).padStart(6, "0");
+    if (!(await findUserWithProfileByStaffNumber(candidate, tx))) {
+      return candidate;
+    }
+  }
+
+  throw new AppError("Could not allocate a staff number. Please try again.", 503);
+}
 
 import {
   findDepartmentById,
@@ -76,11 +112,7 @@ export async function createNewStaff(data, user) {
           throw new AppError("Position not found.", 404);
         }
 
-        const { total } = await findStaffByOrganization(organizationId, {
-          skip: 0,
-          limit: 1,
-        }, tx);
-        staffNumber = `RUN-STF-${String(total + 1).padStart(6, "0")}`;
+        staffNumber = await nextStaffNumber(tx);
 
         const newUser = await createUser(
           {

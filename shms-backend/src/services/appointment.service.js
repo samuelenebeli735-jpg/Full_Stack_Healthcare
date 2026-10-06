@@ -872,11 +872,17 @@ export async function getDoctorsAvailableOnDate(date, user, query = {}) {
     const orgFilter =
       user.role === "super_admin" ? null : user.organizationId;
 
-    const { items } = await findStaffByOrganization(
-      orgFilter,
-      { employmentStatus: "active", limit: 100 },
-      tx
-    );
+    // Every active staff member, not just the first page of 100.
+    const items = [];
+    for (let page = 1; page <= 1000; page++) {
+      const batch = await findStaffByOrganization(
+        orgFilter,
+        { employmentStatus: "active", limit: 100, page },
+        tx
+      );
+      items.push(...batch.items);
+      if (!batch.items.length || items.length >= batch.total) break;
+    }
 
     const activeStaff = items.filter(
       (staff) => staff.user?.isActive !== false
@@ -954,6 +960,16 @@ export async function getDoctorsAvailableOnDate(date, user, query = {}) {
       });
     });
 
+    // For today, slots that have already started cannot be booked, so they
+    // must not make a doctor look available ("No preference" picks the first).
+    const now = new Date();
+    const isToday = dayDate.toDateString() === now.toDateString();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const slotMinutes = (time) => {
+      const [h, m] = String(time).split(":").map(Number);
+      return h * 60 + m;
+    };
+
     const doctors = [];
 
     activeStaff.forEach((staff) => {
@@ -972,7 +988,9 @@ export async function getDoctorsAvailableOnDate(date, user, query = {}) {
 
       if (!valid) return;
 
-      const availableSlots = slots.filter((slot) => slot.available);
+      const availableSlots = slots.filter(
+        (slot) => slot.available && (!isToday || slotMinutes(slot.time) > nowMinutes)
+      );
 
       doctors.push({
         ...(user.role === "student" ? toPublicStaff(staff) : staff),

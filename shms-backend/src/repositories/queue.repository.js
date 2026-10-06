@@ -116,6 +116,9 @@ export async function findLastQueueByDate(organizationId, queueDate, db = prisma
 
 export async function findQueueByUserIdAndDate(userId, queueDate, db = prisma) {
   return await db.queue.findFirst({
+    // A student can hold more than one ticket on a day (e.g. skipped, then
+    // re-booked); the newest one is the relevant one.
+    orderBy: { createdAt: "desc" },
     where: {
       queueDate,
       appointment: {

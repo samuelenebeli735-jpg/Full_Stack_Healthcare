@@ -25,11 +25,18 @@ const authenticate = async (req, res, next) => {
     // Extract token
     const token = authHeader.split(" ")[1];
 
-    // Verify token
-    const decoded = jwt.verify(
-      token,
-      env.JWT_SECRET
-    );
+    // Verify token. Any failure here is a bad credential (401): jsonwebtoken
+    // throws a plain SyntaxError, not JsonWebTokenError, when the payload
+    // segment is not valid JSON.
+    let decoded;
+    try {
+      decoded = jwt.verify(
+        token,
+        env.JWT_SECRET
+      );
+    } catch {
+      throw new AppError("Invalid or expired token.", 401);
+    }
 
     // Find user
     const user = await findUserWithProfileById(decoded.userId);

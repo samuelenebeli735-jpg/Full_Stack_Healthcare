@@ -53,6 +53,9 @@ export async function createNewPrescription(data, user) {
   }
 
   const prescription = await withTenant(consultation.queue.organizationId, async (tx) => {
+    // Same rule as update: only while the visit is in progress.
+    await assertVisitInProgress(tx, consultation.queueId, "create");
+
     const existingPrescription = await findPrescriptionByConsultation(
       data.consultationId,
       tx
@@ -152,6 +155,26 @@ export async function getPrescriptionById(id, user) {
   return prescription;
 }
 
+/**
+ * Lock the visit's queue row (FOR SHARE, inside the writing transaction) and
+ * return its status, so a concurrent "complete" or cancel cannot slip in
+ * between the check and the write.
+ */
+async function lockVisitStatus(tx, queueId) {
+  const rows = await tx.$queryRaw`SELECT status::text AS status FROM "Queue" WHERE id = ${queueId} FOR SHARE`;
+  return rows[0]?.status || null;
+}
+
+async function assertVisitInProgress(tx, queueId, action) {
+  const status = await lockVisitStatus(tx, queueId);
+  if (status !== "in_progress") {
+    throw new AppError(
+      `Cannot ${action} prescription: the visit is "${status || "unknown"}". Prescriptions can only be changed while the consultation is in progress.`,
+      409
+    );
+  }
+}
+
 export async function updateExistingPrescription(id, data, user) {
   const scoped = resolveUserScope(user);
 
@@ -192,6 +215,8 @@ export async function updateExistingPrescription(id, data, user) {
   const updatedPrescription = await withTenant(
     prescription.consultation.queue.organizationId,
     async (tx) => {
+      // Re-check under a row lock: the check above ran in an earlier transaction.
+      await assertVisitInProgress(tx, prescription.consultation.queueId, "update");
       await updatePrescription(id, {}, tx);
       await deletePrescriptionItems(id, tx);
       await createPrescriptionItems(
@@ -243,6 +268,14 @@ export async function removePrescription(id, user) {
   }
 
   await withTenant(prescription.consultation.queue.organizationId, async (tx) => {
+    // A completed visit's prescription is part of the clinical record, as for
+    // consultations (removeConsultation).
+    if ((await lockVisitStatus(tx, prescription.consultation.queueId)) === "completed") {
+      throw new AppError(
+        "A prescription for a completed visit is part of the clinical record and cannot be deleted.",
+        409
+      );
+    }
     await deletePrescription(id, tx);
   });
 

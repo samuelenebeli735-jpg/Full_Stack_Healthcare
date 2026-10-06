@@ -47,7 +47,11 @@ export const callNext = asyncHandler(async (req, res) => {
 });
 
 export const skip = asyncHandler(async (req, res) => {
-  const result = await skipPatient(req.params.organizationId, req.user);
+  const result = await skipPatient(
+    req.params.organizationId,
+    req.user,
+    req.body?.queueId || null
+  );
 
   return successResponse(res, result, "Patient skipped successfully.");
 });

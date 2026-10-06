@@ -2,7 +2,7 @@ import AppError from "../utils/AppError.js";
 import {
   resolveOrganizationId,
 } from "../utils/tenantAccess.js";
-import { withTenant, withSuperAdmin } from "../utils/tenantContext.js";
+import { withTenant, withSuperAdmin, currentTenantTransaction } from "../utils/tenantContext.js";
 import {
   getPagination,
   buildPaginationMeta,
@@ -20,9 +20,26 @@ export async function logAction(data) {
     if (!data || !data.organizationId) {
       return;
     }
-    // Self-contained tenancy: audit logging runs on its own transaction
-    // (nested interactive transactions use a separate connection), so it
-    // keeps working whether it is called inside a tenant transaction or not.
+    // Inside a transaction for the same organization, write on it: the
+    // audit row commits or rolls back with the action, and no second pool
+    // connection is needed while the caller holds one (under load that
+    // second connection could time out and the row was silently lost). A
+    // savepoint keeps an audit failure from aborting the caller's work.
+    const active = currentTenantTransaction();
+    if (active && active.organizationId === String(data.organizationId)) {
+      const { tx } = active;
+      await tx.$executeRawUnsafe("SAVEPOINT shms_audit");
+      try {
+        const row = await createAuditLog(data, tx);
+        await tx.$executeRawUnsafe("RELEASE SAVEPOINT shms_audit");
+        return row;
+      } catch (error) {
+        await tx.$executeRawUnsafe("ROLLBACK TO SAVEPOINT shms_audit").catch(() => {});
+        throw error;
+      }
+    }
+
+    // Otherwise audit logging runs on its own transaction.
     return await withTenant(data.organizationId, async (tx) => {
       return await createAuditLog(data, tx);
     });

@@ -47,6 +47,13 @@ const errorMiddleware = (err, req, res, _next) => {
     }
   }
 
+  // A malformed query reached Prisma (e.g. an unknown "...Id" filter key or a
+  // wrong value type): the client's request is invalid, not a server fault.
+  else if (err instanceof Prisma.PrismaClientValidationError) {
+    statusCode = 400;
+    message = "Invalid request parameters.";
+  }
+
   // Zod validation errors
   else if (err instanceof ZodError) {
     statusCode = 400;

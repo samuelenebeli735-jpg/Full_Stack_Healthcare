@@ -23,3 +23,10 @@ export const organizationQueueSchema = z.object({
     .string()
     .cuid("Invalid organization ID."),
 });
+
+// Optional: the ticket the staff member chose to skip.
+export const skipQueueBodySchema = z
+  .object({
+    queueId: z.string().cuid("Invalid queue ID.").optional(),
+  })
+  .optional();

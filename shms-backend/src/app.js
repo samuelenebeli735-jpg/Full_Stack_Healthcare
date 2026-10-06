@@ -11,6 +11,7 @@ import { apiLimiter } from "./middleware/rateLimiter.middleware.js";
 import { API_PREFIX, APP_NAME, APP_VERSION } from "./config/constants.js";
 import env from "./config/env.js";
 import logger from "./utils/logger.js";
+import prisma from "./config/db.js";
 
 const app = express();
 
@@ -100,10 +101,22 @@ app.get("/", (req, res) => {
 |--------------------------------------------------------------------------
 */
 
-app.get(`${API_PREFIX}/health`, (req, res) => {
-  res.status(200).json({
-    success: true,
-    status: "OK",
+app.get(`${API_PREFIX}/health`, async (req, res) => {
+  // Liveness plus a real database round-trip (no tenant data is read).
+  let database = "ok";
+  try {
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 3000)),
+    ]);
+  } catch {
+    database = "unavailable";
+  }
+
+  res.status(database === "ok" ? 200 : 503).json({
+    success: database === "ok",
+    status: database === "ok" ? "OK" : "DEGRADED",
+    database,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
   });

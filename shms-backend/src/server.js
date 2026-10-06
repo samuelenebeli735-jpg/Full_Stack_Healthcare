@@ -8,7 +8,8 @@ const HOST = env.HOST;
 
 const server = app.listen(PORT, HOST, () => {
   logger.info(
-    `Server running — Environment: ${env.NODE_ENV}, Port: ${PORT}, Host: ${HOST}`
+    `Server running — Environment: ${env.NODE_ENV}, Port: ${PORT}, Host: ${HOST}, ` +
+      `Time zone: ${Intl.DateTimeFormat().resolvedOptions().timeZone} (clinic wall-clock)`
   );
 });
 

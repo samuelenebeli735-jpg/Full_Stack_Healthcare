@@ -1,5 +1,21 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import prisma from "../config/db.js";
 import AppError from "./AppError.js";
+
+// The tenant transaction currently running on this async path, so helpers
+// such as the audit logger can write on it instead of opening a second
+// connection while this one is held.
+const tenantTx = new AsyncLocalStorage();
+
+/**
+ * The open tenant transaction for this request path, or null.
+ * Returns { tx, organizationId } only while the transaction callback runs.
+ */
+export function currentTenantTransaction() {
+  const store = tenantTx.getStore();
+  return store && store.open ? store : null;
+}
 
 async function setLocalGuc(tx, name, value) {
   await tx.$executeRawUnsafe(
@@ -27,7 +43,13 @@ export async function withTenant(organizationId, callback) {
   return await prisma.$transaction(
     async (tx) => {
       await setLocalGuc(tx, "app.organization_id", orgId);
-      return await callback(tx);
+      const store = { tx, organizationId: orgId, open: true };
+      try {
+        return await tenantTx.run(store, () => callback(tx));
+      } finally {
+        // Work that outlives the callback must not touch this transaction.
+        store.open = false;
+      }
     },
     { timeout: 30000 }
   );

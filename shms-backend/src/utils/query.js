@@ -47,7 +47,13 @@ export function buildPrismaQuery(query = {}, options = {}) {
   } = options;
 
   const { page, limit, skip } = getPagination(query);
-  const orderBy = getSorting(query, allowedSortFields) || defaultSort;
+  // Always end with the unique id so offset paging is stable when sort
+  // values tie (otherwise page 2 can repeat or skip rows of page 1).
+  const primarySort = getSorting(query, allowedSortFields) || defaultSort;
+  const orderBy = [
+    ...(Array.isArray(primarySort) ? primarySort : [primarySort]).filter(Boolean),
+    { id: "asc" },
+  ];
   const where = {};
 
   if (query.search && searchFields.length > 0) {

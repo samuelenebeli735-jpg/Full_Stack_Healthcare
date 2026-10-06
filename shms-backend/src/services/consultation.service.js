@@ -139,6 +139,15 @@ export async function updatePatientConsultation(id, data, user) {
   }
 
   const updated = await withTenant(consultation.queue.organizationId, async (tx) => {
+    // Re-check under a row lock: the check above ran in an earlier
+    // transaction, and a concurrent "complete" must not let this edit land.
+    const rows = await tx.$queryRaw`SELECT status::text AS status FROM "Queue" WHERE id = ${consultation.queueId} FOR SHARE`;
+    if (rows[0]?.status !== "in_progress") {
+      throw new AppError(
+        `Cannot update consultation: the visit is "${rows[0]?.status || "unknown"}". Only "in_progress" consultations can be modified.`,
+        409
+      );
+    }
     return await updateConsultation(id, data, tx);
   });
 

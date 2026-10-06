@@ -13,6 +13,9 @@ module.exports = {
       max_memory_restart: "512M",
       env: {
         NODE_ENV: "production",
+        // Scheduling, check-in and "today" use the server's local time as the
+        // clinic's wall-clock time; a UTC host would shift every rule by an hour.
+        TZ: process.env.TZ || "Africa/Lagos",
       },
     },
   ],

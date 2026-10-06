@@ -8,6 +8,7 @@ import {
   checkInSchema,
   queueIdSchema,
   organizationQueueSchema,
+  skipQueueBodySchema,
 } from "../validations/queue.validation.js";
 
 import {
@@ -81,7 +82,7 @@ router.post(
   "/skip/:organizationId",
   authenticate,
   authorize("staff", "admin", "super_admin"),
-  validate({ params: organizationQueueSchema }),
+  validate({ params: organizationQueueSchema, body: skipQueueBodySchema }),
   skip
 );
 

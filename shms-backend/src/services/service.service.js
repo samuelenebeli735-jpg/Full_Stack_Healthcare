@@ -96,7 +96,7 @@ export async function getServiceById(id, organizationId, user) {
     return await findServiceById(id, tx);
   });
 
-  if (!service || service.organizationId !== resolvedOrgId) {
+  if (!service || (resolvedOrgId && service.organizationId !== resolvedOrgId)) {
     throw new AppError("Service not found.", 404);
   }
 
