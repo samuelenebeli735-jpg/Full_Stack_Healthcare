@@ -214,6 +214,14 @@ export async function updateExistingStaff(id, data, user) {
     throw new AppError("Staff not found.", 404);
   }
 
+  if (
+    data.employmentStatus !== undefined &&
+    data.employmentStatus !== "active" &&
+    staff.userId === user.id
+  ) {
+    throw new AppError("You cannot suspend or end your own employment.", 400);
+  }
+
   const updated = await withTenant(organizationId, async (tx) => {
     if (data.departmentId) {
       const department = await findDepartmentById(data.departmentId, tx);
@@ -245,8 +253,26 @@ export async function updateExistingStaff(id, data, user) {
       }
     }
 
-    return await updateStaff(id, updateData, tx);
+    const result = await updateStaff(id, updateData, tx);
+
+    /* Employment status governs access: a suspended, resigned or retired
+       staff member's login account is deactivated in the same transaction
+       (the auth middleware checks isActive on every request, so existing
+       tokens stop working too), and reactivated when they return to active. */
+    if (data.employmentStatus !== undefined) {
+      await tx.user.update({
+        where: { id: staff.userId },
+        data: { isActive: data.employmentStatus === "active" },
+      });
+    }
+
+    return result;
   });
+
+  const statusNote =
+    data.employmentStatus !== undefined && data.employmentStatus !== staff.employmentStatus
+      ? ` Employment status ${staff.employmentStatus} -> ${data.employmentStatus}; account ${data.employmentStatus === "active" ? "enabled" : "disabled"}.`
+      : "";
 
   await auditLogger({
     organizationId: staff.user.organizationId,
@@ -254,7 +280,7 @@ export async function updateExistingStaff(id, data, user) {
     action: "UPDATE",
     entity: "Staff",
     entityId: id,
-    description: `Updated staff ${staff.firstName} ${staff.lastName} (${staff.staffNumber}).`,
+    description: `Updated staff ${staff.firstName} ${staff.lastName} (${staff.staffNumber}).${statusNote}`,
   });
 
   return updated;

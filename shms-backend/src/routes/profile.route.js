@@ -8,11 +8,14 @@ import {
   getMyProfile,
   updateMyProfile,
   changeMyPassword,
+  updateStudentAccountStatus,
 } from "../controllers/profile.controller.js";
 
 import {
   updateProfileSchema,
   changePasswordSchema,
+  studentAccountParamsSchema,
+  studentAccountStatusSchema,
 } from "../validations/profile.validation.js";
 
 const router = Router();
@@ -30,6 +33,15 @@ router.put(
   authorize("student"),
   validate({ body: updateProfileSchema }),
   updateMyProfile
+);
+
+// Admin: enable/disable a student's login account.
+router.patch(
+  "/students/:userId/status",
+  authenticate,
+  authorize("admin", "super_admin"),
+  validate({ params: studentAccountParamsSchema, body: studentAccountStatusSchema }),
+  updateStudentAccountStatus
 );
 
 router.put(

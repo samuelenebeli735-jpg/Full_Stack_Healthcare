@@ -224,6 +224,12 @@ export async function updateExistingMedicalRecord(id, data, user) {
     throw new AppError("Medical record not found.", 404);
   }
 
+  // Record status (active/archived) is an administrative decision: a student
+  // cannot archive or re-activate their own record through self-service.
+  if (user.role === "student" && data.status !== undefined) {
+    throw new AppError("Only clinic staff can change a medical record's status.", 403);
+  }
+
   const updateData = {};
 
   if (data.status !== undefined) {

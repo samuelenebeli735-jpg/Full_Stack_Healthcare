@@ -72,7 +72,7 @@ router.patch(
 router.delete(
   "/:id",
   authenticate,
-  authorize("staff", "admin", "super_admin"),
+  authorize("admin", "super_admin"),
   validate({ params: consultationIdSchema }),
   remove
 );

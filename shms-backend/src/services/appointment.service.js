@@ -158,6 +158,12 @@ async function validateStaff(staffId, organizationId, db = prisma) {
     throw new AppError("Staff not found.", 404);
   }
 
+  // Suspended, resigned or retired staff cannot take appointments, whether
+  // booked through the UI or directly through the API.
+  if (staff.employmentStatus !== "active") {
+    throw new AppError("Selected staff is not active.", 400);
+  }
+
   return staff;
 }
 

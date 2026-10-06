@@ -5,7 +5,14 @@ import {
   getProfile,
   updateStudentProfile,
   changePassword,
+  setStudentAccountStatus,
 } from "../services/profile.service.js";
+
+export const updateStudentAccountStatus = asyncHandler(async (req, res) => {
+  const result = await setStudentAccountStatus(req.params.userId, req.body.isActive, req.user);
+
+  return successResponse(res, result, result.isActive ? "Student account activated." : "Student account deactivated.");
+});
 
 export const getMyProfile = asyncHandler(async (req, res) => {
   const result = await getProfile(req.user.id);

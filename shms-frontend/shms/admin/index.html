@@ -510,8 +510,14 @@
     async function toggleDoctorAvailability(id) {
       const doc = adminDoctors.find(d => d.id === id);
       if (!doc) return;
+      const activate = !doc.availability;
+      // Deactivation suspends employment and disables the doctor's sign-in.
+      if (!confirm(activate
+        ? 'Re-activate this doctor? Their account will be able to sign in and take bookings again.'
+        : 'Deactivate this doctor? They will no longer be able to sign in or receive bookings.')) return;
       try {
-        await API.updateDoctor(id, { availability: !doc.availability });
+        await API.updateDoctor(id, { availability: activate });
+        Utils.showToast(activate ? 'Doctor activated' : 'Doctor deactivated', 'success');
         await loadDoctors();
       } catch(e) { Utils.showToast(e.message, 'error'); }
     }
@@ -563,18 +569,24 @@
           <td>${Utils.sanitize(s.email)}</td>
           <td>${Utils.sanitize(s.faculty || '-')}</td>
           <td><span class="badge badge-primary">${Utils.sanitize(s.level || '-')}</span></td>
-          <td><button class="btn btn-sm btn-danger" onclick="deactivateStudent('${s.id}')">Deactivate</button></td>
+          <td>${s.account_active
+            ? `<button class="btn btn-sm btn-danger" onclick="setStudentAccount('${Utils.sanitize(s.userId)}', false)">Deactivate</button>`
+            : `<span class="badge badge-danger" style="margin-right:6px">Inactive</span><button class="btn btn-sm btn-secondary" onclick="setStudentAccount('${Utils.sanitize(s.userId)}', true)">Activate</button>`}</td>
         </tr>`;
       });
     }
 
     document.getElementById('studentSearch')?.addEventListener('input', Utils.debounce(() => loadStudents(1), 350));
 
-    async function deactivateStudent(id) {
-      if (!confirm('Deactivate this student account?')) return;
+    /* Deactivating disables the student's login account (they can no longer
+       sign in, and existing sessions stop working); activating restores it.
+       The medical record itself is left unchanged. */
+    async function setStudentAccount(userId, isActive) {
+      if (!userId) { Utils.showToast('This student has no linked account.', 'error'); return; }
+      if (!confirm(isActive ? 'Re-activate this student account?' : 'Deactivate this student account? The student will no longer be able to sign in.')) return;
       try {
-        await API.deleteStudent(id);
-        Utils.showToast('Student deactivated', 'success');
+        await API.setStudentAccountActive(userId, isActive);
+        Utils.showToast(isActive ? 'Student account activated' : 'Student account deactivated', 'success');
         await loadStudents();
       } catch(e) { Utils.showToast(e.message, 'error'); }
     }

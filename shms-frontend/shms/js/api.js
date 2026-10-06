@@ -199,6 +199,8 @@ const API = (() => {
     return {
       id: r.id,
       medicalRecordId: r.id,
+      userId: p.userId || (p.user && p.user.id) || '',
+      account_active: p.user ? p.user.isActive !== false : true,
       recordNumber: r.recordNumber,
       full_name: `${p.firstName || ''} ${p.middleName || ''} ${p.lastName || ''}`.replace(/\s+/g, ' ').trim(),
       matric: p.matricNumber || '',
@@ -793,7 +795,9 @@ const API = (() => {
       return { success: true, data: _mapPatient(res.data) };
     },
     updateStudent: async (id, data) => _request('PATCH', `/medical-records/${id}`, data),
-    deleteStudent: async (id) => _request('PATCH', `/medical-records/${id}`, { status: 'archived' }),
+    /* Enable/disable a student's login account (admin). This is what
+       "Deactivate student" means; it does not archive the medical record. */
+    setStudentAccountActive: async (userId, isActive) => _request('PATCH', `/profiles/students/${encodeURIComponent(userId)}/status`, { isActive: !!isActive }),
     archiveStudent: async (id, archived) => _request('PATCH', `/medical-records/${id}`, { status: archived ? 'archived' : 'active' }),
 
     /* ---------- Master data ---------- */

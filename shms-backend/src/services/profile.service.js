@@ -1,6 +1,7 @@
 import AppError from "../utils/AppError.js";
 import { hashPassword, comparePassword } from "../utils/password.js";
 import { withTenant } from "../utils/tenantContext.js";
+import { auditLogger } from "../utils/auditLogger.js";
 
 import {
   updateProfile,
@@ -20,6 +21,42 @@ export async function getProfile(userId) {
   }
 
   return user;
+}
+
+/**
+ * Enable or disable a student's login account (admin / super_admin only).
+ * Disabling takes effect immediately: login is refused and the auth
+ * middleware rejects existing tokens because it checks isActive on every
+ * request. The student's medical record is not touched.
+ */
+export async function setStudentAccountStatus(targetUserId, isActive, actor) {
+  const target = await findUserOrgHint(targetUserId);
+
+  if (!target || target.role !== "student") {
+    throw new AppError("Student not found.", 404);
+  }
+
+  if (actor.role !== "super_admin" && target.organizationId !== actor.organizationId) {
+    throw new AppError("Student not found.", 404);
+  }
+
+  await withTenant(target.organizationId, async (tx) => {
+    await tx.user.update({
+      where: { id: targetUserId },
+      data: { isActive },
+    });
+  });
+
+  await auditLogger({
+    organizationId: target.organizationId,
+    userId: actor.id,
+    action: isActive ? "ACTIVATE" : "DEACTIVATE",
+    entity: "User",
+    entityId: targetUserId,
+    description: `Student account ${isActive ? "activated" : "deactivated"}.`,
+  });
+
+  return { id: targetUserId, isActive };
 }
 
 export async function updateStudentProfile(userId, data) {

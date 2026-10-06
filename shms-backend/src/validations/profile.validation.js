@@ -71,6 +71,14 @@ export const updateProfileSchema = z.object({
   profilePhotoUrl: z.string().trim().url("Invalid photo URL.").optional(),
 });
 
+export const studentAccountParamsSchema = z.object({
+  userId: z.string().cuid("Invalid user ID."),
+});
+
+export const studentAccountStatusSchema = z.object({
+  isActive: z.boolean({ error: "isActive must be true or false." }),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, "Current password is required."),
   newPassword: z.string().min(8, "New password must be at least 8 characters."),

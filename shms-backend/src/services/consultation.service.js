@@ -169,7 +169,30 @@ export async function removeConsultation(id, user) {
     throw new AppError("Consultation not found.", 404);
   }
 
+  /* A consultation is part of the clinical record. It may only be removed
+     while the visit is still open and before anything was prescribed:
+     the Prescription relation cascades on delete, so deleting a consultation
+     with a prescription would silently destroy the prescription too. Both
+     conditions are re-checked inside the deleting transaction. */
   await withTenant(consultation.queue.organizationId, async (tx) => {
+    const queue = await tx.queue.findUnique({
+      where: { id: consultation.queueId },
+      select: { status: true },
+    });
+
+    if (queue && queue.status === "completed") {
+      throw new AppError("A consultation for a completed visit is part of the clinical record and cannot be deleted.", 409);
+    }
+
+    const prescription = await tx.prescription.findUnique({
+      where: { consultationId: id },
+      select: { id: true },
+    });
+
+    if (prescription) {
+      throw new AppError("This consultation has a prescription and cannot be deleted.", 409);
+    }
+
     await deleteConsultation(id, tx);
   });
 
