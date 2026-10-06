@@ -35,7 +35,7 @@
     .doctor-card .dc-info h4 { font-size:14px; font-weight:600; color:var(--text-primary); }
     .doctor-card .dc-info p { font-size:13px; color:var(--text-secondary); }
     .doctor-card .dc-actions { display:flex; gap:6px; }
-    .satisfaction-ring { width:80px; height:80px; border-radius:var(--radius-full); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; color:var(--primary); background:conic-gradient(var(--primary) 0deg 338deg, var(--bg-tertiary) 338deg 360deg); margin:0 auto; position:relative; transition:all 0.5s; }
+    .satisfaction-ring { width:80px; height:80px; border-radius:var(--radius-full); display:flex; align-items:center; justify-content:center; font-size:22px; font-weight:800; color:var(--primary); background:conic-gradient(var(--bg-tertiary) 0deg 360deg); margin:0 auto; position:relative; transition:all 0.5s; }
     .satisfaction-ring:hover { transform:scale(1.08); box-shadow:0 0 30px rgba(var(--theme-rgb),0.25); }
     .satisfaction-ring::after { content:''; position:absolute; width:60px; height:60px; border-radius:var(--radius-full); background:var(--bg-primary); }
     .satisfaction-ring span { position:relative; z-index:1; }
@@ -110,35 +110,27 @@
               <div class="card-header"><h3>Satisfaction Rate</h3></div>
               <div class="card-body text-center">
                 <div class="satisfaction-ring"><span id="satRate">–</span><span id="satRatePct" style="font-size:14px;position:relative;z-index:1">%</span></div>
-                <p style="margin-top:12px;font-size:13px;color:var(--text-secondary)">Patient satisfaction score</p>
+                <p style="margin-top:12px;font-size:13px;color:var(--text-secondary)">No satisfaction survey data is collected yet</p>
               </div>
             </div>
           </div>
           <div class="admin-grid-2 mt-lg">
             <div class="card">
-              <div class="card-header"><h3>System Status</h3><span class="badge badge-success">All Systems Operational</span></div>
+              <div class="card-header"><h3>System Status</h3><span class="badge badge-neutral" id="sysBadge">Checking…</span></div>
               <div class="card-body">
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
                   <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius);background:var(--bg-secondary)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:pulse 2s infinite"></span>
-                    <div><div style="font-size:13px;font-weight:500">Queue Service</div><div style="font-size:11px;color:var(--text-light)">Online &middot; 0 issues</div></div>
+                    <span id="sysApiDot" style="width:10px;height:10px;border-radius:50%;background:#9ca3af;flex-shrink:0"></span>
+                    <div><div style="font-size:13px;font-weight:500">API</div><div style="font-size:11px;color:var(--text-light)" id="sysApiText">Checking…</div></div>
                   </div>
                   <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius);background:var(--bg-secondary)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:pulse 2s infinite 0.15s"></span>
-                    <div><div style="font-size:13px;font-weight:500">Database</div><div style="font-size:11px;color:var(--text-light)">Online &middot; Normal load</div></div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius);background:var(--bg-secondary)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0;animation:pulse 2s infinite 0.3s"></span>
-                    <div><div style="font-size:13px;font-weight:500">Appointment Service</div><div style="font-size:11px;color:var(--text-light)">Online &middot; 0 issues</div></div>
-                  </div>
-                  <div style="display:flex;align-items:center;gap:10px;padding:10px;border-radius:var(--radius);background:var(--bg-secondary)">
-                    <span style="width:10px;height:10px;border-radius:50%;background:#22c55e;flex-shrink:0"></span>
-                    <div><div style="font-size:13px;font-weight:500">Notification Service</div><div style="font-size:11px;color:var(--text-light)">Online &middot; 0 issues</div></div>
+                    <span id="sysDbDot" style="width:10px;height:10px;border-radius:50%;background:#9ca3af;flex-shrink:0"></span>
+                    <div><div style="font-size:13px;font-weight:500">Database</div><div style="font-size:11px;color:var(--text-light)" id="sysDbText">Checking…</div></div>
                   </div>
                 </div>
                 <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;justify-content:space-between;font-size:12px;color:var(--text-light)">
-                  <span>Uptime: 99.97%</span>
-                  <span>Last checked: just now</span>
+                  <span id="sysUptime">API process uptime: –</span>
+                  <span id="sysChecked">Last checked: –</span>
                 </div>
               </div>
             </div>
@@ -294,7 +286,16 @@
             <div class="form-group"><label class="form-label">Phone</label><input type="tel" class="form-input" id="docPhone"></div>
           </div>
           <div class="form-group" id="docPasswordGroup"><label class="form-label">Initial Password</label><input type="password" class="form-input" id="docPassword" autocomplete="new-password" minlength="8" placeholder="At least 8 characters"></div>
-          <div class="form-group"><label class="form-label">Max Patients/Day</label><input type="number" class="form-input" id="docMaxPatients" value="15" min="1" max="40"></div>
+          <div id="docNewFields">
+            <div class="form-row">
+              <div class="form-group"><label class="form-label" for="docGender">Gender</label><select class="form-select" id="docGender"><option value="">Select</option><option>Female</option><option>Male</option></select></div>
+              <div class="form-group"><label class="form-label" for="docDob">Date of birth</label><input type="date" class="form-input" id="docDob"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label class="form-label" for="docDepartment">Department</label><select class="form-select" id="docDepartment"><option value="">Select</option></select></div>
+              <div class="form-group"><label class="form-label" for="docPosition">Position</label><select class="form-select" id="docPosition"><option value="">Select</option></select></div>
+            </div>
+          </div>
         </form>
       </div>
       <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('doctorModal')">Cancel</button><button class="btn btn-primary" onclick="saveDoctor()">Save Doctor</button></div>
@@ -361,7 +362,26 @@
     }
 
     // ==================== OVERVIEW ====================
+    // Real checks only: the API answers /health and /health pings the database.
+    async function checkSystemStatus() {
+      const set = (dotId, textId, ok, text) => {
+        document.getElementById(dotId).style.background = ok === null ? '#9ca3af' : ok ? '#22c55e' : '#ef4444';
+        document.getElementById(textId).textContent = text;
+      };
+      const h = await API.getHealth();
+      set('sysApiDot', 'sysApiText', h.reachable, h.reachable ? 'Reachable' : 'Not reachable');
+      set('sysDbDot', 'sysDbText', h.reachable ? h.database === 'ok' : null, !h.reachable ? 'Unknown' : (h.database === 'ok' ? 'Reachable' : 'Unavailable'));
+      const healthy = h.reachable && h.database === 'ok';
+      const badge = document.getElementById('sysBadge');
+      badge.textContent = healthy ? 'Operational' : 'Problem detected';
+      badge.className = 'badge ' + (healthy ? 'badge-success' : 'badge-danger');
+      const up = Number(h.uptime);
+      document.getElementById('sysUptime').textContent = 'API process uptime: ' + (Number.isFinite(up) ? (up >= 3600 ? Math.floor(up / 3600) + ' h ' : '') + Math.floor((up % 3600) / 60) + ' min' : '–');
+      document.getElementById('sysChecked').textContent = 'Last checked: ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
     async function loadOverview() {
+      checkSystemStatus();
       try {
         const res = await API.getAdminStats();
         if (!res.success) return;
@@ -369,7 +389,7 @@
         document.getElementById('adminStatsRow').innerHTML = `
           <div class="stat-card blue"><div class="stat-card-header"><span class="stat-card-label">Total Doctors</span><div class="stat-card-icon">👨‍⚕️</div></div><div class="stat-card-value">${d.total_doctors}</div><div class="stat-card-change positive">${d.available_doctors == null ? '–' : d.available_doctors + ' available today'}</div></div>
           <div class="stat-card green"><div class="stat-card-header"><span class="stat-card-label">Today's Appointments</span><div class="stat-card-icon">📋</div></div><div class="stat-card-value">${d.appointments_today}</div><div class="stat-card-change positive">${d.completed_today == null ? '– completed' : d.completed_today + ' completed'}</div></div>
-          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Students Registered</span><div class="stat-card-icon">🎓</div></div><div class="stat-card-value">${d.total_students}</div><div class="stat-card-change positive">Active</div></div>
+          <div class="stat-card yellow"><div class="stat-card-header"><span class="stat-card-label">Students Registered</span><div class="stat-card-icon">🎓</div></div><div class="stat-card-value">${d.total_students}</div><div class="stat-card-change">All registered</div></div>
           <div class="stat-card purple"><div class="stat-card-header"><span class="stat-card-label">Avg Wait Time</span><div class="stat-card-icon">⏱️</div></div><div class="stat-card-value">${d.avg_wait_time == null ? '–' : d.avg_wait_time + 'm'}</div><div class="stat-card-change">Peak: ${d.peak_hour == null ? '–' : String(d.peak_hour).padStart(2, '0') + ':00'}</div></div>
         `;
         document.getElementById('satRate').textContent = d.satisfaction_rate == null ? '–' : d.satisfaction_rate;
@@ -454,7 +474,7 @@
         card.innerHTML = `
           <img src="../assets/images/doctor-avatar.svg" alt="" class="dc-avatar-img">
           <div class="dc-info"><h4>${Utils.sanitize(d.name)} <span class="badge badge-${d.availability ? 'success' : 'danger'}">${d.availability ? 'Available' : 'Unavailable'}</span></h4>
-            <p>${Utils.sanitize(d.specialization)} &middot; ${d.email ? Utils.sanitize(d.email) : 'No email'} &middot; Max: ${Number(d.max_patients) || 15}/day</p></div>
+            <p>${Utils.sanitize(d.specialization)} &middot; ${d.email ? Utils.sanitize(d.email) : 'No email'}${d.department ? ' &middot; ' + Utils.sanitize(d.department) : ''}</p></div>
           <div class="dc-actions">
             <button class="btn btn-sm btn-secondary" data-action="toggle">${d.availability ? 'Deactivate' : 'Activate'}</button>
             <button class="btn btn-sm btn-secondary" data-action="edit">Edit</button>
@@ -476,7 +496,7 @@
         if (!doc) return;
         document.getElementById('doctorModalTitle').textContent = 'Edit Doctor';
         document.getElementById('doctorId').value = doc.id;
-        document.getElementById('docName').value = doc.name;
+        document.getElementById('docName').value = doc.full_name || doc.name;
         document.getElementById('docSpecialization').value = doc.specialization;
         document.getElementById('docEmail').value = doc.email || '';
         /* The login email lives on the linked User account and PATCH /staff/:id
@@ -485,9 +505,10 @@
         document.getElementById('docEmail').readOnly = true;
         document.getElementById('docEmailHint').hidden = false;
         document.getElementById('docPhone').value = doc.phone || '';
-        document.getElementById('docMaxPatients').value = doc.max_patients || 15;
         document.getElementById('docPassword').value = '';
         document.getElementById('docPasswordGroup').style.display = 'none';
+        // Personal/HR fields are set at creation and are not editable here.
+        document.getElementById('docNewFields').style.display = 'none';
       } else {
         document.getElementById('doctorModalTitle').textContent = 'Add Doctor';
         document.getElementById('doctorId').value = '';
@@ -495,8 +516,27 @@
         document.getElementById('docEmail').readOnly = false;
         document.getElementById('docEmailHint').hidden = true;
         document.getElementById('docPasswordGroup').style.display = '';
+        document.getElementById('docNewFields').style.display = '';
+        fillStaffMasterSelects();
       }
       overlay.classList.add('active');
+    }
+
+    // Department/position choices for a new doctor (names are data: set as text).
+    async function fillStaffMasterSelects() {
+      try {
+        const res = await API.getStaffMasterData();
+        [['docDepartment', res.departments], ['docPosition', res.positions]].forEach(([id, list]) => {
+          const sel = document.getElementById(id);
+          sel.innerHTML = '<option value="">Select</option>';
+          list.forEach((x) => {
+            const o = document.createElement('option');
+            o.value = x.id;
+            o.textContent = x.name;
+            sel.appendChild(o);
+          });
+        });
+      } catch (e) { Utils.showToast(e.message, 'error'); }
     }
 
     async function saveDoctor() {
@@ -507,8 +547,13 @@
         // Email is only used when creating the account; it is not editable afterwards.
         email: id ? undefined : document.getElementById('docEmail').value.trim(),
         phone: document.getElementById('docPhone').value.trim(),
-        max_patients: document.getElementById('docMaxPatients').value,
       };
+      if (!id) {
+        data.gender = document.getElementById('docGender').value;
+        data.dateOfBirth = document.getElementById('docDob').value;
+        data.departmentId = document.getElementById('docDepartment').value;
+        data.positionId = document.getElementById('docPosition').value;
+      }
       if (!data.name || !data.specialization) {
         Utils.showToast('Name and specialization are required', 'error');
         return;
@@ -1020,6 +1065,13 @@
       }, 100);
       await loadOverview();
       setInterval(() => { if (!document.hidden) loadOverview(); }, 30000);
+      // Sidebar links (#doctors, #students, ...) open that tab.
+      const openTabFromHash = () => {
+        const tab = (location.hash || '').slice(1);
+        if (tab && document.querySelector('.admin-tab[data-tab="' + CSS.escape(tab) + '"]')) switchTab(tab);
+      };
+      window.addEventListener('hashchange', openTabFromHash);
+      openTabFromHash();
     });
   </script>
 </body>

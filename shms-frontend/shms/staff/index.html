@@ -233,7 +233,6 @@
             <div class="sf-card">
               <div class="sf-card-header">
                 <h3>Health Overview</h3>
-                <a class="view-link" href="javascript:void(0)">This Month &#9662;</a>
               </div>
               <div class="sf-card-body">
                 <div class="sf-donut-wrap" id="healthDonut">
@@ -280,7 +279,6 @@
               <div class="sf-banner-content">
                 <h3>Keep Your Students Healthy &amp; Safe</h3>
                 <p>Ensure timely checkups, vaccinations, and follow-ups for a healthier tomorrow.</p>
-                <button class="sf-banner-btn">View Health Tips</button>
               </div>
               <div class="sf-banner-icon">
                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="1.5"><path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/><path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/><circle cx="20" cy="10" r="2"/></svg>
@@ -1196,13 +1194,10 @@
       setRxStatus('No prescription added.', 'muted');
     });
 
-    const doPatientSearch = Utils.debounce(async (query) => {
-      if (!query || query.length < 2) {
-        document.getElementById('patientsResults').innerHTML = '<p style="color:var(--text-secondary);font-size:14px;padding:16px">Type at least 2 characters to search.</p>';
-        return;
-      }
+    // Server-side search, one page at a time, with the real total and paging.
+    async function runPatientSearch(query, page) {
       try {
-        const res = await API.searchPatients(query);
+        const res = await API.searchPatients(query, { page });
         if (res.success) {
           const results = res.data;
           const container = document.getElementById('patientsResults');
@@ -1223,10 +1218,27 @@
             row.querySelector('[data-action="view"]').addEventListener('click', () => showPatientDetail(p.id, p));
             container.appendChild(row);
           });
+          const pg = res.pagination || {};
+          const summary = document.createElement('p');
+          summary.style.cssText = 'font-size:13px;color:var(--text-secondary);margin:8px 0';
+          summary.textContent = (pg.total != null ? pg.total : results.length) + ' matching patient' + ((pg.total != null ? pg.total : results.length) === 1 ? '' : 's');
+          container.appendChild(summary);
+          const pager = document.createElement('div');
+          pager.className = 'pagination';
+          container.appendChild(pager);
+          Utils.renderPagination(pager, pg.page || page, pg.totalPages || 1, (p) => runPatientSearch(query, p));
         }
       } catch(e) {
         document.getElementById('patientsResults').innerHTML = '<div class="empty-state"><h3>Search failed</h3><p>Could not search patients. Please try again.</p></div>';
       }
+    }
+
+    const doPatientSearch = Utils.debounce(async (query) => {
+      if (!query || query.length < 2) {
+        document.getElementById('patientsResults').innerHTML = '<p style="color:var(--text-secondary);font-size:14px;padding:16px">Type at least 2 characters to search.</p>';
+        return;
+      }
+      await runPatientSearch(query, 1);
     }, 400);
 
     document.getElementById('patientSearchInput')?.addEventListener('input', (e) => {
@@ -1302,6 +1314,13 @@
       document.getElementById('viewWaiting')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('queue'); });
       document.getElementById('viewInConsultation')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('queue'); });
       document.getElementById('viewAllRecords')?.addEventListener('click', (event) => { event.preventDefault(); switchStaffTab('patients'); });
+      // Sidebar links (#queue, #patients) open that tab.
+      const openStaffTabFromHash = () => {
+        const tab = (location.hash || '').slice(1);
+        if (tab && document.querySelector('.staff-tab[data-staff-tab="' + CSS.escape(tab) + '"]')) switchStaffTab(tab);
+      };
+      window.addEventListener('hashchange', openStaffTabFromHash);
+      openStaffTabFromHash();
       // Live queue refresh; paused while the tab is hidden, refreshed on return.
       setInterval(() => { if (!document.hidden) loadStaffDashboard(); }, 15000);
       document.addEventListener('visibilitychange', () => { if (!document.hidden) loadStaffDashboard(); });

@@ -140,8 +140,11 @@
           const thisMonth = allHistory.filter(a => historyMonthKey(a) === historyMonthKeyFor(new Date()));
           document.getElementById('monthVisits').textContent = thisMonth.length;
           document.getElementById('cancelledVisits').textContent = allHistory.filter(a => a.status === 'cancelled').length;
-          if (allHistory.length > 0) {
-            const sorted = [...allHistory].sort((a, b) => b.date.localeCompare(a.date));
+          // A visit is an appointment that took place: cancelled and no-show
+          // bookings are not visits.
+          const visits = allHistory.filter(a => a.status === 'completed');
+          if (visits.length > 0) {
+            const sorted = [...visits].sort((a, b) => b.date.localeCompare(a.date));
             document.getElementById('lastVisit').textContent = Utils.formatDate(sorted[0].date, 'short');
           }
           filterAndRender();

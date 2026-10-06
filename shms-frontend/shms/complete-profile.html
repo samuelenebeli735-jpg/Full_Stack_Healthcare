@@ -97,7 +97,8 @@
               </div>
               <div class="form-group">
                 <label for="cpMatric">Matric Number</label>
-                <input type="text" id="cpMatric" placeholder="e.g. CSC/2021/001">
+                <input type="text" id="cpMatric" placeholder="e.g. CSC/2021/001" readonly title="Set at registration. Contact the clinic to change it.">
+                <small style="color:var(--text-light);font-size:12px">Set at registration; contact the clinic to change it.</small>
               </div>
             </div>
           </div>
@@ -198,7 +199,8 @@
         if (currentUser.level) document.getElementById('cpLevel').value = String(currentUser.level);
         if (currentUser.matric_number) document.getElementById('cpMatric').value = currentUser.matric_number;
         if (currentUser.gender) document.getElementById('cpGender').value = currentUser.gender;
-        if (currentUser.date_of_birth) document.getElementById('cpDOB').value = currentUser.date_of_birth;
+        // <input type="date"> needs YYYY-MM-DD; DOB is stored at UTC midnight.
+        if (currentUser.date_of_birth) document.getElementById('cpDOB').value = String(currentUser.date_of_birth).slice(0, 10);
         if (currentUser.blood_group) document.getElementById('cpBloodGroup').value = currentUser.blood_group;
         if (currentUser.genotype) document.getElementById('cpGenotype').value = currentUser.genotype;
         if (currentUser.allergies) document.getElementById('cpAllergies').value = currentUser.allergies;
@@ -240,7 +242,6 @@
         const faculty = document.getElementById('cpFaculty').value;
         const department = document.getElementById('cpDepartment').value;
         const level = document.getElementById('cpLevel').value;
-        const matric = document.getElementById('cpMatric').value;
         const gender = document.getElementById('cpGender').value;
         const dob = document.getElementById('cpDOB').value;
         const bloodGroup = document.getElementById('cpBloodGroup').value;
@@ -252,7 +253,6 @@
         if (faculty) data.faculty = faculty;
         if (department) data.department = department;
         if (level) data.level = level;
-        if (matric) data.matricNumber = matric;
         if (gender) data.gender = gender;
         if (dob) data.date_of_birth = dob;
         if (bloodGroup) data.blood_group = bloodGroup;

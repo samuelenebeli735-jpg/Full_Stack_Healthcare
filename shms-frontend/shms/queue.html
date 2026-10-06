@@ -205,6 +205,14 @@
           <span id="qCalledAlertTicket"></span>
         </div>
 
+        <!-- Students see their own ticket, not clinic-wide figures built from one ticket. -->
+        <div class="card" id="qMyTicketCard" style="display:none;margin-bottom:24px">
+          <div class="card-body" style="display:flex;gap:40px;flex-wrap:wrap">
+            <div><div class="qm-stat-label">Patients ahead of you</div><div class="qm-stat-value" id="qPatientsAhead">–</div></div>
+            <div><div class="qm-stat-label">Estimated wait</div><div class="qm-stat-value" id="qEstWait">–</div></div>
+          </div>
+        </div>
+
         <div class="qm-stats">
           <div class="qm-stat-card">
             <div class="qm-stat-icon green">
@@ -331,8 +339,6 @@
         <!-- Hidden elements for JS compatibility -->
         <div style="display:none">
           <span id="qCurrentServing"></span>
-          <span id="qPatientsAhead"></span>
-          <span id="qEstWait"></span>
           <span id="qProgressFill_"></span>
         </div>
       </div>
@@ -396,6 +402,12 @@
       }
       document.getElementById('qPatientName').textContent = patientName;
       document.getElementById('qPatientDetails').textContent = patientDetails;
+
+      // Clinic-wide totals are only meaningful for staff; a student's list holds just their own ticket.
+      document.querySelector('.qm-stats').style.display = isStudent ? 'none' : '';
+      document.querySelector('.qm-progress-section').style.display = isStudent ? 'none' : '';
+      document.getElementById('qMyTicketCard').style.display = isStudent ? '' : 'none';
+      if (isStudent) document.querySelector('.qm-queue-title').textContent = 'Your ticket';
 
       // Prominent notice for a student whose own entry is 'called', whether or
       // not they are the backend's currentServing (queue.service.js:286-289).

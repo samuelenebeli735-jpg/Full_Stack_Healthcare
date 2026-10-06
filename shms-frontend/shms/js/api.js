@@ -183,13 +183,14 @@ const API = (() => {
       name: name,
       first_name: s.firstName,
       last_name: s.lastName,
+      // Full stored name (with middle name) so the edit form round-trips it.
+      full_name: [s.firstName, s.middleName, s.lastName].filter(Boolean).join(' ') || name,
       specialization: qualification || 'Medical Officer',
       qualification: qualification,
       email: (s.user && s.user.email) || '',
       phone: s.phone || '',
       availability: s.employmentStatus === 'active' || s.employmentStatus === undefined,
       employmentStatus: s.employmentStatus,
-      max_patients: 15,
       department: s.department ? s.department.name : '',
     };
   };
@@ -391,6 +392,16 @@ const API = (() => {
 
     /* ---------- Public ---------- */
     getActiveOrganizations: () => _request('GET', '/organizations/active'),
+    /* Health without throwing: a 503 still carries { database, uptime }. */
+    async getHealth() {
+      try {
+        const res = await fetch(`${BASE_URL}/health`);
+        const body = await res.json().catch(() => ({}));
+        return { reachable: true, database: body.database || (res.ok ? 'ok' : 'unavailable'), uptime: body.uptime };
+      } catch (e) {
+        return { reachable: false, database: null, uptime: null };
+      }
+    },
     /* All organizations (super_admin only, `/organizations` is gated by
        authorize("super_admin")). Pages through the backend metadata so the
        returned array is never truncated to a single page. Each item carries
@@ -442,7 +453,8 @@ const API = (() => {
         profilePhotoUrl: 'profilePhotoUrl',
       };
       const snake = {
-        matric_number: 'matricNumber', matricNumber: 'matricNumber',
+        // matricNumber is not here: it is set at registration and the profile
+        // update schema does not accept it (it would be silently dropped).
         date_of_birth: 'dateOfBirth', blood_group: 'bloodGroup',
         emergency_contact_name: 'emergencyContactName', emergency_contact_phone: 'emergencyContactPhone',
       };
@@ -451,7 +463,8 @@ const API = (() => {
           const parts = String(data[key] || '').split(/\s+/).filter(Boolean);
           if (parts.length) body.firstName = parts[0];
           if (parts.length > 1) body.lastName = parts[parts.length - 1];
-          if (parts.length > 2) body.middleName = parts.slice(1, -1).join(' ');
+          // Two words clear any stored middle name instead of keeping it.
+          if (parts.length > 1) body.middleName = parts.slice(1, -1).join(' ');
         } else if (key in snake) {
           body[snake[key]] = data[key];
         } else if (key in map) {
@@ -767,7 +780,14 @@ const API = (() => {
         return _request('POST', `/queues/call-next/${orgId}`);
       }
       if (action === 'skip') {
-        return _request('POST', `/queues/skip/${orgId}`);
+        // Skip exactly the ticket the user confirmed, never "whoever is called now".
+        let queueId = queueIdByTicket[ticket] || (data && data.queueId) || null;
+        if (!queueId && ticket) {
+          const { items } = await _todayQueue();
+          items.forEach(_mapQueueEntry);
+          queueId = queueIdByTicket[ticket];
+        }
+        return _request('POST', `/queues/skip/${orgId}`, queueId ? { queueId } : undefined);
       }
       if (action === 'start' || action === 'complete') {
         let queueId = queueIdByTicket[ticket] || (data && data.queueId) || null;
@@ -792,14 +812,26 @@ const API = (() => {
       const res = await this.getDoctors();
       return { success: true, data: res.data.filter((d) => d.availability) };
     },
+    /* Departments and positions as {id, name} for staff forms (all pages). */
+    async getStaffMasterData() {
+      const orgId = _orgId();
+      const [departments, positions] = await Promise.all([
+        _allPages(`/departments/organization/${orgId}`, 100),
+        _allPages(`/positions/organization/${orgId}`, 100),
+      ]);
+      const pick = (x) => ({ id: x.id, name: x.name });
+      return { success: true, departments: departments.map(pick), positions: positions.map(pick) };
+    },
     async addDoctor(data) {
       const orgId = _orgId();
-      const deptRes = await _request('GET', `/departments/organization/${orgId}`);
-      const posRes = await _request('GET', `/positions/organization/${orgId}`);
-      const departments = (deptRes.data && deptRes.data.items) || deptRes.data || [];
-      const positions = (posRes.data && posRes.data.items) || posRes.data || [];
-      if (departments.length === 0) throw new Error('Create a department first.');
-      if (positions.length === 0) throw new Error('Create a position first.');
+      /* Every value stored on the staff record comes from the admin; nothing
+         is invented (no default gender, birth date, phone, department or
+         position). */
+      if (!data.departmentId) throw new Error('Choose a department.');
+      if (!data.positionId) throw new Error('Choose a position.');
+      if (!data.gender) throw new Error('Choose a gender.');
+      if (!data.dateOfBirth) throw new Error('Enter the date of birth.');
+      if (!data.phone || String(data.phone).trim().length < 5) throw new Error('Enter a phone number (at least 5 characters).');
 
       const nameParts = (data.name || '').split(/\s+/).filter(Boolean);
       if (nameParts.length < 2) throw new Error('Provide a full name (first and last).');
@@ -812,15 +844,17 @@ const API = (() => {
 
       const payload = {
         organizationId: orgId,
-        departmentId: departments[0].id,
-        positionId: positions[0].id,
+        departmentId: data.departmentId,
+        positionId: data.positionId,
         email: data.email,
         password: data.password,
         firstName: nameParts[0],
+        // Words between the first and last name are kept, not dropped.
+        middleName: nameParts.slice(1, -1).join(' ') || undefined,
         lastName: nameParts[nameParts.length - 1],
-        gender: 'Male',
-        dateOfBirth: '1985-01-01',
-        phone: data.phone || '08000000000',
+        gender: data.gender,
+        dateOfBirth: data.dateOfBirth,
+        phone: String(data.phone).trim(),
         employmentDate: _localDate(),
         qualification: data.specialization || 'Medical Officer',
       };
@@ -833,6 +867,7 @@ const API = (() => {
       if (data.name) {
         const parts = (data.name || '').split(/\s+/).filter(Boolean);
         body.firstName = parts[0];
+        body.middleName = parts.slice(1, -1).join(' ');
         body.lastName = parts[parts.length - 1];
       }
       if (data.qualification !== undefined) body.qualification = data.qualification;
@@ -1037,8 +1072,9 @@ const API = (() => {
       }
 
       const availRes = await _request('GET', `/appointments/doctors/available?date=${today}`).catch(() => null);
+      // Scheduled today AND with a free (future) slot; fully booked doctors are not "available".
       const available_doctors = (availRes && Array.isArray(availRes.data && availRes.data.doctors))
-        ? availRes.data.doctors.length
+        ? availRes.data.doctors.filter((d) => d.hasAvailableSlots !== false).length
         : null;
 
       /* Fixed-length week series. `weekAvailable` is false when the report
@@ -1241,15 +1277,16 @@ const API = (() => {
       const items = queueRes.items;
       const queueTotal = queueRes.total;
       const c = summary.data.counts || {};
-      const qCounts = {};
-      (summary.data.queueStatusCounts || []).forEach((g) => { qCounts[g.status] = g.count; });
-      const waiting = (qCounts.waiting || 0) + (qCounts.called || 0) + (qCounts.checked_in || 0);
-      const inConsultation = qCounts.in_progress || 0;
+      /* Today's tiles come from today's complete queue (all pages), not from
+         /dashboard queueStatusCounts, which spans every day. */
+      const waiting = items.filter((q) => q.status === 'waiting' || q.status === 'called').length;
+      const inConsultation = items.filter((q) => q.status === 'in_progress').length;
+      const checkedInToday = items.filter((q) => q.status !== 'cancelled').length;
       return {
         success: true,
         data: {
           total_appointments: c.appointmentsToday || queueTotal,
-          checked_in: waiting + inConsultation,
+          checked_in: checkedInToday,
           waiting,
           in_consultation: inConsultation,
           queue_list: items.map(_mapQueueEntry),
@@ -1391,9 +1428,16 @@ const API = (() => {
     async lookupPatient(matric) {
       const wanted = String(matric || '').trim().toLowerCase();
       if (!wanted) return { success: true, data: null };
-      const res = await this.getStudents({ search: wanted, limit: 100 });
-      const found = res.data.find((p) => p.matric.toLowerCase() === wanted);
-      return { success: true, data: found || null };
+      // The search is a substring match ('CSC/2019/1' also hits /10../199), so
+      // keep paging until the exact matric is found or the results run out.
+      for (let page = 1; page <= 200; page++) {
+        const res = await this.getStudents({ search: wanted, limit: 100, page });
+        const found = res.data.find((p) => String(p.matric || '').toLowerCase() === wanted);
+        if (found) return { success: true, data: found };
+        const pg = res.pagination || {};
+        if (!res.data.length || page >= (pg.totalPages || 1)) break;
+      }
+      return { success: true, data: null };
     },
 
     /* ---------- Legacy admin lists ---------- */

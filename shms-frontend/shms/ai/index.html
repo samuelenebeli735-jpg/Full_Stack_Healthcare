@@ -166,13 +166,17 @@
 
     function getResponse(input) {
       const lower = input.toLowerCase();
+      // Red flags win over any routine tip, wherever they appear in the text.
+      if (/chest pain|breath|breathing|can'?t breathe|faint|passed out|unconscious|seizure|heavy bleeding|bleeding heavily|suicid|kill myself/.test(lower)) {
+        return '⚠️ What you describe can be an emergency. Please go to the health center or emergency services now, or call for help. Do not wait for an appointment.';
+      }
       for (const [key, response] of Object.entries(responses)) {
         if (lower.includes(key)) return response;
       }
       if (/\b(hello|hi)\b/.test(lower)) return 'Hello! How can I help you today? Please tell me your symptoms.';
       if (lower.includes('thank')) return "You're welcome! Feel free to ask if you have more questions. Stay healthy!";
       if (lower.includes('book') || lower.includes('appointment')) return 'You can book an appointment from the Appointments page. I recommend choosing the appropriate service based on your symptoms.';
-      return 'Thank you for sharing. Based on the information provided, I recommend monitoring your symptoms and booking a General Consultation if they persist. For specific concerns, please visit the health center.';
+      return 'None of the symptom keywords I know matched, so I cannot give a tip for this. If you are unwell or worried, book a General Consultation or visit the health center.';
     }
 
     document.addEventListener('DOMContentLoaded', async () => {

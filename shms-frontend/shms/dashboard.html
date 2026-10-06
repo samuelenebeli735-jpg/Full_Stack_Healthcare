@@ -190,7 +190,10 @@
           '<div class="activity-icon ' + cfg[0] + '"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + cfg[1] + '</svg></div>' +
           '<div class="activity-content">' +
           '<div class="activity-text">' + Utils.sanitize(actionText) + ' - ' + Utils.sanitize(a.service) + '</div>' +
-          '<div class="activity-time">' + Utils.timeAgo(a.appointmentDate || a.date) + '</div>' +
+          // Future bookings get their date, not "Just now".
+          '<div class="activity-time">' + (new Date(a.appointmentDate || a.date) > new Date()
+            ? Utils.sanitize(Utils.formatDate(a.date) + ' ' + Utils.formatTime(a.time))
+            : Utils.timeAgo(a.appointmentDate || a.date)) + '</div>' +
           '</div></div>';
       }).join('');
       list.innerHTML = rows;
@@ -244,19 +247,23 @@
           if (rateEl) rateEl.textContent = total ? (Math.round((completed / total) * 100) + '% completion rate') : '';
           const today = new Date();
           const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
-          const monthCount = appts.filter((a) => a.appointmentDate && a.appointmentDate.startsWith(monthKey)).length;
+          // Local calendar month (a.date), not the UTC month of the raw timestamp.
+          const monthCount = appts.filter((a) => a.date && a.date.slice(0, 7) === monthKey).length;
           const monthEl = document.getElementById('apptMonthChange');
           if (monthEl && monthCount > 0) monthEl.textContent = monthCount + ' this month';
           const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-          const appt = appts.find((a) =>
-            (a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'checked_in') &&
-            a.date >= todayStr
-          );
+          // The NEXT active appointment (the list arrives newest first).
+          const appt = appts
+            .filter((a) =>
+              (a.status === 'scheduled' || a.status === 'confirmed' || a.status === 'checked_in') &&
+              a.date >= todayStr)
+            .sort((x, y) => (x.date + ' ' + x.time).localeCompare(y.date + ' ' + y.time))[0];
           const badge = document.getElementById('apptStatusBadge');
           if (appt) {
             document.getElementById('apptDoctor').textContent = appt.doctor_name;
             document.getElementById('apptService').textContent = appt.service;
-            document.getElementById('apptDept').textContent = appt.department;
+            // appt.department is the student's own course, not the visit's.
+            document.getElementById('apptDept').textContent = '';
             document.getElementById('apptTime').textContent = Utils.formatTime(appt.time);
             document.getElementById('apptDate').textContent = Utils.formatDate(appt.date);
             if (badge) {
@@ -288,7 +295,8 @@
             : 'No active queue';
           document.getElementById('queueProgress').style.width = !active
             ? '0%'
-            : (beingSeen ? '100%' : Math.max(10, Math.min(95, (1 - q.patients_ahead / 20) * 100)) + '%');
+            // Share of the line still ahead that has cleared: full when you are next.
+            : (beingSeen ? '100%' : Math.round(100 / ((Number(q.patients_ahead) || 0) + 1)) + '%');
         } else {
           document.getElementById('queueCard').querySelector('.queue-number').textContent = '--';
         }

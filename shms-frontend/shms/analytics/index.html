@@ -138,7 +138,6 @@
             <p>Insights across health, clinical, and operational performance.</p>
           </div>
           <div class="ax-header-actions">
-            <button class="ax-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg> Live data</button>
           </div>
         </div>
 
@@ -303,7 +302,9 @@
     }
 
     function renderKpis(container, d) {
-      const busiest = d.busiest_day ? `${d.busiest_day.date}<span style="color:#9ca3af;font-weight:400"> (${d.busiest_day.total} appts)</span>` : '–';
+      // The key is a local calendar date (YYYY-MM-DD): parse it locally, then format.
+      const busiestLabel = d.busiest_day ? (() => { const [y, m, dd] = String(d.busiest_day.date).split('-').map(Number); const dt = new Date(y, m - 1, dd); return Number.isNaN(dt.getTime()) ? Utils.sanitize(String(d.busiest_day.date)) : dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }); })() : '';
+      const busiest = d.busiest_day ? `${busiestLabel}<span style="color:#9ca3af;font-weight:400"> (${d.busiest_day.total} appts)</span>` : '–';
       const pct = d.total_appointments ? Math.round((d.completed / d.total_appointments) * 100) + '%' : '–';
       const wait = d.avg_wait_time == null ? '–' : d.avg_wait_time + 'm';
       const peak = d.peak_hour == null ? '–' : String(d.peak_hour).padStart(2, '0') + ':00';
