@@ -44,6 +44,25 @@ const env = {
   REGISTER_RATE_LIMIT_MAX: positiveInt(process.env.REGISTER_RATE_LIMIT_MAX, 30),
 };
 
+/*
+ * Production safety: refuse to start with a JWT secret that can be guessed
+ * (anyone could forge an admin token), and warn about settings still left at
+ * development defaults.
+ */
+if (env.NODE_ENV === "production") {
+  const secret = String(env.JWT_SECRET);
+  if (secret.length < 32 || /your_jwt_secret_here|change[_-]?me|^secret$/i.test(secret)) {
+    console.error("FATAL: JWT_SECRET is too weak for production (use at least 32 random characters).");
+    process.exit(1);
+  }
+  const warn = (msg) => console.warn(`WARNING (production config): ${msg}`);
+  if (!process.env.FRONTEND_URL || /localhost|127.0.0.1/.test(env.FRONTEND_URL)) {
+    warn("FRONTEND_URL is not set to the public site address; password-reset links will point to it.");
+  }
+  if (!env.CORS_ORIGINS) warn("CORS_ORIGINS is not set; only development origins are allowed for cross-origin calls.");
+  if (!env.EMAIL_WEBHOOK_URL) warn("EMAIL_WEBHOOK_URL is not set; password reset by email is unavailable.");
+}
+
 function positiveInt(value, fallback) {
   const n = Number.parseInt(value, 10);
   return Number.isFinite(n) && n > 0 ? n : fallback;

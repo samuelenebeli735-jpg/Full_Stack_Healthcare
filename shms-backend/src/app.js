@@ -36,8 +36,18 @@ if (env.TRUST_PROXY) {
 |--------------------------------------------------------------------------
 */
 
+// CORS compares origins (scheme://host:port), so reduce FRONTEND_URL to its
+// origin; a path or trailing slash would otherwise never match.
+const frontendOrigin = (() => {
+  try {
+    return new URL(env.FRONTEND_URL).origin;
+  } catch {
+    return null;
+  }
+})();
+
 const defaultOrigins = [
-  env.FRONTEND_URL,
+  frontendOrigin,
   "http://localhost:5500",
   "http://127.0.0.1:5500",
   "http://localhost:8080",

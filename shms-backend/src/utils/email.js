@@ -46,7 +46,13 @@ export function isEmailDeliveryConfigured() {
  * Send a password-reset email containing the reset link.
  */
 export async function sendPasswordResetEmail(user, rawToken) {
-  const resetUrl = `${env.FRONTEND_URL}reset-password.html?token=${rawToken}`;
+  // Join as URLs: FRONTEND_URL is normally configured without a trailing
+  // slash (https://clinic.example.org), and plain concatenation produced a
+  // broken link (https://clinic.example.orgreset-password.html).
+  const base = env.FRONTEND_URL.endsWith("/") ? env.FRONTEND_URL : `${env.FRONTEND_URL}/`;
+  const link = new URL("reset-password.html", base);
+  link.searchParams.set("token", rawToken);
+  const resetUrl = link.toString();
 
   await sendEmail({
     to: user.email,

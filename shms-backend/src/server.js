@@ -7,6 +7,27 @@ import { closeOutPastQueueDaysEverywhere } from "./services/queue.service.js";
 const PORT = env.PORT;
 const HOST = env.HOST;
 
+/*
+ * Tenant isolation relies on PostgreSQL row-level security, which a superuser
+ * or BYPASSRLS role silently ignores. In production refuse to start on such a
+ * connection (the app must use the shms_app role; migrations use a separate
+ * owner connection).
+ */
+if (env.NODE_ENV === "production") {
+  try {
+    const [role] = await prisma.$queryRawUnsafe(
+      "SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_catalog.pg_roles WHERE rolname = current_user"
+    );
+    if (!role || role.rolsuper || role.rolbypassrls) {
+      logger.error(`FATAL: database role "${role?.name}" bypasses row-level security; connect as the application role (shms_app).`);
+      process.exit(1);
+    }
+  } catch (error) {
+    logger.error(`FATAL: could not verify the database role: ${error.message}`);
+    process.exit(1);
+  }
+}
+
 const server = app.listen(PORT, HOST, () => {
   logger.info(
     `Server running — Environment: ${env.NODE_ENV}, Port: ${PORT}, Host: ${HOST}, ` +
