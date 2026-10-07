@@ -1,21 +1,25 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { Tabs } from 'expo-router';
+import type { ComponentProps } from 'react';
+import type { ColorValue } from 'react-native';
 
 import { RoleGate } from '@/components/RoleGate';
 import { colors } from '@/components/ui';
+
+type IconName = ComponentProps<typeof Ionicons>['name'];
+const icon =
+  (name: IconName) =>
+  ({ color, size }: { color: ColorValue; size: number }) => <Ionicons name={name} color={color} size={size} />;
 
 export default function StaffLayout() {
   return (
     <RoleGate role="staff">
       <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary }}>
-        <Tabs.Screen
-          name="index"
-          options={{ title: 'Home', tabBarIcon: ({ color, size }) => <Ionicons name="home" color={color} size={size} /> }}
-        />
-        <Tabs.Screen
-          name="more"
-          options={{ title: 'More', tabBarIcon: ({ color, size }) => <Ionicons name="menu" color={color} size={size} /> }}
-        />
+        <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home') }} />
+        <Tabs.Screen name="queue" options={{ title: 'Queue', tabBarIcon: icon('people') }} />
+        <Tabs.Screen name="appointments" options={{ title: 'Appointments', tabBarIcon: icon('calendar') }} />
+        <Tabs.Screen name="patients" options={{ title: 'Patients', tabBarIcon: icon('search') }} />
+        <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon('menu') }} />
       </Tabs>
     </RoleGate>
   );
