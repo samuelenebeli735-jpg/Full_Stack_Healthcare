@@ -1,7 +1,15 @@
 (function() {
-  var scripts = document.querySelectorAll('script[src$="config.js"]');
-  if (scripts.length) {
-    var src = scripts[0].src;
+  /* The app root is the folder that contains js/config.js. Use the running
+     script element: every page loads it with a cache tag (config.js?v=...),
+     so matching src$="config.js" would fail and every link on pages in
+     sub-folders (staff/, admin/, ...) would resolve one folder too deep. */
+  var current = document.currentScript;
+  var scripts = current ? [current] : Array.prototype.filter.call(
+    document.getElementsByTagName('script'),
+    function (s) { return /\/js\/config\.js(\?|#|$)/.test(s.src || ''); }
+  );
+  if (scripts.length && scripts[0].src) {
+    var src = scripts[0].src.split(/[?#]/)[0];
     window.SHMS_BASE = src.substring(0, src.lastIndexOf('/js/') + 1);
   } else {
     var path = location.pathname;

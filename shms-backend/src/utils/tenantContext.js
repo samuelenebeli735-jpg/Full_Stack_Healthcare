@@ -17,6 +17,10 @@ export function currentTenantTransaction() {
   return store && store.open ? store : null;
 }
 
+// Wait up to 10s for a pooled connection (Prisma's default is 2s, which made
+// short bursts, e.g. a dashboard's parallel report requests, fail outright).
+const TX_OPTIONS = { maxWait: 10000, timeout: 30000 };
+
 async function setLocalGuc(tx, name, value) {
   await tx.$executeRawUnsafe(
     "SELECT pg_catalog.set_config($1, $2, true)",
@@ -51,7 +55,7 @@ export async function withTenant(organizationId, callback) {
         store.open = false;
       }
     },
-    { timeout: 30000 }
+    TX_OPTIONS
   );
 }
 
@@ -68,7 +72,7 @@ export async function withSuperAdmin(callback) {
       await setLocalGuc(tx, "app.bypass_rls", "true");
       return await callback(tx);
     },
-    { timeout: 30000 }
+    TX_OPTIONS
   );
 }
 

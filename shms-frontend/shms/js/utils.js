@@ -180,7 +180,8 @@ const Utils = {
       document.body.appendChild(c);
     }
     const toast = document.createElement('div');
-    const icons = { success: 'check-circle', error: 'alert-circle', warning: 'alert-triangle', info: 'info' };
+    // Shown as text, so these must be symbols, not icon-font names.
+    const icons = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
     toast.style.cssText = `
       display:flex;align-items:center;gap:10px;padding:14px 18px;
       border-radius:8px;font-size:14px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,0.12);
@@ -189,7 +190,7 @@ const Utils = {
       color:${type === 'success' ? '#166534' : type === 'error' ? '#c62828' : type === 'warning' ? '#92400e' : '#075985'};
       border:1px solid ${type === 'success' ? '#bbf7d0' : type === 'error' ? '#f8bbd0' : type === 'warning' ? '#fde68a' : '#bae6fd'};
     `;
-    toast.innerHTML = `<span style="font-size:18px">${icons[type] || 'info'}</span><span></span>`;
+    toast.innerHTML = `<span style="font-size:18px">${icons[type] || 'ℹ'}</span><span></span>`;
     // Messages can carry server text or user-entered values: always plain text.
     toast.lastElementChild.textContent = message == null ? '' : String(message);
     const containerEl = document.getElementById('toast-container');

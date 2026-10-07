@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Notifications - SHMS</title>
-  <link rel="stylesheet" href="css/styles.css?v=20261006">
-  <link rel="stylesheet" href="css/dashboard.css?v=20261006">
-  <link rel="stylesheet" href="css/responsive.css?v=20261006">
+  <link rel="stylesheet" href="css/styles.css?v=20261007">
+  <link rel="stylesheet" href="css/dashboard.css?v=20261007">
+  <link rel="stylesheet" href="css/responsive.css?v=20261007">
   <style>
     .notif-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:24px; }
     .notif-tab { padding:10px 20px; font-size:14px; font-weight:500; color:var(--text-secondary); border-bottom:2px solid transparent; cursor:pointer; transition:var(--transition); }
@@ -168,10 +168,10 @@
       </div>
     </div>
   </div>
-  <script src="js/config.js?v=20261006"></script>
-  <script src="js/api.js?v=20261006"></script>
-  <script src="js/utils.js?v=20261006"></script>
-  <script src="js/auth.js?v=20261006"></script>
+  <script src="js/config.js?v=20261007"></script>
+  <script src="js/api.js?v=20261007"></script>
+  <script src="js/utils.js?v=20261007"></script>
+  <script src="js/auth.js?v=20261007"></script>
   <script>
     let allNotifications = [];
     let notificationPrefs = {};
@@ -258,6 +258,9 @@
             </div>
           </div>
         `;
+        // Only unread items act on click (mark as read); read ones must not look clickable.
+        div.style.cursor = n.read ? 'default' : 'pointer';
+        if (!n.read) div.title = 'Mark as read';
         div.addEventListener('click', async () => {
           if (n.read) return;
           try {

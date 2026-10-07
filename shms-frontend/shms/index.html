@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SHMS - Student Health Management System</title>
-  <meta name="description" content="School Health Management System - Track appointments, vaccinations, and medical history in one secure place.">
-  <link rel="stylesheet" href="css/styles.css?v=20261006">
-  <link rel="stylesheet" href="css/responsive.css?v=20261006">
+  <meta name="description" content="Student Health Management System - book clinic appointments, check in, follow the queue and see your visit history in one secure place.">
+  <link rel="stylesheet" href="css/styles.css?v=20261007">
+  <link rel="stylesheet" href="css/responsive.css?v=20261007">
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
     body { font-family:var(--font-family); color:var(--text-primary); background:#fff; overflow-x:hidden; }
@@ -284,8 +284,6 @@
     <div class="lp-nav-links">
       <a href="#features">Features</a>
       <a href="#how-it-works">How it works</a>
-      <a href="#schools">For schools</a>
-      <a href="#support">Support</a>
     </div>
     <div class="lp-nav-actions">
       <a href="login.html" class="lp-btn-login">Log in</a>
@@ -296,66 +294,20 @@
   <section class="lp-hero">
     <div class="lp-hero-content">
       <div class="lp-trust-badge">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-        Trusted by 18 schools
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+        Student health center portal
       </div>
       <h1>Your school health record,<br><span class="green">made simple</span></h1>
-      <p>Track appointments, vaccinations, and medical history in one secure place — built for students, loved by school nurses.</p>
+      <p>Book clinic appointments, check in on the day, follow the queue and see your visit history in one secure place.</p>
       <div class="lp-hero-actions">
         <a href="register.html" class="lp-hero-cta">Create your account <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></a>
-        <a href="#" class="lp-hero-watch">
+        <a href="#how-it-works" class="lp-hero-watch">
           <span class="play-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
-          Watch how it works
+          See how it works
         </a>
-      </div>
-      <div class="lp-social-proof">
-        <div class="lp-avatars">
-          <span class="avatar a1">AC</span>
-          <span class="avatar a2">TQ</span>
-          <span class="avatar a3">KJ</span>
-          <span class="avatar a4">MB</span>
-        </div>
-        <div>
-          <div class="lp-stars">★★★★★</div>
-          <div class="lp-social-text"><strong>2,400+ students</strong> already on board</div>
-        </div>
       </div>
     </div>
     <div class="lp-hero-visual">
-      <div class="lp-floating-card lp-card-patient">
-        <div class="lp-card-patient-header">
-          <div class="lp-card-patient-avatar">AC</div>
-          <div>
-            <div class="lp-card-patient-name">Amara Chukwu</div>
-            <div class="lp-card-patient-role">Grade 7B · Student</div>
-          </div>
-        </div>
-        <div class="lp-card-patient-stats">
-          <div class="lp-card-patient-stat">
-            <div class="label">BMI</div>
-            <div class="value">18.0</div>
-          </div>
-          <div class="lp-card-patient-stat">
-            <div class="label">Vaccines</div>
-            <div class="value">3/4</div>
-          </div>
-        </div>
-        <div class="lp-card-vaccination-progress">
-          <div class="label"><span>Vaccination progress</span><span>75%</span></div>
-          <div class="lp-card-vaccination-bar"><div class="lp-card-vaccination-fill"></div></div>
-        </div>
-      </div>
-      <div class="lp-floating-card lp-card-vaccine">
-        <div class="lp-card-vaccine-inner">
-          <div class="lp-card-vaccine-check">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-          <div class="lp-card-vaccine-text">
-            <div class="title">Hep B — 3rd dose</div>
-            <div class="sub">Marked complete</div>
-          </div>
-        </div>
-      </div>
       <div class="lp-floating-card lp-card-appointment">
         <div class="lp-card-appointment-inner">
           <div class="lp-card-appt-icon">
@@ -371,26 +323,11 @@
   </section>
 
   <section class="lp-stats-bar">
-    <div class="lp-stat-item">
-      <div class="value">2,400+</div>
-      <div class="label">Students tracked</div>
-    </div>
-    <div class="lp-stat-item">
-      <div class="value">98%</div>
-      <div class="label">Vaccination compliance</div>
-    </div>
-    <div class="lp-stat-item">
-      <div class="value">18</div>
-      <div class="label">Partner schools</div>
-    </div>
-    <div class="lp-stat-item">
-      <div class="value">4.9/5</div>
-      <div class="label">Guardian satisfaction</div>
-    </div>
-    <div class="lp-stat-item">
-      <div class="value">&lt;2min</div>
-      <div class="label">Avg. nurse response</div>
-    </div>
+    <div class="lp-stat-item"><div class="value">Book</div><div class="label">Clinic appointments online</div></div>
+    <div class="lp-stat-item"><div class="value">Confirm</div><div class="label">Clinic confirms before check-in</div></div>
+    <div class="lp-stat-item"><div class="value">Queue</div><div class="label">Live place in the queue</div></div>
+    <div class="lp-stat-item"><div class="value">History</div><div class="label">Past visits and prescriptions</div></div>
+    <div class="lp-stat-item"><div class="value">Private</div><div class="label">Data kept per organization</div></div>
   </section>
 
   <section class="lp-features" id="features">
@@ -408,22 +345,22 @@
         <div class="lp-feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 2v7.31l-6 9.2A2 2 0 0 0 5.64 22h12.72a2 2 0 0 0 1.64-3.49l-6-9.2V2"/><line x1="10" y1="2" x2="14" y2="2"/></svg>
         </div>
-        <h3>Vaccination tracking</h3>
-        <p>Digital immunization cards with dose history and upcoming due dates.</p>
+        <h3>Check-in &amp; live queue</h3>
+        <p>Once the clinic confirms your appointment, check in on the day and follow your place in the queue.</p>
       </div>
       <div class="lp-feature-card">
         <div class="lp-feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
         </div>
-        <h3>Allergies & conditions</h3>
-        <p>Keep asthma, allergies and chronic conditions visible to staff instantly.</p>
+        <h3>Health profile</h3>
+        <p>Record your blood group, genotype, allergies and emergency contact for the clinic team.</p>
       </div>
       <div class="lp-feature-card">
         <div class="lp-feature-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         </div>
-        <h3>Growth & vitals</h3>
-        <p>Height, weight and BMI trends charted automatically over time.</p>
+        <h3>Visit history</h3>
+        <p>See your past consultations and the prescriptions issued at each visit.</p>
       </div>
     </div>
   </section>
@@ -438,58 +375,28 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
         </div>
         <h3>Create your account</h3>
-        <p>Sign up with your student ID — your school pre-verifies enrollment.</p>
+        <p>Register with your matric number and email address.</p>
       </div>
       <div class="lp-step-card">
         <div class="lp-step-number">2</div>
         <div class="lp-step-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         </div>
-        <h3>Sync your health record</h3>
-        <p>Upload existing immunization cards or let the nurse's office link them.</p>
+        <h3>Complete your profile</h3>
+        <p>Add your faculty, department, level and health details.</p>
       </div>
       <div class="lp-step-card">
         <div class="lp-step-number">3</div>
         <div class="lp-step-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
         </div>
-        <h3>Stay on top of it</h3>
-        <p>Get reminders for appointments and doses before they're due.</p>
+        <h3>Book and get seen</h3>
+        <p>Book a visit, check in on the day once it is confirmed, and follow the queue until you are called.</p>
       </div>
     </div>
   </section>
 
-  <section class="lp-bottom-row">
-    <div class="lp-testimonial">
-      <div class="lp-testimonial-quote">
-        SHMS cut our appointment no-show rate in half and finally gave parents visibility into their kid's vaccination status without chasing paper forms.
-      </div>
-      <div class="lp-testimonial-author">
-        <div class="lp-testimonial-avatar">FA</div>
-        <div>
-          <div class="lp-testimonial-name">Nurse Folake Adewale</div>
-          <div class="lp-testimonial-role">Head School Nurse, Lekki International</div>
-        </div>
-      </div>
-    </div>
-    <div class="lp-schools-used" id="schools">
-      <div class="lp-schools-label">Used across schools like</div>
-      <div class="lp-school-list">
-        <div class="lp-school-item">
-          <div class="lp-school-item-left"><span class="lp-school-dot green"></span><span class="lp-school-item-name">Lekki International School</span></div>
-          <span class="lp-school-item-city">Lagos</span>
-        </div>
-        <div class="lp-school-item">
-          <div class="lp-school-item-left"><span class="lp-school-dot blue"></span><span class="lp-school-item-name">Greenview Secondary</span></div>
-          <span class="lp-school-item-city">Abuja</span>
-        </div>
-        <div class="lp-school-item">
-          <div class="lp-school-item-left"><span class="lp-school-dot purple"></span><span class="lp-school-item-name">Bright Path Academy</span></div>
-          <span class="lp-school-item-city">Ibadan</span>
-        </div>
-      </div>
-    </div>
-  </section>
+
 
   <footer class="lp-footer">
     <div class="lp-footer-grid">
@@ -498,46 +405,18 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
           <span>SHMS</span>
         </div>
-        <p>The school health management system trusted by nurses, students, and guardians across 18 schools.</p>
-        <div class="lp-footer-socials">
-          <span class="lp-footer-social-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z"/></svg></span>
-          <span class="lp-footer-social-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="5"/><circle cx="17.5" cy="6.5" r="1.5"/></svg></span>
-          <span class="lp-footer-social-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg></span>
-        </div>
+        <p>A student health center portal for appointments, check-in, queues and visit records.</p>
       </div>
       <div class="lp-footer-col">
         <h4>Product</h4>
         <a href="#features">Features</a>
         <a href="#how-it-works">How it works</a>
-        <a href="#schools">For schools</a>
-        <a href="#">Pricing</a>
-        <a href="#">Security</a>
       </div>
       <div class="lp-footer-col">
-        <h4>Company</h4>
-        <a href="#">About us</a>
-        <a href="#">Careers</a>
-        <a href="#">Blog</a>
-        <a href="#">Partners</a>
-        <a href="#">Contact</a>
-      </div>
-      <div class="lp-footer-col">
-        <h4>Resources</h4>
-        <a href="#">Help center</a>
-        <a href="#">Guardian FAQs</a>
-        <a href="#">Nurse toolkit</a>
-        <a href="#">Vaccination guide</a>
-        <a href="#">System status</a>
-      </div>
-      <div class="lp-footer-newsletter">
-        <h4 style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;opacity:0.5;margin-bottom:16px;">Stay in the loop</h4>
-        <p>Product updates and school health tips, once a month.</p>
-        <div class="lp-footer-newsletter-form">
-          <input type="email" class="lp-footer-newsletter-input" placeholder="you@school.edu">
-          <button class="lp-footer-newsletter-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-          </button>
-        </div>
+        <h4>Account</h4>
+        <a href="login.html">Log in</a>
+        <a href="register.html">Create an account</a>
+        <a href="forgot-password.html">Reset password</a>
       </div>
     </div>
     <div class="lp-footer-bottom">

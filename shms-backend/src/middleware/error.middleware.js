@@ -41,6 +41,13 @@ const errorMiddleware = (err, req, res, _next) => {
         message = "The record was changed by another request. Please retry.";
         break;
 
+      // No database connection became free in time: a load problem, not a
+      // server bug, and safe to retry.
+      case "P2028":
+        statusCode = 503;
+        message = "The server is busy. Please try again in a moment.";
+        break;
+
       default:
         statusCode = 500;
         message = "Database operation failed.";

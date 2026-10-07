@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Appointment History - SHMS</title>
-  <link rel="stylesheet" href="css/styles.css?v=20261006">
-  <link rel="stylesheet" href="css/dashboard.css?v=20261006">
-  <link rel="stylesheet" href="css/responsive.css?v=20261006">
+  <link rel="stylesheet" href="css/styles.css?v=20261007">
+  <link rel="stylesheet" href="css/dashboard.css?v=20261007">
+  <link rel="stylesheet" href="css/responsive.css?v=20261007">
   <style>
     .history-filters { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; align-items: center; }
     .history-stats { margin-bottom: 24px; }
@@ -69,10 +69,10 @@
       </div>
     </div>
   </div>
-  <script src="js/config.js?v=20261006"></script>
-  <script src="js/api.js?v=20261006"></script>
-  <script src="js/utils.js?v=20261006"></script>
-  <script src="js/auth.js?v=20261006"></script>
+  <script src="js/config.js?v=20261007"></script>
+  <script src="js/api.js?v=20261007"></script>
+  <script src="js/utils.js?v=20261007"></script>
+  <script src="js/auth.js?v=20261007"></script>
   <script>
     let allHistory = [];
     const HISTORY_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -109,10 +109,14 @@
             <span class="badge badge-${Utils.getStatusColor(a.status)}">${Utils.capitalize(a.status)}</span>
           </div>
         `;
+        // Every item is clickable: always say what is (or is not) on record for the visit.
+        div.title = 'Show visit details';
         div.addEventListener('click', () => {
-          if (a.diagnosis || a.notes) {
-            Utils.showToast(`Diagnosis: ${a.diagnosis || 'N/A'}\nTreatment: ${a.treatment || 'N/A'}`, 'info', 5000);
-          }
+          const head = `${a.service || 'Visit'} · ${Utils.formatDate(a.date)} · ${Utils.capitalize(String(a.status || '').replace(/_/g, ' '))}`;
+          const body = (a.diagnosis || a.notes || a.treatment)
+            ? `Diagnosis: ${a.diagnosis || 'not recorded'}. Treatment: ${a.treatment || 'not recorded'}.`
+            : 'No consultation notes were recorded for this visit.';
+          Utils.showToast(head + ' — ' + body, 'info', 6000);
         });
         container.appendChild(div);
       });

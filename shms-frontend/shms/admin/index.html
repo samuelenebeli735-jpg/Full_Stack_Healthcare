@@ -4,16 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - SHMS</title>
-  <link rel="stylesheet" href="../css/styles.css?v=20261006">
-  <link rel="stylesheet" href="../css/dashboard.css?v=20261006">
-  <link rel="stylesheet" href="../css/responsive.css?v=20261006">
+  <link rel="stylesheet" href="../css/styles.css?v=20261007">
+  <link rel="stylesheet" href="../css/dashboard.css?v=20261007">
+  <link rel="stylesheet" href="../css/responsive.css?v=20261007">
   <style>
 
     .tab-panel { display:none; animation:fadeIn 0.4s ease; }
     .tab-panel.active { display:block; }
     .action-bar { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; flex-wrap:wrap; gap:12px; }
     .admin-chart { display:flex; align-items:flex-end; gap:8px; height:120px; padding:16px 0; }
-    .admin-chart .bar { flex:1; border-radius:4px 4px 0 0; min-height:8px; transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1); position:relative; cursor:pointer; }
+    .admin-chart .bar { flex:1; border-radius:4px 4px 0 0; min-height:8px; transition:all 0.4s cubic-bezier(0.34,1.56,0.64,1); position:relative; cursor:default; }
     .admin-chart .bar:hover { opacity:1; transform:scaleY(1.06); transform-origin:bottom; filter:brightness(1.15); box-shadow:0 -4px 16px rgba(var(--theme-rgb),0.25); }
     .admin-chart .bar .bar-label { position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); font-size:11px; color:var(--text-secondary); white-space:nowrap; transition:color 0.3s; }
     .admin-chart .bar:hover .bar-label { color:var(--primary); font-weight:600; }
@@ -41,7 +41,8 @@
     .satisfaction-ring span { position:relative; z-index:1; }
     .progress-bar-fill { transition:width 0.8s cubic-bezier(0.34,1.56,0.64,1); }
     .progress-bar-fill:hover { filter:brightness(1.15); }
-    .stat-card { transition:all 0.3s; cursor:pointer; }
+    /* Informational cards and chart bars: no click action, so no pointer cursor. */
+    .stat-card { transition:all 0.3s; cursor:default; }
     .stat-card:hover { transform:translateY(-4px); box-shadow:0 12px 32px rgba(var(--theme-rgb),0.15); }
     .stat-card .stat-card-value { transition:color 0.3s; }
     .stat-card:hover .stat-card-value { color:var(--primary); }
@@ -68,8 +69,8 @@
       <div id="navbarContainer"></div>
       <div class="main-body">
         <div class="page-header">
-          <h1>Admin Dashboard <span class="role-badge role-admin-badge">Administrator</span></h1>
-          <p>Full system management — doctors, students, schedules, appointments.</p>
+          <h1>Admin Dashboard <span class="role-badge role-admin-badge" id="roleBadge">Administrator</span></h1>
+          <p id="adminScopeNote">Organization management — doctors, students, schedules, appointments.</p>
         </div>
         <div class="admin-tabs">
           <button class="admin-tab active" data-tab="overview">Overview</button>
@@ -326,10 +327,10 @@
       <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('scheduleModal')">Cancel</button><button class="btn btn-primary" id="scheduleSaveBtn" onclick="saveSchedule()">Save</button></div>
     </div>
   </div>
-  <script src="../js/config.js?v=20261006"></script>
-  <script src="../js/api.js?v=20261006"></script>
-  <script src="../js/utils.js?v=20261006"></script>
-  <script src="../js/auth.js?v=20261006"></script>
+  <script src="../js/config.js?v=20261007"></script>
+  <script src="../js/api.js?v=20261007"></script>
+  <script src="../js/utils.js?v=20261007"></script>
+  <script src="../js/auth.js?v=20261007"></script>
   <script>
     let adminDoctors = [];
     let adminStudents = [];
@@ -1055,6 +1056,17 @@
       if (!verify.success) { Auth.logout(); return; }
       if (!Auth.requireRole(['admin', 'super_admin'])) return;
       Auth.updateUI(verify.user);
+      // Every view on this page is scoped to the signed-in account's organization
+      // (super admins included); say so instead of implying a system-wide view.
+      {
+        const orgName = (verify.user.organization && verify.user.organization.name) || 'your organization';
+        if (verify.user.role === 'super_admin') {
+          document.getElementById('roleBadge').textContent = 'Super Administrator';
+          document.getElementById('adminScopeNote').textContent = 'Showing data for ' + orgName + '. A combined view across all organizations is not available in this interface yet; broadcasts can target any organization.';
+        } else {
+          document.getElementById('adminScopeNote').textContent = 'Organization management for ' + orgName + ' — doctors, students, schedules, appointments.';
+        }
+      }
       document.getElementById('sidebarContainer').innerHTML = Utils.buildSidebar('');
       document.getElementById('navbarContainer').innerHTML = Utils.buildNavbar('Admin Dashboard');
       setTimeout(() => {

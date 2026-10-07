@@ -44,14 +44,17 @@ export async function findTodayQueue(
   pagination = {},
   db = prisma
 ) {
-  const { skip = 0, limit = 20 } = pagination;
-  const where = {
-    organizationId,
-    createdAt: {
-      gte: startOfDay,
-      lte: endOfDay,
-    },
-  };
+  const { skip = 0, limit = 20, carryOverInProgress = false } = pagination;
+  const today = { createdAt: { gte: startOfDay, lte: endOfDay } };
+  // Day-close policy (F14): an earlier day's consultation that is still in
+  // progress is never closed automatically, so it stays on today's list
+  // until a clinician completes it.
+  const where = carryOverInProgress
+    ? {
+        organizationId,
+        OR: [today, { status: "in_progress", createdAt: { lt: startOfDay } }],
+      }
+    : { organizationId, ...today };
 
   const [items, total] = await Promise.all([
     db.queue.findMany({
@@ -83,7 +86,7 @@ export async function findTodayQueue(
           },
         },
       },
-      orderBy: { queueNumber: "asc" },
+      orderBy: [{ queueDate: "asc" }, { queueNumber: "asc" }, { id: "asc" }],
     }),
     db.queue.count({ where }),
   ]);

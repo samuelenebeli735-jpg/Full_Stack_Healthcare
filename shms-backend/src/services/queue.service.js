@@ -83,6 +83,89 @@ function runnable(orgId) {
     : withSuperAdmin;
 }
 
+/**
+ * Day-close policy (F14, agreed clinical policy). For every queue day before
+ * today (server local date = clinic wall-clock):
+ *   waiting / called -> the patient was not seen: the ticket is closed
+ *                        (queue "cancelled"; the queue has no no-show state)
+ *                        and the appointment becomes "no_show";
+ *   in_progress      -> left open: an active consultation is never closed
+ *                        automatically (it stays on the staff list instead);
+ *   completed / cancelled / no_show -> unchanged.
+ * Compare-and-set writes make it idempotent and safe to run concurrently.
+ * Runs inside the caller's TENANT transaction (RLS only allows these writes
+ * under an organization context; the super-admin view is read-only), so it is
+ * a no-op without an organization: the background sweep covers that case.
+ * Returns the number of tickets closed.
+ */
+async function closeOutPastQueueDays(tx, organizationId) {
+  if (!organizationId) return 0;
+  const today = getLocalDateString();
+
+  const stale = await tx.queue.findMany({
+    where: {
+      organizationId,
+      queueDate: { lt: today },
+      status: { in: ["waiting", "called"] },
+    },
+    select: { id: true, organizationId: true, appointmentId: true, queueNumber: true, queueDate: true },
+    orderBy: [{ queueDate: "asc" }, { queueNumber: "asc" }],
+    take: 500,
+  });
+
+  let closed = 0;
+
+  for (const ticket of stale) {
+    const moved = await tx.queue.updateMany({
+      where: { id: ticket.id, status: { in: ["waiting", "called"] } },
+      data: { status: "cancelled", completedAt: new Date() },
+    });
+
+    if (moved.count === 0) continue;
+    closed++;
+
+    await tx.appointment.updateMany({
+      where: { id: ticket.appointmentId, status: { in: ["confirmed", "checked_in"] } },
+      data: { status: "no_show" },
+    });
+
+    await auditLogger({
+      organizationId: ticket.organizationId,
+      userId: null,
+      action: "UPDATE",
+      entity: "Queue",
+      entityId: ticket.id,
+      description: `Day close: queue number ${ticket.queueNumber} of ${ticket.queueDate} was not seen; marked no-show.`,
+    });
+  }
+
+  return closed;
+}
+
+/**
+ * Background sweep across all organizations (startup + interval), so
+ * dashboards and reports are right even if nobody opens the queue.
+ */
+export async function closeOutPastQueueDaysEverywhere() {
+  // The super-admin view is read-only under RLS: use it only to find which
+  // organizations have stale tickets, then close each organization's tickets
+  // inside its own tenant transaction.
+  const orgs = await withSuperAdmin(async (tx) => {
+    const rows = await tx.queue.findMany({
+      where: { queueDate: { lt: getLocalDateString() }, status: { in: ["waiting", "called"] } },
+      distinct: ["organizationId"],
+      select: { organizationId: true },
+    });
+    return rows.map((row) => row.organizationId);
+  });
+
+  let closed = 0;
+  for (const organizationId of orgs) {
+    closed += await withTenant(organizationId, (tx) => closeOutPastQueueDays(tx, organizationId));
+  }
+  return closed;
+}
+
 export async function checkInPatient(data, user) {
   const scoped = resolveUserScope(user);
 
@@ -250,11 +333,12 @@ export async function getTodayQueue(organizationId, user, query = {}) {
   const { page, limit, skip } = getPagination(query);
 
   const { items, total } = await runnable(resolvedOrgId)(async (tx) => {
+    await closeOutPastQueueDays(tx, resolvedOrgId || null);
     return await findTodayQueue(
       resolvedOrgId,
       startOfDay,
       endOfDay,
-      { skip, limit },
+      { skip, limit, carryOverInProgress: true },
       tx
     );
   });
@@ -267,6 +351,7 @@ export async function getMyQueue(user) {
   const { startOfDay, endOfDay } = getTodayRange();
 
   return await withTenant(user.organizationId, async (tx) => {
+    await closeOutPastQueueDays(tx, user.organizationId);
     const queue = await findQueueByUserIdAndDate(user.id, queueDate, tx);
 
     if (!queue) {
@@ -356,6 +441,7 @@ export async function callNextPatient(organizationId, user) {
   const { startOfDay, endOfDay } = getTodayRange();
 
   const updatedQueue = await runnable(resolvedOrgId)(async (tx) => {
+    await closeOutPastQueueDays(tx, resolvedOrgId || null);
     const today = {
       organizationId: resolvedOrgId,
       createdAt: { gte: startOfDay, lte: endOfDay },
@@ -433,6 +519,7 @@ export async function skipPatient(organizationId, user, queueId = null) {
   const { startOfDay, endOfDay } = getTodayRange();
 
   const result = await runnable(resolvedOrgId)(async (tx) => {
+    await closeOutPastQueueDays(tx, resolvedOrgId || null);
     const currentPatient = await tx.queue.findFirst({
       where: queueId
         ? { id: queueId, organizationId: resolvedOrgId, status: "called" }

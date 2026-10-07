@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Create Account - SHMS</title>
   <meta name="description" content="Register for the Student Health Management System">
-  <link rel="stylesheet" href="css/styles.css?v=20261006">
-  <link rel="stylesheet" href="css/responsive.css?v=20261006">
+  <link rel="stylesheet" href="css/styles.css?v=20261007">
+  <link rel="stylesheet" href="css/responsive.css?v=20261007">
   <style>
     *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
     body{font-family:var(--font-family);background:#fff;overflow-x:hidden}
@@ -375,7 +375,7 @@
           </div>
           <label class="rr-terms">
             <input type="checkbox" id="terms" required>
-            <span>I agree to the <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a></span>
+            <span>I understand that this organization's Terms of Service and Privacy Policy have not been published yet. They must be supplied by the organization before this system is used in production.</span>
           </label>
           <button type="submit" class="rr-submit">
             Create account <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
@@ -385,15 +385,15 @@
         <div class="rr-signin">Already have an account? <a href="login.html">Sign in</a></div>
       </div>
       <div class="rr-footer-links">
-        <a href="#">Privacy</a> <span class="sep">·</span> <a href="#">Terms</a> <span class="sep">·</span> <a href="#">Help</a>
+        <span>Terms of Service and Privacy Policy: pending publication by your organization</span>
       </div>
     </div>
   </div>
 
-  <script src="js/config.js?v=20261006"></script>
-  <script src="js/api.js?v=20261006"></script>
-  <script src="js/utils.js?v=20261006"></script>
-  <script src="js/auth.js?v=20261006"></script>
+  <script src="js/config.js?v=20261007"></script>
+  <script src="js/api.js?v=20261007"></script>
+  <script src="js/utils.js?v=20261007"></script>
+  <script src="js/auth.js?v=20261007"></script>
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       Auth.redirectIfAuthenticated();

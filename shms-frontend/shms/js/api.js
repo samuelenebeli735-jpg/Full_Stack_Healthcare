@@ -223,7 +223,11 @@ const API = (() => {
   const _mapQueueEntry = (q) => {
     const profile = q.appointment && q.appointment.medicalRecord ? q.appointment.medicalRecord.profile : null;
     const patient = profile ? `${profile.firstName || ''} ${profile.lastName || ''}`.trim() : 'Patient';
-    const ticket = '#' + String(q.queueNumber);
+    /* A consultation still open from an earlier day stays on today's list
+       (day-close policy); its number can repeat today's, so its label carries
+       the date and actions keyed by ticket stay unambiguous. */
+    const carried = q.queueDate && q.queueDate !== _localDate();
+    const ticket = '#' + String(q.queueNumber) + (carried ? ' (' + q.queueDate.slice(5).replace('-', '/') + ')' : '');
     /* Only in_progress gets a display alias; every other QueueStatus
        (waiting | called | completed | cancelled) passes through so a called
        patient is never shown as merely "checked in". */
@@ -1281,7 +1285,7 @@ const API = (() => {
          /dashboard queueStatusCounts, which spans every day. */
       const waiting = items.filter((q) => q.status === 'waiting' || q.status === 'called').length;
       const inConsultation = items.filter((q) => q.status === 'in_progress').length;
-      const checkedInToday = items.filter((q) => q.status !== 'cancelled').length;
+      const checkedInToday = items.filter((q) => q.status !== 'cancelled' && (!q.queueDate || q.queueDate === _localDate())).length;
       return {
         success: true,
         data: {
