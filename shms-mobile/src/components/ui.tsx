@@ -267,3 +267,39 @@ export function PressableCard({ children, onPress }: { children: ReactNode; onPr
     </Pressable>
   );
 }
+
+/** A labelled single-choice row of chips (tap the selected chip again to clear when `clearable`). */
+export function ChoiceField({
+  label,
+  options,
+  value,
+  onChange,
+  error,
+  clearable = false,
+}: {
+  label: string;
+  options: readonly string[];
+  value: string;
+  onChange: (v: string) => void;
+  error?: string;
+  clearable?: boolean;
+}) {
+  return (
+    <View style={{ marginBottom: 14 }}>
+      <Text style={styles.label}>{label}</Text>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+        {options.map((o) => (
+          <Chip key={o} label={o} selected={o === value} onPress={() => onChange(clearable && o === value ? '' : o)} />
+        ))}
+      </View>
+      {error ? <Text style={styles.fieldError}>{error}</Text> : null}
+    </View>
+  );
+}
+
+/** Server field errors keyed by field name (from ApiError.fieldErrors). */
+export function fieldErrorMap(errors: { field: string; message: string }[] | undefined): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const e of errors ?? []) if (!map[e.field]) map[e.field] = e.message;
+  return map;
+}

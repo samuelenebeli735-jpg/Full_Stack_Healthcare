@@ -42,3 +42,31 @@ export const activeOrganizations = () =>
 
 export const changePassword = (currentPassword: string, newPassword: string) =>
   request<unknown>('PUT', '/profiles/password', { currentPassword, newPassword });
+
+export type ProfileUpdate = Partial<
+  Pick<
+    RegisterInput,
+    | 'firstName'
+    | 'middleName'
+    | 'lastName'
+    | 'faculty'
+    | 'department'
+    | 'level'
+    | 'gender'
+    | 'dateOfBirth'
+    | 'phone'
+    | 'emergencyContactName'
+    | 'emergencyContactPhone'
+    | 'bloodGroup'
+    | 'genotype'
+    | 'allergies'
+  >
+>;
+
+/** Student's own profile (PUT /profiles/me). */
+export const updateMyProfile = (data: ProfileUpdate) => request<unknown>('PUT', '/profiles/me', data);
+
+export const LEVELS = ['100', '200', '300', '400', '500', '600', '700'] as const;
+export const GENDERS = ['Male', 'Female'] as const;
+export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
+export const GENOTYPES = ['AA', 'AS', 'AC', 'SS', 'SC'] as const;

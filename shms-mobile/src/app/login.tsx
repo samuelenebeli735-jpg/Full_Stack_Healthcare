@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Text } from 'react-native';
 
@@ -60,6 +60,7 @@ export default function Login() {
           onSubmitEditing={() => void submit()}
         />
         <Button title="Sign in" onPress={() => void submit()} loading={busy} />
+        <Button title="New student? Create an account" variant="secondary" onPress={() => router.push('/register')} />
       </Screen>
     </KeyboardAvoidingView>
   );
