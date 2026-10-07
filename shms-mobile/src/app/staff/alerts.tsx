@@ -1,5 +1,5 @@
 import { NotificationsList } from '@/components/NotificationsList';
 
-export default function StudentNotifications() {
+export default function StaffAlerts() {
   return <NotificationsList />;
 }

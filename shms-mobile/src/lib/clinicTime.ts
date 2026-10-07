@@ -66,3 +66,10 @@ export function formatClinicDateTime(iso: string): string {
   const { date, time } = toClinicParts(iso);
   return `${formatClinicDate(date)}, ${formatTime(time)}`;
 }
+
+/** A clinic date shifted by whole days. */
+export function addClinicDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + days));
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}

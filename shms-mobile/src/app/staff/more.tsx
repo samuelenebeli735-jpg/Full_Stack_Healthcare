@@ -13,6 +13,7 @@ export default function StaffMore() {
         <Muted>{user?.email}</Muted>
         <Muted>{user?.organization?.name}</Muted>
       </Card>
+      <Button title="Reminder settings" variant="secondary" onPress={() => router.push('/notification-preferences')} />
       <Button title="Change password" variant="secondary" onPress={() => router.push('/change-password')} />
       <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
     </Screen>

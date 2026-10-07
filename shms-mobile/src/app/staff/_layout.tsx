@@ -19,6 +19,7 @@ export default function StaffLayout() {
         <Tabs.Screen name="queue" options={{ title: 'Queue', tabBarIcon: icon('people') }} />
         <Tabs.Screen name="appointments" options={{ title: 'Appointments', tabBarIcon: icon('calendar') }} />
         <Tabs.Screen name="patients" options={{ title: 'Patients', tabBarIcon: icon('search') }} />
+        <Tabs.Screen name="alerts" options={{ title: 'Alerts', tabBarIcon: icon('notifications') }} />
         <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: icon('menu') }} />
       </Tabs>
     </RoleGate>

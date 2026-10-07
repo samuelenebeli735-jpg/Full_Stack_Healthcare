@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Text, View } from 'react-native';
 
-import { appointmentsOn, confirmAppointment, type OrgAppointment } from '@/api/staff';
+import { appointmentsPage, setAppointmentStatus, type OrgAppointment, type StaffAppointmentAction } from '@/api/staff';
+import type { Pagination } from '@/api/types';
 import { useAuth } from '@/auth/AuthContext';
 import {
   Button,
@@ -9,89 +11,215 @@ import {
   Chip,
   EmptyState,
   ErrorBanner,
-  Loading,
   Muted,
   Screen,
   StatusBadge,
+  TextField,
   Title,
   colors,
+  statusLabel,
 } from '@/components/ui';
-import { formatClinicDate, formatTime, nextClinicDates, toClinicParts } from '@/lib/clinicTime';
+import { addClinicDays, clinicToday, formatClinicDate, formatClinicDateTime, formatTime, toClinicParts } from '@/lib/clinicTime';
 import { patientName } from '@/lib/patients';
-import { useFocusData } from '@/lib/useAsync';
 
-const DATES = nextClinicDates(7);
+const STATUSES = ['scheduled', 'confirmed', 'checked_in', 'in_progress', 'completed', 'cancelled', 'no_show'];
+
+// Staff actions offered before the patient arrives. The API allows these
+// transitions (and rejects any other); checked-in and in-progress visits are
+// handled through the queue (Skip / Complete).
+const ACTIONS: Record<string, StaffAppointmentAction[]> = {
+  scheduled: ['confirmed', 'cancelled', 'no_show'],
+  confirmed: ['cancelled', 'no_show'],
+};
+
+const ACTION_LABEL: Record<StaffAppointmentAction, string> = {
+  confirmed: 'Confirm',
+  cancelled: 'Cancel',
+  no_show: 'Mark missed',
+};
 
 export default function StaffAppointments() {
   const { user } = useAuth();
   const orgId = user?.organizationId ?? '';
-  const [date, setDate] = useState(DATES[0]);
-  const { data, error, loading, reload } = useFocusData(() => appointmentsOn(orgId, date));
+
+  const [mode, setMode] = useState<'day' | 'all'>('day');
+  const [date, setDate] = useState(clinicToday());
+  const [status, setStatus] = useState('');
+  const [search, setSearch] = useState('');
+  const [appliedSearch, setAppliedSearch] = useState('');
+
+  const [items, setItems] = useState<OrgAppointment[]>([]);
+  const [pagination, setPagination] = useState<Pagination | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const seq = useRef(0);
 
-  // Focus loads the first date; reload when another date is picked.
-  const first = useRef(true);
-  useEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    void reload();
-  }, [date, reload]);
-  const pick = (d: string) => setDate(d);
+  const filters = { mode, date, status, search: appliedSearch };
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
 
-  const confirm = async (a: OrgAppointment) => {
-    setBusyId(a.id);
-    setActionError(null);
-    try {
-      await confirmAppointment(a.id);
-      await reload();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'Could not confirm.');
-    } finally {
-      setBusyId(null);
-    }
+  /** Load page 1 (reset) or the next page of the current filters. */
+  const load = useCallback(
+    async (page: number) => {
+      const f = filtersRef.current;
+      const mine = ++seq.current;
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await appointmentsPage(orgId, {
+          date: f.mode === 'day' ? f.date : undefined,
+          status: f.status || undefined,
+          search: f.search || undefined,
+          page,
+          order: f.mode === 'day' ? 'asc' : 'desc',
+        });
+        if (mine !== seq.current) return;
+        setItems((prev) => (page === 1 ? res.items : [...prev, ...res.items]));
+        setPagination(res.pagination);
+      } catch (e) {
+        if (mine === seq.current) setError(e instanceof Error ? e.message : 'Could not load appointments.');
+      } finally {
+        if (mine === seq.current) setLoading(false);
+      }
+    },
+    [orgId]
+  );
+
+  // Reload when the screen gains focus or any filter changes.
+  useFocusEffect(
+    useCallback(() => {
+      void load(1);
+    }, [load, mode, date, status, appliedSearch])
+  );
+
+  const act = (a: OrgAppointment, action: StaffAppointmentAction) => {
+    const run = async () => {
+      setBusyId(a.id);
+      setError(null);
+      try {
+        await setAppointmentStatus(a.id, action);
+        await load(1);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'The action failed.');
+      } finally {
+        setBusyId(null);
+      }
+    };
+    if (action === 'confirmed') return void run();
+    const who = patientName(a.medicalRecord?.profile);
+    const when = formatClinicDateTime(a.appointmentDate);
+    Alert.alert(
+      action === 'cancelled' ? 'Cancel appointment?' : 'Mark as missed?',
+      `${who}, ${when}. ${action === 'cancelled' ? 'The appointment will be cancelled.' : 'The appointment will be recorded as missed (no-show).'} The student is notified.`,
+      [
+        { text: 'Back', style: 'cancel' },
+        { text: ACTION_LABEL[action], style: 'destructive', onPress: () => void run() },
+      ]
+    );
   };
 
-  const list = (data ?? []).filter((a) => toClinicParts(a.appointmentDate).date === date);
-  const toConfirm = list.filter((a) => a.status === 'scheduled').length;
+  const total = pagination?.total ?? 0;
+  const toConfirm = items.filter((a) => a.status === 'scheduled').length;
 
   return (
-    <Screen onRefresh={reload}>
+    <Screen onRefresh={() => load(1)}>
       <Title>Appointments</Title>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-        {DATES.map((d) => (
-          <Chip key={d} label={formatClinicDate(d)} selected={d === date} onPress={() => pick(d)} />
+
+      <View style={{ flexDirection: 'row' }}>
+        <Chip label="By day" selected={mode === 'day'} onPress={() => setMode('day')} />
+        <Chip label="All dates" selected={mode === 'all'} onPress={() => setMode('all')} />
+      </View>
+
+      {mode === 'day' ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+          <Chip label="‹ Prev" onPress={() => setDate((d) => addClinicDays(d, -1))} />
+          <Text style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: colors.text, marginBottom: 8 }}>
+            {formatClinicDate(date)}
+          </Text>
+          <Chip label="Next ›" onPress={() => setDate((d) => addClinicDays(d, 1))} />
+        </View>
+      ) : null}
+      {mode === 'day' && date !== clinicToday() ? (
+        <Chip label="Back to today" onPress={() => setDate(clinicToday())} />
+      ) : null}
+
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
+        <Chip label="All statuses" selected={!status} onPress={() => setStatus('')} />
+        {STATUSES.map((s) => (
+          <Chip key={s} label={statusLabel(s)} selected={status === s} onPress={() => setStatus(s)} />
         ))}
       </View>
-      <ErrorBanner message={actionError || error} />
-      {loading && !data ? (
-        <Loading />
-      ) : list.length === 0 ? (
-        <EmptyState title="No appointments" message={`Nothing booked for ${formatClinicDate(date)}.`} />
+
+      <TextField
+        label="Search patient (name or matric number) or reason"
+        value={search}
+        onChangeText={(v) => {
+          setSearch(v);
+          if (!v.trim()) setAppliedSearch('');
+        }}
+        autoCapitalize="none"
+        returnKeyType="search"
+        onSubmitEditing={() => setAppliedSearch(search.trim())}
+      />
+
+      <ErrorBanner message={error} />
+
+      {loading && items.length === 0 ? (
+        <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
+      ) : items.length === 0 ? (
+        <EmptyState
+          title="No appointments"
+          message={mode === 'day' ? `Nothing matches for ${formatClinicDate(date)}.` : 'Nothing matches these filters.'}
+        />
       ) : (
         <>
-          {toConfirm ? <Muted>{toConfirm} awaiting confirmation. Patients can only check in once confirmed.</Muted> : null}
+          <Muted>
+            {total} appointment{total === 1 ? '' : 's'}
+            {toConfirm ? ` · ${toConfirm} awaiting confirmation (patients can check in only once confirmed)` : ''}
+          </Muted>
           <View style={{ height: 8 }} />
-          {list.map((a) => (
-            <Card key={a.id}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1, paddingRight: 8 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
-                    {formatTime(toClinicParts(a.appointmentDate).time)} · {patientName(a.medicalRecord?.profile)}
-                  </Text>
-                  <Muted>{a.service?.name || 'Appointment'}</Muted>
-                  <Muted>{a.staff ? `Dr ${a.staff.firstName} ${a.staff.lastName}` : 'Any available doctor'}</Muted>
-                  {a.reason ? <Muted>Reason: {a.reason}</Muted> : null}
+          {items.map((a) => {
+            const { date: d, time } = toClinicParts(a.appointmentDate);
+            const actions = ACTIONS[a.status] ?? [];
+            return (
+              <Card key={a.id}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
+                      {mode === 'all' ? `${formatClinicDate(d)}, ` : ''}
+                      {formatTime(time)} · {patientName(a.medicalRecord?.profile)}
+                    </Text>
+                    <Muted>{a.service?.name || 'Appointment'}</Muted>
+                    <Muted>{a.staff ? `Dr ${a.staff.firstName} ${a.staff.lastName}` : 'Any available doctor'}</Muted>
+                    {a.reason ? <Muted>Reason: {a.reason}</Muted> : null}
+                  </View>
+                  <StatusBadge status={a.status} />
                 </View>
-                <StatusBadge status={a.status} />
-              </View>
-              {a.status === 'scheduled' ? (
-                <Button title="Confirm" loading={busyId === a.id} onPress={() => void confirm(a)} />
-              ) : null}
-            </Card>
-          ))}
+                {actions.length ? (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+                    {actions.map((action) => (
+                      <Chip
+                        key={action}
+                        label={busyId === a.id ? '…' : ACTION_LABEL[action]}
+                        selected={action === 'confirmed'}
+                        disabled={busyId !== null}
+                        onPress={() => act(a, action)}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </Card>
+            );
+          })}
+          {pagination?.hasNextPage ? (
+            <Button
+              title={`Load more (${items.length} of ${total})`}
+              variant="secondary"
+              loading={loading}
+              onPress={() => void load((pagination?.page ?? 1) + 1)}
+            />
+          ) : null}
         </>
       )}
     </Screen>

@@ -132,9 +132,46 @@ export const createPrescription = (consultationId: string, items: NewPrescriptio
 export const updatePrescription = (id: string, items: NewPrescriptionItem[]) =>
   request<Prescription>('PATCH', `/prescriptions/${id}`, { items });
 
+/** A student's medical record as GET /medical-records returns it (profile-level). */
+export interface PatientRecord {
+  id: string;
+  recordNumber?: string | null;
+  status: string;
+  createdAt?: string;
+  profile: (Profile & { user?: { email: string | null; isActive?: boolean } }) | null;
+}
+
 /** Patient records (students) of the organization, optionally searched. */
 export const patientRecords = (search: string) =>
-  request<Paginated<{ id: string; recordNumber?: string | null; status: string; profile: Profile & { user?: { email: string | null } } }>>(
+  request<Paginated<PatientRecord>>('GET', `/medical-records${qs({ search: search || undefined, limit: 30 })}`);
+
+export type StaffAppointmentAction = 'confirmed' | 'cancelled' | 'no_show';
+
+/** Status change by staff; the API enforces which transitions are allowed. */
+export const setAppointmentStatus = (id: string, status: StaffAppointmentAction) =>
+  request<OrgAppointment>('PATCH', `/appointments/${id}`, { status });
+
+/** One page of organization appointments with the filters the API supports. */
+export const appointmentsPage = (
+  organizationId: string,
+  filters: { date?: string; status?: string; search?: string; page: number; order: 'asc' | 'desc' }
+) =>
+  request<Paginated<OrgAppointment>>(
     'GET',
-    `/medical-records${qs({ search: search || undefined, limit: 30 })}`
+    `/appointments/organization/${organizationId}${qs({
+      appointmentDate: filters.date,
+      status: filters.status,
+      search: filters.search,
+      sort: 'appointmentDate',
+      order: filters.order,
+      page: filters.page,
+      limit: 20,
+    })}`
   );
+
+/** Most recently created patient records of the organization. */
+export const recentPatientRecords = () =>
+  request<Paginated<PatientRecord>>('GET', `/medical-records${qs({ sort: 'createdAt', order: 'desc', limit: 20 })}`);
+
+/** One patient record (profile-level details, as on the web). */
+export const patientRecord = (id: string) => request<PatientRecord>('GET', `/medical-records/${id}`);
