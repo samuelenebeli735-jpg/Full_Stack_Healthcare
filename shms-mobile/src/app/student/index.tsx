@@ -58,6 +58,22 @@ export default function StudentHome() {
       )}
       <Button title="Book an appointment" onPress={() => router.navigate('/student/appointments/book')} />
 
+      <SectionTitle>My health</SectionTitle>
+      <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flex: 1 }}>
+          <PressableCard onPress={() => router.push('/medical-history')}>
+            <Text style={{ fontWeight: '600', color: colors.text }}>Medical history</Text>
+            <Muted>Past visits</Muted>
+          </PressableCard>
+        </View>
+        <View style={{ flex: 1 }}>
+          <PressableCard onPress={() => router.push('/prescriptions')}>
+            <Text style={{ fontWeight: '600', color: colors.text }}>Prescriptions</Text>
+            <Muted>Medicines</Muted>
+          </PressableCard>
+        </View>
+      </View>
+
       {data && data.unread > 0 ? (
         <PressableCard onPress={() => router.navigate('/student/notifications')}>
           <Text style={{ color: colors.primary, fontWeight: '600' }}>

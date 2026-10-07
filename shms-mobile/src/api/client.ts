@@ -36,6 +36,15 @@ const TIMEOUT_MS = 20000;
  * envelope. Throws ApiError with the server's message on any failure.
  */
 export async function request<T>(method: Method, path: string, body?: unknown): Promise<T> {
+  return (await requestWithMessage<T>(method, path, body)).data;
+}
+
+/** Like request(), but also returns the server's success message. */
+export async function requestWithMessage<T>(
+  method: Method,
+  path: string,
+  body?: unknown
+): Promise<{ data: T; message: string | null }> {
   if (!API_URL) {
     throw new ApiError(0, 'The app is not configured: EXPO_PUBLIC_API_URL is missing.');
   }
@@ -75,7 +84,7 @@ export async function request<T>(method: Method, path: string, body?: unknown): 
     throw new ApiError(res.status, message, Array.isArray(json?.errors) ? json.errors : []);
   }
 
-  return (json ? json.data : null) as T;
+  return { data: (json ? json.data : null) as T, message: json?.message ?? null };
 }
 
 /** Build "?a=1&b=2" from defined, non-empty values. */

@@ -60,6 +60,7 @@ export default function Login() {
           onSubmitEditing={() => void submit()}
         />
         <Button title="Sign in" onPress={() => void submit()} loading={busy} />
+        <Button title="Forgot password?" variant="secondary" onPress={() => router.push('/forgot-password')} />
         <Button title="New student? Create an account" variant="secondary" onPress={() => router.push('/register')} />
       </Screen>
     </KeyboardAvoidingView>

@@ -48,6 +48,8 @@ export default function StudentProfile() {
       </Card>
 
       <Button title="Edit profile" onPress={() => router.push('/edit-profile')} />
+      <Button title="Medical history" variant="secondary" onPress={() => router.push('/medical-history')} />
+      <Button title="Prescriptions" variant="secondary" onPress={() => router.push('/prescriptions')} />
       <Button title="Change password" variant="secondary" onPress={() => router.push('/change-password')} />
       <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
     </Screen>

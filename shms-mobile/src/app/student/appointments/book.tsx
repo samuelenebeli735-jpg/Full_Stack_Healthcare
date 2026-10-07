@@ -1,40 +1,12 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 
-import {
-  availableDoctors,
-  bookAppointment,
-  ensureMedicalRecordId,
-  services as loadServices,
-  slots as loadSlots,
-  type AvailableDoctor,
-  type Service,
-} from '@/api/student';
+import { bookAppointment, ensureMedicalRecordId, services as loadServices, type Service } from '@/api/student';
 import { useAuth } from '@/auth/AuthContext';
-import {
-  Button,
-  Card,
-  Chip,
-  EmptyState,
-  ErrorBanner,
-  Muted,
-  PressableCard,
-  Screen,
-  SectionTitle,
-  TextField,
-  colors,
-} from '@/components/ui';
-import {
-  clinicNowTime,
-  clinicToday,
-  formatClinicDate,
-  formatTime,
-  fromClinicParts,
-  nextClinicDates,
-} from '@/lib/clinicTime';
-
-const DATES = nextClinicDates(14);
+import { SlotPicker, type SlotChoice } from '@/components/SlotPicker';
+import { Button, Card, Chip, EmptyState, ErrorBanner, Muted, Screen, SectionTitle, TextField, colors } from '@/components/ui';
+import { formatClinicDate, formatTime, fromClinicParts } from '@/lib/clinicTime';
 
 export default function BookAppointment() {
   const { user } = useAuth();
@@ -42,13 +14,7 @@ export default function BookAppointment() {
 
   const [serviceList, setServiceList] = useState<Service[] | null>(null);
   const [serviceId, setServiceId] = useState<string | null>(null);
-  const [date, setDate] = useState<string>(DATES[0]);
-  const [doctors, setDoctors] = useState<AvailableDoctor[] | null>(null);
-  const [doctorsMessage, setDoctorsMessage] = useState<string | null>(null);
-  const [doctor, setDoctor] = useState<AvailableDoctor | null>(null);
-  const [times, setTimes] = useState<string[] | null>(null);
-  const [timesMessage, setTimesMessage] = useState<string | null>(null);
-  const [time, setTime] = useState<string | null>(null);
+  const [choice, setChoice] = useState<SlotChoice | null>(null);
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -63,47 +29,8 @@ export default function BookAppointment() {
       .catch((e: Error) => setError(e.message));
   }, [orgId]);
 
-  // Doctors working on the chosen date.
-  useEffect(() => {
-    if (!serviceId) return;
-    let live = true;
-    setDoctors(null);
-    setDoctor(null);
-    setTimes(null);
-    setTime(null);
-    availableDoctors(date, serviceId)
-      .then((res) => {
-        if (!live) return;
-        setDoctors(res.doctors);
-        setDoctorsMessage(res.message);
-      })
-      .catch((e: Error) => live && setError(e.message));
-    return () => {
-      live = false;
-    };
-  }, [serviceId, date]);
-
-  // Free slots of the chosen doctor (past times today are not offered).
-  useEffect(() => {
-    if (!doctor || !serviceId) return;
-    let live = true;
-    setTimes(null);
-    setTime(null);
-    loadSlots(doctor.id, date, serviceId)
-      .then((res) => {
-        if (!live) return;
-        const now = date === clinicToday() ? clinicNowTime() : null;
-        setTimes(res.slots.filter((s) => s.available && (!now || s.time > now)).map((s) => s.time));
-        setTimesMessage(res.message);
-      })
-      .catch((e: Error) => live && setError(e.message));
-    return () => {
-      live = false;
-    };
-  }, [doctor, date, serviceId]);
-
   const book = async () => {
-    if (!serviceId || !doctor || !time) return;
+    if (!serviceId || !choice) return;
     setBusy(true);
     setError(null);
     try {
@@ -112,8 +39,9 @@ export default function BookAppointment() {
         organizationId: orgId,
         medicalRecordId,
         serviceId,
-        staffId: doctor.id,
-        appointmentDate: fromClinicParts(date, time),
+        // A real doctor even for "No preference" (the first available one).
+        staffId: choice.doctor.id,
+        appointmentDate: fromClinicParts(choice.date, choice.time),
         ...(reason.trim() ? { reason: reason.trim() } : {}),
       });
       router.replace({ pathname: '/student/appointments/[id]', params: { id: created.id, booked: '1' } });
@@ -141,55 +69,10 @@ export default function BookAppointment() {
       )}
 
       {serviceId ? (
-        <>
-          <SectionTitle>2. Date</SectionTitle>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {DATES.map((d) => (
-              <Chip key={d} label={formatClinicDate(d)} selected={d === date} onPress={() => setDate(d)} />
-            ))}
-          </View>
-
-          <SectionTitle>3. Doctor</SectionTitle>
-          {doctors === null ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : doctors.length === 0 ? (
-            <EmptyState title="No doctors available" message={doctorsMessage || 'Try another date.'} />
-          ) : (
-            doctors.map((d) => (
-              <PressableCard key={d.id} onPress={() => d.hasAvailableSlots && setDoctor(d)}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: doctor?.id === d.id ? colors.primary : colors.text }}>
-                      Dr {d.firstName} {d.lastName}
-                    </Text>
-                    <Muted>{[d.qualification, d.department?.name].filter(Boolean).join(' · ') || 'Doctor'}</Muted>
-                  </View>
-                  <Muted>{d.hasAvailableSlots ? `${d.availableSlotCount} free` : 'Fully booked'}</Muted>
-                </View>
-              </PressableCard>
-            ))
-          )}
-        </>
+        <SlotPicker key={serviceId} serviceId={serviceId} onChange={setChoice} onError={setError} stepOffset={2} />
       ) : null}
 
-      {doctor ? (
-        <>
-          <SectionTitle>4. Time</SectionTitle>
-          {times === null ? (
-            <ActivityIndicator color={colors.primary} />
-          ) : times.length === 0 ? (
-            <EmptyState title="No free times" message={timesMessage || 'Choose another date or doctor.'} />
-          ) : (
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-              {times.map((t) => (
-                <Chip key={t} label={formatTime(t)} selected={t === time} onPress={() => setTime(t)} />
-              ))}
-            </View>
-          )}
-        </>
-      ) : null}
-
-      {time ? (
+      {choice ? (
         <>
           <SectionTitle>5. Reason (optional)</SectionTitle>
           <TextField
@@ -202,7 +85,9 @@ export default function BookAppointment() {
           />
           <Card>
             <Muted>
-              {formatClinicDate(date)} at {formatTime(time)} with Dr {doctor?.firstName} {doctor?.lastName}
+              {formatClinicDate(choice.date)} at {formatTime(choice.time)} with Dr {choice.doctor.firstName}{' '}
+              {choice.doctor.lastName}
+              {choice.firstAvailable ? ' (first available)' : ''}
             </Muted>
             <Muted>The clinic confirms your appointment before you can check in.</Muted>
           </Card>

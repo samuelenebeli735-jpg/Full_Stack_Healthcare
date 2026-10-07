@@ -1,4 +1,4 @@
-import { request } from '@/api/client';
+import { request, requestWithMessage } from '@/api/client';
 import type { Organization, Profile, User } from '@/api/types';
 
 export interface Session {
@@ -79,3 +79,10 @@ export const LEVELS = ['100', '200', '300', '400', '500', '600', '700'] as const
 export const GENDERS = ['Male', 'Female'] as const;
 export const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 export const GENOTYPES = ['AA', 'AS', 'AC', 'SS', 'SC'] as const;
+
+/**
+ * Ask for a password-reset email. The server answers the same way for every
+ * address; the reset itself is completed on the SHMS website from the link.
+ */
+export const forgotPassword = async (email: string) =>
+  (await requestWithMessage<unknown>('POST', '/auth/forgot-password', { email })).message;

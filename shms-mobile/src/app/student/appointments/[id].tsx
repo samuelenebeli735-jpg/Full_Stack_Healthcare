@@ -134,6 +134,13 @@ export default function AppointmentDetail() {
         </>
       ) : null}
 
+      {canCancel && !cancelling ? (
+        <Button
+          title="Reschedule"
+          variant="secondary"
+          onPress={() => router.push({ pathname: '/student/appointments/reschedule', params: { id: a.id } })}
+        />
+      ) : null}
       {canCancel ? (
         cancelling ? (
           <Card>

@@ -64,6 +64,7 @@ export interface Appointment {
       diagnosis: string | null;
       treatmentPlan: string | null;
       notes: string | null;
+      consultationDate?: string | null;
       prescription: { id: string; createdAt: string; items: PrescriptionItem[] } | null;
     } | null;
   } | null;
@@ -137,6 +138,10 @@ export const bookAppointment = (body: {
 }) => request<Appointment>('POST', '/appointments', body);
 
 export const myAppointments = () => allPages<Appointment>('/appointments/my');
+
+/** Move an appointment to another time (and optionally another doctor). */
+export const rescheduleAppointment = (id: string, appointmentDate: string, staffId: string) =>
+  request<Appointment>('POST', `/appointments/${id}/reschedule`, { appointmentDate, staffId });
 
 export const cancelAppointment = (id: string, reason: string) =>
   request<Appointment>('POST', `/appointments/${id}/cancel`, { reason });
