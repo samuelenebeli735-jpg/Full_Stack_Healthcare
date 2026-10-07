@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "cluster": "pm2 start ecosystem.config.cjs"
+    "cluster": "pm2 start ecosystem.config.cjs",
+    "bootstrap": "node src/cli/bootstrap.js"
   },
   "keywords": [],
   "author": "",
