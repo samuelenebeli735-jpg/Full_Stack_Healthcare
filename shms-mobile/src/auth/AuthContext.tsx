@@ -66,6 +66,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [clearSession]);
 
+  // Stable across user updates, so screens can call it from focus effects.
+  const refresh = useCallback(async () => {
+    if (status === 'offline') return restore();
+    const { user: u } = await authApi.verify();
+    setUser(u);
+  }, [status, restore]);
+
   useEffect(() => {
     setUnauthorizedHandler(() => {
       void clearSession();
@@ -83,16 +90,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await startSession(await authApi.login(identifier.trim(), password));
       },
       register: async (input) => {
-        await startSession(await authApi.register(input));
+        // The register response's `user` carries no profile or organization
+        // (they come back beside it), so load the full user from the server
+        // the same way the app does at launch.
+        const { token } = await authApi.register(input);
+        setAuthToken(token);
+        await SecureStore.setItemAsync(TOKEN_KEY, token);
+        await restore();
       },
       signOut: clearSession,
-      refresh: async () => {
-        if (status === 'offline') return restore();
-        const { user: u } = await authApi.verify();
-        setUser(u);
-      },
+      refresh,
     }),
-    [status, user, error, startSession, clearSession, restore]
+    [status, user, error, startSession, clearSession, restore, refresh]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

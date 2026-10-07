@@ -1,5 +1,5 @@
 import { request } from '@/api/client';
-import type { Organization, User } from '@/api/types';
+import type { Organization, Profile, User } from '@/api/types';
 
 export interface Session {
   user: User;
@@ -33,9 +33,18 @@ export interface RegisterInput {
   allergies?: string;
 }
 
-/** Student self-registration; returns a session like login. */
+/**
+ * Student self-registration. Unlike login, `user` here has no profile or
+ * organization; the profile is returned beside it.
+ */
+export interface RegisterResult {
+  user: Omit<User, 'profile' | 'organization'>;
+  profile: Profile;
+  token: string;
+}
+
 export const register = (input: RegisterInput) =>
-  request<Session>('POST', '/auth/register', input);
+  request<RegisterResult>('POST', '/auth/register', input);
 
 export const activeOrganizations = () =>
   request<Organization[]>('GET', '/organizations/active');

@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 import { Text, View } from 'react-native';
 
 import { displayName, useAuth } from '@/auth/AuthContext';
@@ -15,7 +16,13 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 }
 
 export default function StudentProfile() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refresh } = useAuth();
+  // Re-read the profile from the server each time this tab opens.
+  useFocusEffect(
+    useCallback(() => {
+      refresh().catch(() => {});
+    }, [refresh])
+  );
   const p = user?.profile;
   const dob = p?.dateOfBirth ? formatClinicDate(p.dateOfBirth.slice(0, 10)) : null;
   return (

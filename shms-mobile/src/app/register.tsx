@@ -1,4 +1,4 @@
-import { Redirect, Stack } from 'expo-router';
+import { Redirect, Stack, router } from 'expo-router';
 import { useEffect, useState, type ComponentProps } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 
@@ -128,7 +128,9 @@ export default function Register() {
     };
     try {
       await register(input);
-      // Signed in: the entry gate takes the new student to their home.
+      // The entry gate shows the student's home (or a retry screen if the
+      // new account's profile could not be loaded yet).
+      router.replace('/');
     } catch (e) {
       if (e instanceof ApiError) {
         setErrors(fieldErrorMap(e.fieldErrors));
