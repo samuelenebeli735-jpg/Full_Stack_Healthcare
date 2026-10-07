@@ -1,0 +1,23 @@
+# Keep the build context to what the Dockerfile copies (package*.json,
+# prisma/, src/, ecosystem.config.cjs). Secrets, local data and dev tooling
+# never leave the machine.
+.git
+node_modules
+.env
+.env.*
+!.env.example
+.tmp
+.vscode
+.postman
+*.log
+
+# Dev-only scripts (hardcoded test credentials), tests and local folders.
+scripts
+test
+backups
+deploy
+jobs
+postman
+
+# Stale local Prisma output; the image generates its client with `prisma generate`.
+src/generated
