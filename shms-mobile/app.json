@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "shms-mobile",
+    "name": "SHMS",
     "slug": "shms-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,6 +11,7 @@
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.shms.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
