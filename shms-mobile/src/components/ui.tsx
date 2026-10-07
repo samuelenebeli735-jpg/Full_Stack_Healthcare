@@ -1,7 +1,8 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -25,11 +26,34 @@ export const colors = {
 };
 
 /** A screen with safe-area padding and optional scrolling. */
-export function Screen({ children, scroll = true }: { children: ReactNode; scroll?: boolean }) {
+export function Screen({
+  children,
+  scroll = true,
+  onRefresh,
+}: {
+  children: ReactNode;
+  scroll?: boolean;
+  /** Enables pull-to-refresh. */
+  onRefresh?: () => Promise<void>;
+}) {
+  const [refreshing, setRefreshing] = useState(false);
+  const refresh = onRefresh
+    ? async () => {
+        setRefreshing(true);
+        try {
+          await onRefresh();
+        } finally {
+          setRefreshing(false);
+        }
+      }
+    : undefined;
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       {scroll ? (
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={refresh ? <RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} /> : undefined}>
           {children}
         </ScrollView>
       ) : (
@@ -160,3 +184,86 @@ export const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
 });
+
+const STATUS_COLORS: Record<string, { bg: string; fg: string }> = {
+  scheduled: { bg: '#FFF4E5', fg: '#9A5B00' },
+  confirmed: { bg: '#E3F2FD', fg: '#0D47A1' },
+  checked_in: { bg: '#E8EAF6', fg: '#283593' },
+  waiting: { bg: '#E8EAF6', fg: '#283593' },
+  called: { bg: '#FFF8E1', fg: '#8D6E00' },
+  in_progress: { bg: '#E0F2F1', fg: '#00695C' },
+  completed: { bg: '#E8F5E9', fg: '#1B5E20' },
+  cancelled: { bg: '#ECEFF1', fg: '#455A64' },
+  no_show: { bg: '#FDECEA', fg: '#B71C1C' },
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  scheduled: 'Awaiting confirmation',
+  confirmed: 'Confirmed',
+  checked_in: 'Checked in',
+  waiting: 'Waiting',
+  called: 'Called',
+  in_progress: 'In consultation',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+  no_show: 'Missed',
+};
+
+export function statusLabel(status: string): string {
+  return STATUS_LABELS[status] || status;
+}
+
+export function StatusBadge({ status }: { status: string }) {
+  const c = STATUS_COLORS[status] || { bg: '#ECEFF1', fg: '#455A64' };
+  return (
+    <View style={{ alignSelf: 'flex-start', backgroundColor: c.bg, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
+      <Text style={{ color: c.fg, fontSize: 12, fontWeight: '700' }}>{statusLabel(status)}</Text>
+    </View>
+  );
+}
+
+/** A selectable pill (dates, times, services). */
+export function Chip({ label, selected, onPress, disabled }: { label: string; selected?: boolean; onPress: () => void; disabled?: boolean }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        {
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          borderRadius: 999,
+          borderWidth: 1,
+          borderColor: selected ? colors.primary : colors.border,
+          backgroundColor: selected ? colors.primary : colors.card,
+          marginRight: 8,
+          marginBottom: 8,
+        },
+        disabled && { opacity: 0.4 },
+      ]}>
+      <Text style={{ color: selected ? colors.primaryText : colors.text, fontWeight: '600' }}>{label}</Text>
+    </Pressable>
+  );
+}
+
+export function SectionTitle({ children }: { children: ReactNode }) {
+  return <Text style={{ fontSize: 16, fontWeight: '700', color: colors.text, marginTop: 10, marginBottom: 8 }}>{children}</Text>;
+}
+
+export function EmptyState({ title, message }: { title: string; message?: string }) {
+  return (
+    <View style={{ alignItems: 'center', paddingVertical: 32 }}>
+      <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{title}</Text>
+      {message ? <Text style={[styles.muted, { textAlign: 'center', marginTop: 6 }]}>{message}</Text> : null}
+    </View>
+  );
+}
+
+/** A tappable card row. */
+export function PressableCard({ children, onPress }: { children: ReactNode; onPress: () => void }) {
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.7 }]}>
+      {children}
+    </Pressable>
+  );
+}
