@@ -1,19 +1,10 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { displayName, useAuth } from '@/auth/AuthContext';
-import { Button, Card, Muted, Screen, SectionTitle, Title, colors } from '@/components/ui';
+import { Button, Card, CardTitle, IconCircle, InfoRow, Muted, Screen, SectionTitle, Title, space } from '@/components/ui';
 import { formatClinicDate } from '@/lib/clinicTime';
-
-function Row({ label, value }: { label: string; value?: string | null }) {
-  return (
-    <View style={{ marginBottom: 8 }}>
-      <Muted>{label}</Muted>
-      <Text style={{ fontSize: 15, color: colors.text }}>{value || '—'}</Text>
-    </View>
-  );
-}
 
 export default function StudentProfile() {
   const { user, signOut, refresh } = useAuth();
@@ -29,29 +20,42 @@ export default function StudentProfile() {
     <Screen>
       <Title>Profile</Title>
       <Card>
-        <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>{displayName(user)}</Text>
-        <Muted>{user?.email}</Muted>
-        <Muted>Matric number: {p?.matricNumber || '—'}</Muted>
-        <Muted>{user?.organization?.name}</Muted>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <IconCircle name="person" size={52} />
+          <View style={{ flex: 1, marginLeft: space.md }}>
+            <CardTitle style={{ fontSize: 18 }}>{displayName(user)}</CardTitle>
+            <Muted>{user?.email}</Muted>
+            <Muted>{user?.organization?.name}</Muted>
+          </View>
+        </View>
       </Card>
 
-      <SectionTitle>Details</SectionTitle>
+      <SectionTitle>Student details</SectionTitle>
       <Card>
-        <Row label="Faculty / department" value={[p?.faculty, p?.department].filter(Boolean).join(' · ')} />
-        <Row label="Level" value={p?.level ? `${p.level} level` : null} />
-        <Row label="Gender" value={p?.gender} />
-        <Row label="Date of birth" value={dob} />
-        <Row label="Phone" value={p?.phone} />
-        <Row label="Emergency contact" value={[p?.emergencyContactName, p?.emergencyContactPhone].filter(Boolean).join(' · ')} />
-        <Row label="Blood group / genotype" value={[p?.bloodGroup, p?.genotype].filter(Boolean).join(' · ')} />
-        <Row label="Allergies" value={p?.allergies} />
+        <InfoRow label="Matric number" value={p?.matricNumber} />
+        <InfoRow label="Faculty / department" value={[p?.faculty, p?.department].filter(Boolean).join(' · ')} />
+        <InfoRow label="Level" value={p?.level ? `${p.level} level` : null} />
+        <InfoRow label="Gender" value={p?.gender} />
+        <InfoRow label="Date of birth" value={dob} />
+        <InfoRow label="Phone" value={p?.phone} />
+        <InfoRow label="Emergency contact" value={[p?.emergencyContactName, p?.emergencyContactPhone].filter(Boolean).join(' · ')} />
       </Card>
 
-      <Button title="Edit profile" onPress={() => router.push('/edit-profile')} />
-      <Button title="Medical history" variant="secondary" onPress={() => router.push('/medical-history')} />
-      <Button title="Prescriptions" variant="secondary" onPress={() => router.push('/prescriptions')} />
-      <Button title="Change password" variant="secondary" onPress={() => router.push('/change-password')} />
-      <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
+      <SectionTitle>Health</SectionTitle>
+      <Card>
+        <InfoRow label="Blood group" value={p?.bloodGroup} />
+        <InfoRow label="Genotype" value={p?.genotype} />
+        <InfoRow label="Allergies" value={p?.allergies} />
+      </Card>
+
+      <Button title="Edit profile" icon="create-outline" onPress={() => router.push('/edit-profile')} />
+      <SectionTitle>Records</SectionTitle>
+      <Button title="Medical history" variant="secondary" icon="document-text-outline" onPress={() => router.push('/medical-history')} />
+      <Button title="Prescriptions" variant="secondary" icon="medical-outline" onPress={() => router.push('/prescriptions')} />
+      <SectionTitle>Account</SectionTitle>
+      <Button title="Reminder settings" variant="secondary" icon="notifications-outline" onPress={() => router.push('/notification-preferences')} />
+      <Button title="Change password" variant="secondary" icon="key-outline" onPress={() => router.push('/change-password')} />
+      <Button title="Sign out" variant="link" icon="log-out-outline" onPress={() => void signOut()} />
     </Screen>
   );
 }

@@ -2,9 +2,34 @@ import { router } from 'expo-router';
 import { Text, View } from 'react-native';
 
 import { markAllNotificationsRead, markNotificationRead, notifications } from '@/api/student';
-import { Button, EmptyState, ErrorBanner, Loading, Muted, PressableCard, Screen, Title, colors } from '@/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorBanner,
+  IconCircle,
+  Loading,
+  Muted,
+  PressableCard,
+  Screen,
+  Title,
+  colors,
+  space,
+  type IconName,
+} from '@/components/ui';
 import { formatClinicDateTime } from '@/lib/clinicTime';
 import { useFocusData } from '@/lib/useAsync';
+
+// Icons for the notification types the API sends; anything else gets a bell.
+const TYPE_ICONS: Record<string, IconName> = {
+  appointment: 'calendar-outline',
+  queue: 'people-outline',
+  consultation: 'medkit-outline',
+  prescription: 'medical-outline',
+  pharmacy: 'medical-outline',
+  reminder: 'alarm-outline',
+  system: 'settings-outline',
+};
 
 /**
  * The signed-in user's in-app notifications (GET /notifications returns only
@@ -20,34 +45,57 @@ export function NotificationsList() {
 
   return (
     <Screen onRefresh={reload}>
-      <Title>Alerts</Title>
+      <Title subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}>Alerts</Title>
       <ErrorBanner message={error} />
-      {unread > 0 ? (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: space.sm }}>
+        {unread > 0 ? (
+          <Button
+            title="Mark all as read"
+            size="sm"
+            variant="secondary"
+            icon="checkmark-done-outline"
+            onPress={() => void markAllNotificationsRead().then(reload)}
+          />
+        ) : null}
         <Button
-          title={`Mark all ${unread} as read`}
+          title="Reminder settings"
+          size="sm"
           variant="secondary"
-          onPress={() => void markAllNotificationsRead().then(reload)}
+          icon="settings-outline"
+          onPress={() => router.push('/notification-preferences')}
         />
-      ) : null}
-      <Button title="Reminder settings" variant="secondary" onPress={() => router.push('/notification-preferences')} />
-      <View style={{ height: 12 }} />
+      </View>
       {items.length === 0 ? (
-        error ? null : <EmptyState title="No notifications" />
+        error ? null : (
+          <Card>
+            <EmptyState icon="notifications-outline" title="No notifications" message="Updates about your visits will appear here." />
+          </Card>
+        )
       ) : (
         items.map((n) => (
           <PressableCard
             key={n.id}
+            chevron={false}
+            accent={n.read ? undefined : colors.primary}
             onPress={() => {
               if (!n.read) void markNotificationRead(n.id).then(reload);
             }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {!n.read ? (
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary, marginRight: 8 }} />
-              ) : null}
-              <Text style={{ flex: 1, fontSize: 15, fontWeight: n.read ? '500' : '700', color: colors.text }}>{n.title}</Text>
+            <View style={{ flexDirection: 'row' }}>
+              <IconCircle
+                name={TYPE_ICONS[n.type] ?? 'notifications-outline'}
+                size={36}
+                color={n.read ? colors.muted : colors.primary}
+                bg={n.read ? colors.neutralBg : colors.primarySoft}
+              />
+              <View style={{ flex: 1, marginLeft: space.md }}>
+                <Text style={{ fontSize: 15, fontWeight: n.read ? '500' : '700', color: colors.text }}>{n.title}</Text>
+                <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 2, lineHeight: 20 }}>{n.message}</Text>
+                <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
+                  {formatClinicDateTime(n.createdAt)}
+                  {n.read ? '' : ' · Unread'}
+                </Text>
+              </View>
             </View>
-            <Text style={{ fontSize: 14, color: colors.text, marginTop: 4 }}>{n.message}</Text>
-            <Muted>{formatClinicDateTime(n.createdAt)}</Muted>
           </PressableCard>
         ))
       )}

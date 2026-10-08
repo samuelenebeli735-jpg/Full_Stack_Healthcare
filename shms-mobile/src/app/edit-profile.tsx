@@ -6,14 +6,13 @@ import { BLOOD_GROUPS, GENDERS, GENOTYPES, LEVELS, updateMyProfile, type Profile
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
 import {
+  Banner,
   Button,
   ChoiceField,
   ErrorBanner,
-  Muted,
   Screen,
   SectionTitle,
   TextField,
-  colors,
   fieldErrorMap,
 } from '@/components/ui';
 import { isValidDate } from '@/lib/validation';
@@ -110,10 +109,10 @@ export default function EditProfile() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen options={{ headerShown: true, title: 'Edit profile', headerTintColor: colors.primary }} />
+      <Stack.Screen options={{ headerShown: true, title: 'Edit profile' }} />
       <Screen>
         <ErrorBanner message={error} />
-        <Muted>Email and matric number cannot be changed here.</Muted>
+        <Banner tone="info">Email and matric number cannot be changed here.</Banner>
 
         <SectionTitle>Personal details</SectionTitle>
         {field('firstName', 'First name')}
@@ -137,7 +136,7 @@ export default function EditProfile() {
         <ChoiceField label="Genotype" options={GENOTYPES} value={form.genotype} onChange={set('genotype')} />
         {field('allergies', 'Allergies', { multiline: true })}
 
-        <Button title="Save changes" onPress={() => void save()} loading={busy} />
+        <Button title="Save changes" icon="save-outline" onPress={() => void save()} loading={busy} />
       </Screen>
     </KeyboardAvoidingView>
   );

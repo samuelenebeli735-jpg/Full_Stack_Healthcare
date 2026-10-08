@@ -4,10 +4,14 @@ import { Text, View } from 'react-native';
 
 import { cancelAppointment, checkIn, myAppointments } from '@/api/student';
 import {
+  Banner,
   Button,
   Card,
+  CardTitle,
+  DateBlock,
   EmptyState,
   ErrorBanner,
+  InfoRow,
   Loading,
   Muted,
   Screen,
@@ -15,19 +19,16 @@ import {
   StatusBadge,
   TextField,
   colors,
+  space,
+  statusColor,
 } from '@/components/ui';
 import { doctorName } from '@/lib/appointments';
 import { clinicToday, formatClinicDateTime, toClinicParts } from '@/lib/clinicTime';
 import { useFocusData } from '@/lib/useAsync';
 
-function Row({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
-  return (
-    <View style={{ marginBottom: 8 }}>
-      <Muted>{label}</Muted>
-      <Text style={{ fontSize: 15, color: colors.text }}>{value}</Text>
-    </View>
-  );
+/** Shows a recorded value; nothing when the field was not recorded. */
+function Recorded({ label, value }: { label: string; value?: string | null }) {
+  return value ? <InfoRow label={label} value={value} /> : null;
 }
 
 export default function AppointmentDetail() {
@@ -45,13 +46,14 @@ export default function AppointmentDetail() {
     return (
       <Screen>
         <ErrorBanner message={error} />
-        <EmptyState title="Appointment not found" />
+        <EmptyState icon="calendar-outline" title="Appointment not found" />
       </Screen>
     );
   }
 
   const a = data;
-  const isToday = toClinicParts(a.appointmentDate).date === clinicToday();
+  const { date } = toClinicParts(a.appointmentDate);
+  const isToday = date === clinicToday();
   const canCancel = a.status === 'scheduled' || a.status === 'confirmed';
   const canCheckIn = a.status === 'confirmed' && isToday && !a.queue;
   const consultation = a.queue?.consultation;
@@ -74,47 +76,57 @@ export default function AppointmentDetail() {
   return (
     <Screen onRefresh={reload}>
       {booked ? (
-        <Card>
-          <Text style={{ color: colors.success, fontWeight: '600' }}>Appointment booked.</Text>
-          <Muted>The clinic will confirm it; you can check in on the day once it is confirmed.</Muted>
-        </Card>
+        <Banner tone="success" title="Appointment booked.">
+          The clinic will confirm it; you can check in on the day once it is confirmed.
+        </Banner>
       ) : null}
       <ErrorBanner message={actionError || error} />
 
-      <Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 }}>
-          <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, flex: 1 }}>{a.service?.name || 'Appointment'}</Text>
-          <StatusBadge status={a.status} />
+      <Card accent={statusColor(a.status)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: space.md }}>
+          <DateBlock date={date} />
+          <View style={{ flex: 1 }}>
+            <CardTitle>{a.service?.name || 'Appointment'}</CardTitle>
+            <View style={{ marginTop: 6 }}>
+              <StatusBadge status={a.status} />
+            </View>
+          </View>
         </View>
-        <Row label="When" value={formatClinicDateTime(a.appointmentDate)} />
-        <Row label="Doctor" value={doctorName(a)} />
-        <Row label="Reason" value={a.reason} />
-        <Row label="Queue ticket" value={a.queue ? `#${a.queue.queueNumber}` : null} />
+        <InfoRow label="When" value={formatClinicDateTime(a.appointmentDate)} />
+        <InfoRow label="Doctor" value={doctorName(a)} />
+        <Recorded label="Reason" value={a.reason} />
+        <Recorded label="Queue ticket" value={a.queue ? `#${a.queue.queueNumber}` : null} />
       </Card>
 
       {canCheckIn ? (
         <Button
           title="Check in now"
+          icon="log-in-outline"
           loading={busy}
           onPress={() => void run(() => checkIn(a.id), () => router.navigate('/student/queue'))}
         />
       ) : null}
       {a.status === 'scheduled' && isToday ? (
-        <Muted>Waiting for the clinic to confirm this appointment before you can check in.</Muted>
+        <Banner tone="warning">Waiting for the clinic to confirm this appointment before you can check in.</Banner>
       ) : null}
-      {a.status === 'confirmed' && !isToday ? <Muted>You can check in on the day of the appointment.</Muted> : null}
+      {a.status === 'confirmed' && !isToday ? (
+        <Banner tone="info">You can check in on the day of the appointment.</Banner>
+      ) : null}
       {a.queue && (a.status === 'checked_in' || a.status === 'in_progress') ? (
-        <Button title="View queue status" variant="secondary" onPress={() => router.navigate('/student/queue')} />
+        <Button title="View queue status" variant="secondary" icon="people-outline" onPress={() => router.navigate('/student/queue')} />
       ) : null}
 
       {consultation ? (
         <>
           <SectionTitle>Visit summary</SectionTitle>
           <Card>
-            <Row label="Complaint" value={consultation.chiefComplaint} />
-            <Row label="Diagnosis" value={consultation.diagnosis} />
-            <Row label="Treatment plan" value={consultation.treatmentPlan} />
-            <Row label="Notes" value={consultation.notes} />
+            <Recorded label="Complaint" value={consultation.chiefComplaint} />
+            <Recorded label="Diagnosis" value={consultation.diagnosis} />
+            <Recorded label="Treatment plan" value={consultation.treatmentPlan} />
+            <Recorded label="Notes" value={consultation.notes} />
+            {!consultation.chiefComplaint && !consultation.diagnosis && !consultation.treatmentPlan && !consultation.notes ? (
+              <Muted>No notes recorded.</Muted>
+            ) : null}
           </Card>
         </>
       ) : null}
@@ -122,41 +134,46 @@ export default function AppointmentDetail() {
       {prescription && prescription.items.length ? (
         <>
           <SectionTitle>Prescription</SectionTitle>
-          {prescription.items.map((it) => (
-            <Card key={it.id}>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{it.medicationName}</Text>
-              <Muted>
-                {it.dosage} · {it.frequency} · {it.duration} · Qty {it.quantity}
-              </Muted>
-              {it.instructions ? <Muted>{it.instructions}</Muted> : null}
-            </Card>
-          ))}
+          <Card>
+            {prescription.items.map((it, i) => (
+              <View
+                key={it.id}
+                style={i ? { marginTop: space.md, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.divider } : undefined}>
+                <CardTitle>{it.medicationName}</CardTitle>
+                <Muted>
+                  {it.dosage} · {it.frequency} · {it.duration} · Qty {it.quantity}
+                </Muted>
+                {it.instructions ? <Text style={{ color: colors.textSecondary, marginTop: 2 }}>{it.instructions}</Text> : null}
+              </View>
+            ))}
+          </Card>
         </>
       ) : null}
 
       {canCancel && !cancelling ? (
-        <Button
-          title="Reschedule"
-          variant="secondary"
-          onPress={() => router.push({ pathname: '/student/appointments/reschedule', params: { id: a.id } })}
-        />
+        <>
+          <SectionTitle>Manage</SectionTitle>
+          <Button
+            title="Reschedule"
+            variant="secondary"
+            icon="calendar-outline"
+            onPress={() => router.push({ pathname: '/student/appointments/reschedule', params: { id: a.id } })}
+          />
+          <Button title="Cancel appointment" variant="secondary" icon="close-circle-outline" onPress={() => setCancelling(true)} />
+        </>
       ) : null}
-      {canCancel ? (
-        cancelling ? (
-          <Card>
-            <TextField label="Reason for cancelling" value={reason} onChangeText={setReason} maxLength={500} />
-            <Button
-              title="Confirm cancellation"
-              variant="danger"
-              loading={busy}
-              disabled={!reason.trim()}
-              onPress={() => void run(() => cancelAppointment(a.id, reason.trim()), () => setCancelling(false))}
-            />
-            <Button title="Keep appointment" variant="secondary" onPress={() => setCancelling(false)} />
-          </Card>
-        ) : (
-          <Button title="Cancel appointment" variant="secondary" onPress={() => setCancelling(true)} />
-        )
+      {canCancel && cancelling ? (
+        <Card>
+          <TextField label="Reason for cancelling" value={reason} onChangeText={setReason} maxLength={500} required />
+          <Button
+            title="Confirm cancellation"
+            variant="danger"
+            loading={busy}
+            disabled={!reason.trim()}
+            onPress={() => void run(() => cancelAppointment(a.id, reason.trim()), () => setCancelling(false))}
+          />
+          <Button title="Keep appointment" variant="link" onPress={() => setCancelling(false)} />
+        </Card>
       ) : null}
     </Screen>
   );

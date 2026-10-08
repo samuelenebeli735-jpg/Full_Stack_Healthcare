@@ -1,10 +1,10 @@
 import { Redirect, Stack, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 
 import { changePassword } from '@/api/auth';
 import { useAuth } from '@/auth/AuthContext';
-import { Button, Card, ErrorBanner, Screen, TextField, colors } from '@/components/ui';
+import { Banner, Button, Card, ErrorBanner, Screen, TextField } from '@/components/ui';
 
 /** Change the signed-in user's password (students and staff). */
 export default function ChangePassword() {
@@ -40,23 +40,22 @@ export default function ChangePassword() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen options={{ headerShown: true, title: 'Change password', headerTintColor: colors.primary }} />
+      <Stack.Screen options={{ headerShown: true, title: 'Change password' }} />
       <Screen>
         {done ? (
           <>
-            <Card>
-              <Text style={{ color: colors.success, fontWeight: '600' }}>Password changed.</Text>
-              <Text style={{ color: colors.text, marginTop: 4 }}>Use the new password the next time you sign in.</Text>
-            </Card>
+            <Banner tone="success" title="Password changed.">Use the new password the next time you sign in.</Banner>
             <Button title="Done" onPress={() => router.back()} />
           </>
         ) : (
           <>
-            <ErrorBanner message={error} />
-            <TextField label="Current password" value={current} onChangeText={setCurrent} secureTextEntry />
-            <TextField label="New password (at least 8 characters)" value={next} onChangeText={setNext} secureTextEntry />
-            <TextField label="Confirm new password" value={confirm} onChangeText={setConfirm} secureTextEntry />
-            <Button title="Change password" onPress={() => void submit()} loading={busy} />
+            <Card>
+              <ErrorBanner message={error} />
+              <TextField label="Current password" value={current} onChangeText={setCurrent} secureTextEntry required />
+              <TextField label="New password" value={next} onChangeText={setNext} secureTextEntry required helper="At least 8 characters." />
+              <TextField label="Confirm new password" value={confirm} onChangeText={setConfirm} secureTextEntry required />
+              <Button title="Change password" icon="key-outline" onPress={() => void submit()} loading={busy} />
+            </Card>
           </>
         )}
       </Screen>

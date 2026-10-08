@@ -1,7 +1,20 @@
 import { Text, View } from 'react-native';
 
 import { myQueue } from '@/api/student';
-import { Card, EmptyState, ErrorBanner, Loading, Muted, Screen, StatusBadge, Title, colors } from '@/components/ui';
+import {
+  Card,
+  EmptyState,
+  ErrorBanner,
+  Loading,
+  Muted,
+  Screen,
+  StatCard,
+  StatusBadge,
+  Title,
+  colors,
+  radius,
+  space,
+} from '@/components/ui';
 import { useFocusData } from '@/lib/useAsync';
 
 const MESSAGES: Record<string, string> = {
@@ -20,43 +33,44 @@ export default function StudentQueue() {
 
   return (
     <Screen onRefresh={reload}>
-      <Title>Queue</Title>
+      <Title subtitle="Updates automatically every 10 seconds">Queue</Title>
       <ErrorBanner message={error} />
       {!q ? (
-        <EmptyState
-          title="You are not in the queue"
-          message="Check in from a confirmed appointment on the day of your visit."
-        />
+        <Card>
+          <EmptyState
+            icon="people-outline"
+            title="You are not in the queue"
+            message="Check in from a confirmed appointment on the day of your visit."
+          />
+        </Card>
       ) : (
         <>
-          <Card>
-            <Muted>Your ticket</Muted>
-            <Text style={{ fontSize: 56, fontWeight: '800', color: colors.primary }}>#{q.queueNumber}</Text>
-            <StatusBadge status={q.status} />
-            <Text style={{ marginTop: 12, fontSize: 15, color: colors.text }}>{MESSAGES[q.status] || ''}</Text>
-          </Card>
+          <View
+            style={{
+              backgroundColor: q.status === 'called' ? '#B45309' : colors.primary,
+              borderRadius: radius.lg,
+              padding: space.xl,
+              marginBottom: space.md,
+              alignItems: 'center',
+            }}>
+            <Text style={{ color: '#E6EEF8', fontSize: 13, fontWeight: '700', letterSpacing: 0.8 }}>YOUR TICKET</Text>
+            <Text style={{ color: colors.primaryText, fontSize: 64, fontWeight: '800' }}>#{q.queueNumber}</Text>
+            <View style={{ backgroundColor: colors.card, borderRadius: radius.pill }}>
+              <StatusBadge status={q.status} />
+            </View>
+            <Text style={{ color: colors.primaryText, fontSize: 16, fontWeight: '600', textAlign: 'center', marginTop: space.md }}>
+              {MESSAGES[q.status] || ''}
+            </Text>
+          </View>
           {q.status === 'waiting' ? (
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Card>
-                  <Muted>Now serving</Muted>
-                  <Text style={{ fontSize: 24, fontWeight: '700', color: colors.text }}>
-                    {q.currentServing ? `#${q.currentServing.queueNumber}` : '—'}
-                  </Text>
-                </Card>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Card>
-                  <Muted>Ahead of you</Muted>
-                  <Text style={{ fontSize: 24, fontWeight: '700', color: colors.text }}>{q.patientsAhead}</Text>
-                </Card>
-              </View>
+            <View style={{ flexDirection: 'row', gap: space.md }}>
+              <StatCard icon="megaphone-outline" label="Now serving" value={q.currentServing ? `#${q.currentServing.queueNumber}` : '—'} />
+              <StatCard icon="people-outline" label="Ahead of you" value={q.patientsAhead} />
             </View>
           ) : null}
           {q.status === 'waiting' && q.estimatedWaitMinutes > 0 ? (
             <Muted>Estimated wait: about {q.estimatedWaitMinutes} minutes.</Muted>
           ) : null}
-          <Muted>This screen updates automatically.</Muted>
         </>
       )}
     </Screen>

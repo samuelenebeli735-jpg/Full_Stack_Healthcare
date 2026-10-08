@@ -1,7 +1,7 @@
 import { Redirect } from 'expo-router';
 
 import { displayName, useAuth } from '@/auth/AuthContext';
-import { Button, Card, Muted, Screen, Title } from '@/components/ui';
+import { Banner, BrandHeader, Button, Screen } from '@/components/ui';
 
 /** Admin and super admin work on the SHMS web dashboard. */
 export default function WebOnly() {
@@ -10,14 +10,11 @@ export default function WebOnly() {
 
   return (
     <Screen>
-      <Title>Use the web dashboard</Title>
-      <Card>
-        <Muted>
-          Signed in as {displayName(user)} ({user.role === 'super_admin' ? 'Super Admin' : 'Admin'}). Administration is
-          available on the SHMS web dashboard. The mobile app is for students and clinic staff.
-        </Muted>
-      </Card>
-      <Button title="Sign out" variant="secondary" onPress={() => void signOut()} />
+      <BrandHeader subtitle="Use the web dashboard" />
+      <Banner tone="info" title={`Signed in as ${displayName(user)} (${user.role === 'super_admin' ? 'Super Admin' : 'Admin'})`}>
+        Administration is available on the SHMS web dashboard. The mobile app is for students and clinic staff.
+      </Banner>
+      <Button title="Sign out" variant="secondary" icon="log-out-outline" onPress={() => void signOut()} />
     </Screen>
   );
 }

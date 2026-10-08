@@ -1,9 +1,55 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import Ionicons from '@expo/vector-icons/Ionicons';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
 import { availableDoctors, slots as loadSlots, type AvailableDoctor } from '@/api/student';
-import { Chip, EmptyState, Muted, PressableCard, SectionTitle, colors } from '@/components/ui';
+import { Chip, EmptyState, Muted, SectionTitle, colors, space, styles, type } from '@/components/ui';
 import { clinicNowTime, clinicToday, formatClinicDate, formatTime, nextClinicDates } from '@/lib/clinicTime';
+
+/** A selectable card with a radio indicator. */
+function Option({
+  title,
+  subtitle,
+  meta,
+  selected,
+  disabled,
+  onPress,
+}: {
+  title: string;
+  subtitle?: string;
+  meta?: string;
+  selected: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ selected, disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        selected && { borderColor: colors.primary, borderWidth: 2, backgroundColor: colors.primarySoft },
+        pressed && !selected && { backgroundColor: colors.divider },
+        disabled && { opacity: 0.55 },
+      ]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <Ionicons
+          name={selected ? 'radio-button-on' : 'radio-button-off'}
+          size={22}
+          color={selected ? colors.primary : '#94A3B8'}
+          style={{ marginRight: space.md }}
+        />
+        <View style={{ flex: 1 }}>
+          <Text style={[type.cardTitle, selected && { color: colors.primary }]}>{title}</Text>
+          {subtitle ? <Muted>{subtitle}</Muted> : null}
+        </View>
+        {meta ? <Text style={[type.caption, { marginLeft: space.sm }]}>{meta}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
 
 /** The API accepts appointments up to 2 days ahead (today included). */
 export const BOOKING_DATES = nextClinicDates(3);
@@ -97,18 +143,15 @@ export function SlotPicker({
   }, [doctor, time, date, doctorChoice, onChange]);
 
   const doctorCard = (d: AvailableDoctor) => (
-    <PressableCard key={d.id} onPress={() => d.hasAvailableSlots && setDoctorChoice(d.id)}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: doctorChoice === d.id ? colors.primary : colors.text }}>
-            Dr {d.firstName} {d.lastName}
-            {d.id === currentDoctorId ? ' (current)' : ''}
-          </Text>
-          <Muted>{[d.qualification, d.department?.name].filter(Boolean).join(' · ') || 'Doctor'}</Muted>
-        </View>
-        <Muted>{d.hasAvailableSlots ? `${d.availableSlotCount} free` : 'Fully booked'}</Muted>
-      </View>
-    </PressableCard>
+    <Option
+      key={d.id}
+      selected={doctorChoice === d.id}
+      disabled={!d.hasAvailableSlots}
+      onPress={() => setDoctorChoice(d.id)}
+      title={`Dr ${d.firstName} ${d.lastName}${d.id === currentDoctorId ? ' (current)' : ''}`}
+      subtitle={[d.qualification, d.department?.name].filter(Boolean).join(' · ') || 'Doctor'}
+      meta={d.hasAvailableSlots ? `${d.availableSlotCount} free` : 'Fully booked'}
+    />
   );
 
   return (
@@ -119,27 +162,27 @@ export function SlotPicker({
           <Chip key={d} label={formatClinicDate(d)} selected={d === date} onPress={() => setDate(d)} />
         ))}
       </View>
-      <Muted>Appointments can be booked up to 2 days ahead.</Muted>
+      <Muted style={{ marginBottom: 4 }}>Appointments can be booked up to 2 days ahead.</Muted>
 
       <SectionTitle>{stepOffset + 1}. Doctor</SectionTitle>
       {doctors === null ? (
         <ActivityIndicator color={colors.primary} />
       ) : doctors.length === 0 ? (
-        <EmptyState title="No doctors available" message={doctorsMessage || 'Choose another date.'} />
+        <EmptyState icon="person-outline" title="No doctors available" message={doctorsMessage || 'Choose another date.'} />
       ) : (
         <>
-          <PressableCard onPress={() => setDoctorChoice(ANY)}>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: doctorChoice === ANY ? colors.primary : colors.text }}>
-              No preference
-            </Text>
-            <Muted>
-              {doctorChoice === ANY
+          <Option
+            selected={doctorChoice === ANY}
+            onPress={() => setDoctorChoice(ANY)}
+            title="No preference"
+            subtitle={
+              doctorChoice === ANY
                 ? firstAvailable
                   ? `First available doctor: Dr ${firstAvailable.firstName} ${firstAvailable.lastName}`
                   : 'No doctor has a free time on this date. Choose another date.'
-                : 'The first available doctor on this date'}
-            </Muted>
-          </PressableCard>
+                : 'The first available doctor on this date'
+            }
+          />
           {doctors.map(doctorCard)}
         </>
       )}
@@ -150,7 +193,7 @@ export function SlotPicker({
           {times === null ? (
             <ActivityIndicator color={colors.primary} />
           ) : times.length === 0 ? (
-            <EmptyState title="No free times" message={timesMessage || 'Choose another date or doctor.'} />
+            <EmptyState icon="time-outline" title="No free times" message={timesMessage || 'Choose another date or doctor.'} />
           ) : (
             <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
               {times.map((t) => (

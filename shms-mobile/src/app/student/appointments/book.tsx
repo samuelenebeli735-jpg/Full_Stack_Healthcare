@@ -5,7 +5,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { bookAppointment, ensureMedicalRecordId, services as loadServices, type Service } from '@/api/student';
 import { useAuth } from '@/auth/AuthContext';
 import { SlotPicker, type SlotChoice } from '@/components/SlotPicker';
-import { Button, Card, Chip, EmptyState, ErrorBanner, Muted, Screen, SectionTitle, TextField, colors } from '@/components/ui';
+import { Banner, Button, Card, CardTitle, Chip, EmptyState, ErrorBanner, InfoRow, Screen, SectionTitle, TextField, colors } from '@/components/ui';
 import { formatClinicDate, formatTime, fromClinicParts } from '@/lib/clinicTime';
 
 export default function BookAppointment() {
@@ -59,7 +59,7 @@ export default function BookAppointment() {
       {serviceList === null ? (
         <ActivityIndicator color={colors.primary} />
       ) : serviceList.length === 0 ? (
-        <EmptyState title="No services yet" message="The clinic has not set up any services." />
+        <EmptyState icon="medkit-outline" title="No services yet" message="The clinic has not set up any services." />
       ) : (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {serviceList.map((s) => (
@@ -83,15 +83,17 @@ export default function BookAppointment() {
             multiline
             style={{ minHeight: 80, textAlignVertical: 'top' }}
           />
-          <Card>
-            <Muted>
-              {formatClinicDate(choice.date)} at {formatTime(choice.time)} with Dr {choice.doctor.firstName}{' '}
-              {choice.doctor.lastName}
-              {choice.firstAvailable ? ' (first available)' : ''}
-            </Muted>
-            <Muted>The clinic confirms your appointment before you can check in.</Muted>
+          <SectionTitle>Review</SectionTitle>
+          <Card accent={colors.primary}>
+            <CardTitle>{serviceList?.find((s) => s.id === serviceId)?.name || 'Appointment'}</CardTitle>
+            <InfoRow label="When" value={`${formatClinicDate(choice.date)} at ${formatTime(choice.time)}`} />
+            <InfoRow
+              label="Doctor"
+              value={`Dr ${choice.doctor.firstName} ${choice.doctor.lastName}${choice.firstAvailable ? ' (first available)' : ''}`}
+            />
           </Card>
-          <Button title="Book appointment" onPress={() => void book()} loading={busy} />
+          <Banner tone="info">The clinic confirms your appointment before you can check in.</Banner>
+          <Button title="Book appointment" icon="checkmark-circle-outline" onPress={() => void book()} loading={busy} />
         </>
       ) : null}
     </Screen>

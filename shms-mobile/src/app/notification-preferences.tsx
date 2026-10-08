@@ -5,12 +5,14 @@ import { Switch, Text, View } from 'react-native';
 import { getPreferences, savePreferences, type NotificationPreferences } from '@/api/notifications';
 import { useAuth } from '@/auth/AuthContext';
 import {
+  Banner,
   Button,
   Card,
   Chip,
   ErrorBanner,
   Loading,
   Muted,
+  Pill,
   Screen,
   SectionTitle,
   TextField,
@@ -19,12 +21,12 @@ import {
 
 const HOURS = [1, 2, 6, 12, 24, 48];
 
-function Toggle({ label, value, onChange, note }: { label: string; value: boolean; onChange: (v: boolean) => void; note?: string }) {
+function Toggle({ label, value, onChange, unavailable }: { label: string; value: boolean; onChange: (v: boolean) => void; unavailable?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8 }}>
-      <View style={{ flex: 1, paddingRight: 8 }}>
+      <View style={{ flex: 1, paddingRight: 8, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
         <Text style={{ fontSize: 15, color: colors.text }}>{label}</Text>
-        {note ? <Muted>{note}</Muted> : null}
+        {unavailable ? <Pill>Not available yet</Pill> : null}
       </View>
       <Switch value={value} onValueChange={onChange} trackColor={{ true: colors.primary }} />
     </View>
@@ -75,27 +77,24 @@ export default function NotificationPreferencesScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ headerShown: true, title: 'Reminder settings', headerTintColor: colors.primary }} />
+      <Stack.Screen options={{ headerShown: true, title: 'Reminder settings' }} />
       {!prefs && !error ? (
         <Loading />
       ) : (
         <Screen>
-          <Card>
-            <Text style={{ fontWeight: '700', color: colors.text }}>Reminder delivery is not available yet.</Text>
-            <Muted>
-              Email, WhatsApp and Telegram reminders are not sent by SHMS yet, so no automatic appointment reminder will
-              arrive. Your choices below are saved for when delivery is added. In-app notifications (the Alerts tab) work
-              today.
-            </Muted>
-          </Card>
+          <Banner tone="warning" title="Reminder delivery is not available yet.">
+            Email, WhatsApp and Telegram reminders are not sent by SHMS yet, so no automatic appointment reminder will
+            arrive. Your choices below are saved for when delivery is added. In-app notifications (the Alerts tab) work
+            today.
+          </Banner>
           <ErrorBanner message={error} />
           {prefs ? (
             <>
               <SectionTitle>Channels</SectionTitle>
               <Card>
-                <Toggle label="Email" note="Not available yet" value={prefs.emailEnabled} onChange={(v) => set('emailEnabled', v)} />
-                <Toggle label="WhatsApp" note="Not available yet" value={prefs.whatsappEnabled} onChange={(v) => set('whatsappEnabled', v)} />
-                <Toggle label="Telegram" note="Not available yet" value={prefs.telegramEnabled} onChange={(v) => set('telegramEnabled', v)} />
+                <Toggle label="Email" unavailable value={prefs.emailEnabled} onChange={(v) => set('emailEnabled', v)} />
+                <Toggle label="WhatsApp" unavailable value={prefs.whatsappEnabled} onChange={(v) => set('whatsappEnabled', v)} />
+                <Toggle label="Telegram" unavailable value={prefs.telegramEnabled} onChange={(v) => set('telegramEnabled', v)} />
               </Card>
               <TextField
                 label="Phone number (WhatsApp)"
@@ -105,6 +104,7 @@ export default function NotificationPreferencesScreen() {
                   setPhone(v);
                 }}
                 keyboardType="phone-pad"
+                helper="Kept for WhatsApp reminders once they are available."
               />
 
               <SectionTitle>Remind before appointment</SectionTitle>
@@ -126,8 +126,13 @@ export default function NotificationPreferencesScreen() {
                 <Toggle label="Lab results" value={prefs.remindForResults} onChange={(v) => set('remindForResults', v)} />
               </Card>
 
-              {saved ? <Text style={{ color: colors.success, fontWeight: '600', marginBottom: 6 }}>Settings saved.</Text> : null}
-              <Button title="Save settings" onPress={() => void save()} loading={busy} />
+              {saved ? (
+                <Banner tone="success" title="Settings saved.">
+                  Your choices are stored. No email, WhatsApp or Telegram reminders are sent yet.
+                </Banner>
+              ) : null}
+              <Button title="Save settings" icon="save-outline" onPress={() => void save()} loading={busy} />
+              <Muted style={{ marginTop: 8, textAlign: 'center' }}>Saving stores your choices only; it does not send reminders.</Muted>
             </>
           ) : null}
         </Screen>

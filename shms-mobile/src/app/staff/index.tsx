@@ -1,21 +1,10 @@
 import { router, type Href } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { dashboard } from '@/api/staff';
 import { displayName, useAuth } from '@/auth/AuthContext';
-import { Button, Card, ErrorBanner, Loading, Muted, Screen, SectionTitle, Title, colors, statusLabel } from '@/components/ui';
+import { Button, ErrorBanner, Loading, Screen, SectionTitle, StatCard, Title, space, statusLabel } from '@/components/ui';
 import { useFocusData } from '@/lib/useAsync';
-
-function Stat({ label, value }: { label: string; value: number | string }) {
-  return (
-    <View style={{ flex: 1 }}>
-      <Card>
-        <Muted>{label}</Muted>
-        <Text style={{ fontSize: 26, fontWeight: '800', color: colors.text }}>{value}</Text>
-      </Card>
-    </View>
-  );
-}
 
 export default function StaffHome() {
   const { user } = useAuth();
@@ -25,26 +14,33 @@ export default function StaffHome() {
   if (loading && !data) return <Loading />;
 
   const q = (status: string) => data?.queueStatusCounts.find((s) => s.status === status)?.count ?? 0;
+  const scheduled = data?.appointmentStatusCounts.find((s) => s.status === 'scheduled')?.count;
 
   return (
     <Screen onRefresh={reload}>
-      <Title>Hello, {displayName(user)}</Title>
-      <Muted>{user?.organization?.name}</Muted>
-      <View style={{ height: 12 }} />
+      <Title subtitle={user?.organization?.name}>Hello, {displayName(user)}</Title>
       <ErrorBanner message={error} />
 
-      <SectionTitle>Today</SectionTitle>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <Stat label="Appointments" value={data?.counts.appointmentsToday ?? '—'} />
-        <Stat label={statusLabel('waiting')} value={q('waiting')} />
+      <SectionTitle>Queue now</SectionTitle>
+      <View style={{ flexDirection: 'row', gap: space.md }}>
+        <StatCard highlight icon="hourglass-outline" label={statusLabel('waiting')} value={q('waiting')} />
+        <View style={{ flex: 1 }}>
+          <StatCard icon="megaphone-outline" label={statusLabel('called')} value={q('called')} />
+        </View>
       </View>
-      <View style={{ flexDirection: 'row', gap: 12 }}>
-        <Stat label={statusLabel('called')} value={q('called')} />
-        <Stat label={statusLabel('in_progress')} value={q('in_progress')} />
+      <View style={{ flexDirection: 'row', gap: space.md }}>
+        <StatCard icon="medkit-outline" label={statusLabel('in_progress')} value={q('in_progress')} />
+        <StatCard icon="calendar-outline" label="Appointments today" value={data?.counts.appointmentsToday ?? '—'} />
       </View>
 
-      <Button title="Open the queue" onPress={() => router.navigate('/staff/queue' as Href)} />
-      <Button title="Today’s appointments" variant="secondary" onPress={() => router.navigate('/staff/appointments')} />
+      <Button title="Open the queue" icon="people-outline" onPress={() => router.navigate('/staff/queue' as Href)} />
+      <Button
+        title={scheduled ? `Appointments (${scheduled} awaiting confirmation)` : 'Appointments'}
+        variant="secondary"
+        icon="calendar-outline"
+        onPress={() => router.navigate('/staff/appointments')}
+      />
+      <Button title="Patients" variant="secondary" icon="search-outline" onPress={() => router.navigate('/staff/patients' as Href)} />
     </Screen>
   );
 }

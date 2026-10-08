@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
@@ -20,9 +21,12 @@ import {
 } from '@/api/staff';
 import { useAuth } from '@/auth/AuthContext';
 import {
+  Banner,
   Button,
   Card,
+  CardTitle,
   ErrorBanner,
+  InfoRow,
   Loading,
   Muted,
   Screen,
@@ -30,6 +34,9 @@ import {
   StatusBadge,
   TextField,
   colors,
+  radius,
+  space,
+  statusColor,
 } from '@/components/ui';
 import { formatClinicDateTime } from '@/lib/clinicTime';
 import { patientFacts, patientName } from '@/lib/patients';
@@ -198,35 +205,44 @@ export default function Visit() {
   return (
     <Screen onRefresh={reload}>
       <ErrorBanner message={actionError || error} />
-      {message ? (
-        <Card>
-          <Text style={{ color: colors.success, fontWeight: '600' }}>{message}</Text>
-        </Card>
-      ) : null}
+      {message ? <Banner tone="success">{message}</Banner> : null}
 
-      <Card>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-          <Text style={{ fontSize: 28, fontWeight: '800', color: colors.primary }}>#{entry.queueNumber}</Text>
-          <StatusBadge status={entry.status} />
+      <Card accent={statusColor(entry.status)}>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <View style={{ minWidth: 64, marginRight: space.md, paddingVertical: 8, paddingHorizontal: 8, borderRadius: radius.md, backgroundColor: colors.primarySoft, alignItems: 'center' }}>
+            <Text style={{ fontSize: 24, fontWeight: '800', color: colors.primary }}>#{entry.queueNumber}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <CardTitle style={{ fontSize: 18 }}>{patientName(profile)}</CardTitle>
+            <Muted>{[profile?.matricNumber, entry.appointment?.medicalRecord?.recordNumber].filter(Boolean).join(' · ')}</Muted>
+            <View style={{ marginTop: 6 }}>
+              <StatusBadge status={entry.status} />
+            </View>
+          </View>
         </View>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, marginTop: 8 }}>{patientName(profile)}</Text>
-        <Muted>{[profile?.matricNumber, entry.appointment?.medicalRecord?.recordNumber].filter(Boolean).join(' · ')}</Muted>
-        <Muted>{patientFacts(profile)}</Muted>
-        {profile?.allergies ? (
-          <Text style={{ color: colors.danger, marginTop: 6 }}>Allergies: {profile.allergies}</Text>
+        <View style={{ height: space.md }} />
+        <InfoRow label="Patient" value={patientFacts(profile)} />
+        <InfoRow label="Service" value={entry.appointment?.service?.name} />
+        {entry.appointment?.appointmentDate ? (
+          <InfoRow label="Booked for" value={formatClinicDateTime(entry.appointment.appointmentDate)} />
         ) : null}
-        <View style={{ height: 8 }} />
-        <Muted>Service: {entry.appointment?.service?.name || '—'}</Muted>
-        {entry.appointment?.appointmentDate ? <Muted>Booked for {formatClinicDateTime(entry.appointment.appointmentDate)}</Muted> : null}
-        {entry.appointment?.reason ? <Muted>Reason: {entry.appointment.reason}</Muted> : null}
+        {entry.appointment?.reason ? <InfoRow label="Reason" value={entry.appointment.reason} /> : null}
       </Card>
+      {profile?.allergies ? <Banner tone="danger" title="Allergies">{profile.allergies}</Banner> : null}
 
-      {entry.status === 'waiting' ? <Muted>This patient is waiting. Use “Call next” on the queue to call them.</Muted> : null}
+      {entry.status === 'waiting' ? (
+        <Banner tone="info">This patient is waiting. Use “Call next” on the queue to call them.</Banner>
+      ) : null}
 
       {entry.status === 'called' ? (
         <>
-          <Button title="Start consultation" loading={busy === 'start'} onPress={() => void run('start', () => startVisit(entry.id))} />
-          <Button title="Skip (not present)" variant="secondary" loading={busy === 'skip'} onPress={confirmSkip} />
+          <Button
+            title="Start consultation"
+            icon="play-circle-outline"
+            loading={busy === 'start'}
+            onPress={() => void run('start', () => startVisit(entry.id))}
+          />
+          <Button title="Skip (not present)" variant="secondary" icon="play-skip-forward-outline" loading={busy === 'skip'} onPress={confirmSkip} />
         </>
       ) : null}
 
@@ -248,6 +264,7 @@ export default function Visit() {
           {inProgress ? (
             <Button
               title={consultation ? 'Update consultation' : 'Save consultation'}
+              icon="save-outline"
               loading={busy === 'consultation'}
               onPress={() => void saveConsultation()}
             />
@@ -258,37 +275,50 @@ export default function Visit() {
       {consultation ? (
         <>
           <SectionTitle>Prescription</SectionTitle>
-          {items.length === 0 ? <Muted>No medication added.</Muted> : null}
-          {items.map((it, i) => (
-            <Card key={`${it.medicationName}-${i}`}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text, flex: 1 }}>{it.medicationName}</Text>
-                {inProgress ? (
-                  <Pressable onPress={() => setItems((prev) => prev.filter((_, j) => j !== i))}>
-                    <Text style={{ color: colors.danger, fontWeight: '600' }}>Remove</Text>
-                  </Pressable>
-                ) : null}
+          <Card>
+            {items.length === 0 ? <Muted>No medication added.</Muted> : null}
+            {items.map((it, i) => (
+              <View
+                key={`${it.medicationName}-${i}`}
+                style={i ? { marginTop: space.md, paddingTop: space.md, borderTopWidth: 1, borderTopColor: colors.divider } : undefined}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                  <View style={{ flex: 1 }}>
+                    <CardTitle>{it.medicationName}</CardTitle>
+                    <Muted>
+                      {it.dosage} · {it.frequency} · {it.duration} · Qty {it.quantity}
+                    </Muted>
+                    {it.instructions ? <Muted>{it.instructions}</Muted> : null}
+                  </View>
+                  {inProgress ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove ${it.medicationName}`}
+                      onPress={() => setItems((prev) => prev.filter((_, j) => j !== i))}
+                      style={{ flexDirection: 'row', alignItems: 'center', padding: 4 }}>
+                      <Ionicons name="trash-outline" size={16} color={colors.danger} />
+                      <Text style={{ color: colors.danger, fontWeight: '600', marginLeft: 4 }}>Remove</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
-              <Muted>
-                {it.dosage} · {it.frequency} · {it.duration} · Qty {it.quantity}
-              </Muted>
-              {it.instructions ? <Muted>{it.instructions}</Muted> : null}
-            </Card>
-          ))}
+            ))}
+          </Card>
           {inProgress ? (
             <Card>
-              <TextField label="Medication" value={draft.medicationName} onChangeText={(v) => setDraft({ ...draft, medicationName: v })} />
-              <TextField label="Dosage (e.g. 500 mg)" value={draft.dosage} onChangeText={(v) => setDraft({ ...draft, dosage: v })} />
-              <TextField label="Frequency (e.g. twice daily)" value={draft.frequency} onChangeText={(v) => setDraft({ ...draft, frequency: v })} />
-              <TextField label="Duration (e.g. 5 days)" value={draft.duration} onChangeText={(v) => setDraft({ ...draft, duration: v })} />
-              <TextField label="Quantity" value={draft.quantity} keyboardType="number-pad" onChangeText={(v) => setDraft({ ...draft, quantity: v })} />
-              <TextField label="Instructions (optional)" value={draft.instructions} onChangeText={(v) => setDraft({ ...draft, instructions: v })} />
-              <Button title="Add medication" variant="secondary" onPress={addItem} />
+              <CardTitle style={{ marginBottom: space.md }}>Add medication</CardTitle>
+              <TextField label="Medication" required value={draft.medicationName} onChangeText={(v) => setDraft({ ...draft, medicationName: v })} />
+              <TextField label="Dosage" required helper="e.g. 500 mg" value={draft.dosage} onChangeText={(v) => setDraft({ ...draft, dosage: v })} />
+              <TextField label="Frequency" required helper="e.g. twice daily" value={draft.frequency} onChangeText={(v) => setDraft({ ...draft, frequency: v })} />
+              <TextField label="Duration" required helper="e.g. 5 days" value={draft.duration} onChangeText={(v) => setDraft({ ...draft, duration: v })} />
+              <TextField label="Quantity" required value={draft.quantity} keyboardType="number-pad" onChangeText={(v) => setDraft({ ...draft, quantity: v })} />
+              <TextField label="Instructions" value={draft.instructions} onChangeText={(v) => setDraft({ ...draft, instructions: v })} />
+              <Button title="Add to prescription" variant="secondary" icon="add-circle-outline" onPress={addItem} />
             </Card>
           ) : null}
           {inProgress ? (
             <Button
               title={prescription ? 'Update prescription' : 'Save prescription'}
+              icon="save-outline"
               loading={busy === 'prescription'}
               disabled={!items.length}
               onPress={() => void savePrescription()}
@@ -299,8 +329,8 @@ export default function Visit() {
 
       {inProgress ? (
         <>
-          <View style={{ height: 16 }} />
-          <Button title="Complete visit" variant="danger" loading={busy === 'complete'} onPress={confirmComplete} />
+          <SectionTitle>Finish</SectionTitle>
+          <Button title="Complete visit" variant="danger" icon="checkmark-done-outline" loading={busy === 'complete'} onPress={confirmComplete} />
         </>
       ) : null}
     </Screen>

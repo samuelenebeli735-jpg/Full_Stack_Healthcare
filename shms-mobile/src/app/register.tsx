@@ -17,6 +17,7 @@ import {
   Button,
   ChoiceField,
   ErrorBanner,
+  Muted,
   Screen,
   SectionTitle,
   TextField,
@@ -92,8 +93,9 @@ export default function Register() {
   if (status === 'signedIn') return <Redirect href="/" />;
 
   const set = (key: keyof Form) => (v: string) => setForm((f) => ({ ...f, [key]: v }));
+  const OPTIONAL: (keyof Form)[] = ['middleName', 'allergies'];
   const field = (key: keyof Form, label: string, props: Partial<ComponentProps<typeof TextField>> = {}) => (
-    <TextField label={label} value={form[key]} onChangeText={set(key)} error={errors[key]} {...props} />
+    <TextField label={label} value={form[key]} onChangeText={set(key)} error={errors[key]} required={!OPTIONAL.includes(key)} {...props} />
   );
 
   const submit = async () => {
@@ -144,10 +146,11 @@ export default function Register() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen options={{ headerShown: true, title: 'Create student account', headerTintColor: colors.primary }} />
+      <Stack.Screen options={{ headerShown: true, title: 'Create student account' }} />
       <Screen>
         <ErrorBanner message={error} />
 
+        <Muted>Fields marked * are required.</Muted>
         <SectionTitle>Institution</SectionTitle>
         {orgs === null ? (
           <ActivityIndicator color={colors.primary} />
@@ -158,27 +161,28 @@ export default function Register() {
             value={orgs.find((o) => o.id === form.organizationId)?.name ?? ''}
             onChange={(name) => set('organizationId')(orgs.find((o) => o.name === name)?.id ?? '')}
             error={errors.organizationId}
+            required
           />
         )}
 
         <SectionTitle>Account</SectionTitle>
         {field('email', 'Email', { autoCapitalize: 'none', keyboardType: 'email-address', autoCorrect: false })}
-        {field('password', 'Password (at least 8 characters)', { secureTextEntry: true })}
+        {field('password', 'Password', { secureTextEntry: true, helper: 'At least 8 characters.' })}
         {field('confirm', 'Confirm password', { secureTextEntry: true })}
 
         <SectionTitle>Personal details</SectionTitle>
         {field('firstName', 'First name')}
-        {field('middleName', 'Middle name (optional)')}
+        {field('middleName', 'Middle name')}
         {field('lastName', 'Last name')}
-        <ChoiceField label="Gender" options={GENDERS} value={form.gender} onChange={set('gender')} error={errors.gender} />
-        {field('dateOfBirth', 'Date of birth (YYYY-MM-DD)', { keyboardType: 'numbers-and-punctuation', placeholder: '2004-06-01' })}
+        <ChoiceField label="Gender" options={GENDERS} value={form.gender} onChange={set('gender')} error={errors.gender} required />
+        {field('dateOfBirth', 'Date of birth', { keyboardType: 'numbers-and-punctuation', placeholder: '2004-06-01', helper: 'Format: YYYY-MM-DD' })}
         {field('phone', 'Phone number', { keyboardType: 'phone-pad' })}
 
         <SectionTitle>Studies</SectionTitle>
         {field('matricNumber', 'Matric number', { autoCapitalize: 'characters' })}
         {field('faculty', 'Faculty')}
         {field('department', 'Department')}
-        <ChoiceField label="Level" options={LEVELS} value={form.level} onChange={set('level')} error={errors.level} />
+        <ChoiceField label="Level" options={LEVELS} value={form.level} onChange={set('level')} error={errors.level} required />
 
         <SectionTitle>Emergency contact</SectionTitle>
         {field('emergencyContactName', 'Contact name')}
@@ -189,7 +193,7 @@ export default function Register() {
         <ChoiceField label="Genotype" options={GENOTYPES} value={form.genotype} onChange={set('genotype')} clearable />
         {field('allergies', 'Allergies', { multiline: true })}
 
-        <Button title="Create account" onPress={() => void submit()} loading={busy} />
+        <Button title="Create account" icon="person-add-outline" onPress={() => void submit()} loading={busy} />
       </Screen>
     </KeyboardAvoidingView>
   );

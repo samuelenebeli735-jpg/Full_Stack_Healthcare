@@ -4,7 +4,7 @@ import type { ComponentProps } from 'react';
 import type { ColorValue } from 'react-native';
 
 import { RoleGate } from '@/components/RoleGate';
-import { colors } from '@/components/ui';
+import { tabScreenOptions } from '@/components/ui';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 const icon =
@@ -14,7 +14,7 @@ const icon =
 export default function StaffLayout() {
   return (
     <RoleGate role="staff">
-      <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary }}>
+      <Tabs screenOptions={tabScreenOptions}>
         <Tabs.Screen name="index" options={{ title: 'Home', tabBarIcon: icon('home') }} />
         <Tabs.Screen name="queue" options={{ title: 'Queue', tabBarIcon: icon('people') }} />
         <Tabs.Screen name="appointments" options={{ title: 'Appointments', tabBarIcon: icon('calendar') }} />

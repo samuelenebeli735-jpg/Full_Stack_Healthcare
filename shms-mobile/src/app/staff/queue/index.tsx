@@ -6,6 +6,8 @@ import { callNext, todayQueue, type QueueEntry } from '@/api/staff';
 import { useAuth } from '@/auth/AuthContext';
 import {
   Button,
+  Card,
+  CardTitle,
   EmptyState,
   ErrorBanner,
   Loading,
@@ -16,6 +18,9 @@ import {
   StatusBadge,
   Title,
   colors,
+  radius,
+  space,
+  statusColor,
 } from '@/components/ui';
 import { clinicToday } from '@/lib/clinicTime';
 import { patientName } from '@/lib/patients';
@@ -58,41 +63,46 @@ export default function StaffQueue() {
   };
 
   const row = (e: QueueEntry) => (
-    <PressableCard key={e.id} onPress={() => router.push({ pathname: '/staff/queue/[id]', params: { id: e.id } })}>
+    <PressableCard
+      key={e.id}
+      accent={statusColor(e.status)}
+      onPress={() => router.push({ pathname: '/staff/queue/[id]', params: { id: e.id } })}>
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        <Text style={{ fontSize: 22, fontWeight: '800', color: colors.primary, width: 76 }}>{ticket(e)}</Text>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
-            {patientName(e.appointment?.medicalRecord?.profile)}
-          </Text>
-          <Muted>{e.appointment?.service?.name || 'Visit'}</Muted>
+        <View style={{ minWidth: 64, marginRight: space.md, paddingVertical: 6, paddingHorizontal: 8, borderRadius: radius.md, backgroundColor: colors.primarySoft, alignItems: 'center' }}>
+          <Text style={{ fontSize: 20, fontWeight: '800', color: colors.primary }}>{ticket(e)}</Text>
         </View>
-        <StatusBadge status={e.status} />
+        <View style={{ flex: 1 }}>
+          <CardTitle>{patientName(e.appointment?.medicalRecord?.profile)}</CardTitle>
+          <Muted>{e.appointment?.service?.name || 'Visit'}</Muted>
+          <View style={{ marginTop: 6 }}>
+            <StatusBadge status={e.status} />
+          </View>
+        </View>
       </View>
     </PressableCard>
   );
 
   return (
     <Screen onRefresh={reload}>
-      <Title>Queue</Title>
+      <Title subtitle="Updates automatically every 10 seconds">Queue</Title>
       <ErrorBanner message={actionError || error} />
       <Button
         title={waiting.length ? `Call next (${waiting.length} waiting)` : 'No one waiting'}
+        icon="megaphone-outline"
         onPress={() => void next()}
         loading={busy}
         disabled={!waiting.length}
       />
       <SectionTitle>With staff</SectionTitle>
-      {active.length ? active.map(row) : <Muted>No patient is called or in consultation.</Muted>}
+      {active.length ? active.map(row) : <Card><Muted>No patient is called or in consultation.</Muted></Card>}
       <SectionTitle>Waiting</SectionTitle>
-      {waiting.length ? waiting.map(row) : <EmptyState title="Nobody is waiting" />}
+      {waiting.length ? waiting.map(row) : <Card><EmptyState icon="people-outline" title="Nobody is waiting" message="Checked-in patients appear here." /></Card>}
       {done.length ? (
         <>
           <SectionTitle>Finished today</SectionTitle>
           {done.map(row)}
         </>
       ) : null}
-      <Muted>Updates automatically every 10 seconds.</Muted>
     </Screen>
   );
 }

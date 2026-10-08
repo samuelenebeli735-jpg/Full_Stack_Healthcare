@@ -1,10 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Text } from 'react-native';
 
 import { myAppointments, rescheduleAppointment } from '@/api/student';
 import { SlotPicker, type SlotChoice } from '@/components/SlotPicker';
-import { Button, Card, EmptyState, ErrorBanner, Loading, Muted, Screen, SectionTitle, colors } from '@/components/ui';
+import { Button, Card, CardTitle, EmptyState, ErrorBanner, InfoRow, Loading, Screen, SectionTitle, colors } from '@/components/ui';
 import { doctorName } from '@/lib/appointments';
 import { formatClinicDate, formatClinicDateTime, formatTime, fromClinicParts } from '@/lib/clinicTime';
 import { useFocusData } from '@/lib/useAsync';
@@ -23,7 +22,7 @@ export default function Reschedule() {
     return (
       <Screen>
         <ErrorBanner message={error} />
-        <EmptyState title="Appointment not found" />
+        <EmptyState icon="calendar-outline" title="Appointment not found" />
       </Screen>
     );
   }
@@ -46,11 +45,11 @@ export default function Reschedule() {
   return (
     <Screen>
       <ErrorBanner message={actionError || error} />
+      <SectionTitle>Current appointment</SectionTitle>
       <Card>
-        <Muted>Current appointment</Muted>
-        <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{appt.service?.name || 'Appointment'}</Text>
-        <Muted>{formatClinicDateTime(appt.appointmentDate)}</Muted>
-        <Muted>{doctorName(appt)}</Muted>
+        <CardTitle>{appt.service?.name || 'Appointment'}</CardTitle>
+        <InfoRow label="When" value={formatClinicDateTime(appt.appointmentDate)} />
+        <InfoRow label="Doctor" value={doctorName(appt)} />
       </Card>
 
       {appt.serviceId ? (
@@ -60,17 +59,14 @@ export default function Reschedule() {
       {choice ? (
         <>
           <SectionTitle>Review</SectionTitle>
-          <Card>
-            <Muted>New time</Muted>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
-              {formatClinicDate(choice.date)} at {formatTime(choice.time)}
-            </Text>
-            <Muted>
-              Dr {choice.doctor.firstName} {choice.doctor.lastName}
-              {choice.firstAvailable ? ' (first available)' : ''}
-            </Muted>
+          <Card accent={colors.primary}>
+            <InfoRow label="New time" value={`${formatClinicDate(choice.date)} at ${formatTime(choice.time)}`} />
+            <InfoRow
+              label="Doctor"
+              value={`Dr ${choice.doctor.firstName} ${choice.doctor.lastName}${choice.firstAvailable ? ' (first available)' : ''}`}
+            />
           </Card>
-          <Button title="Confirm new time" onPress={() => void confirm()} loading={busy} />
+          <Button title="Confirm new time" icon="checkmark-circle-outline" onPress={() => void confirm()} loading={busy} />
         </>
       ) : null}
     </Screen>

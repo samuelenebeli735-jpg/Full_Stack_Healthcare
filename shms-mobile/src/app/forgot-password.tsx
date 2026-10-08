@@ -1,11 +1,11 @@
 import { Redirect, Stack } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 
 import { forgotPassword } from '@/api/auth';
 import { ApiError } from '@/api/client';
 import { useAuth } from '@/auth/AuthContext';
-import { Button, Card, ErrorBanner, Muted, Screen, TextField, colors } from '@/components/ui';
+import { Banner, Button, Card, ErrorBanner, Muted, Screen, TextField } from '@/components/ui';
 
 /** Request a password-reset email; the reset itself happens on the SHMS website. */
 export default function ForgotPassword() {
@@ -39,17 +39,19 @@ export default function ForgotPassword() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <Stack.Screen options={{ headerShown: true, title: 'Forgot password', headerTintColor: colors.primary }} />
+      <Stack.Screen options={{ headerShown: true, title: 'Forgot password' }} />
       <Screen>
         {sent ? (
-          <Card>
-            <Text style={{ color: colors.success, fontWeight: '600' }}>{sent}</Text>
-            <Muted>Open the link in the email to choose a new password, then sign in here. The link expires after 1 hour.</Muted>
-          </Card>
+          <Banner tone="success" title={sent}>
+            Open the link in the email to choose a new password, then sign in here. The link expires after 1 hour.
+          </Banner>
         ) : (
           <>
-            <Muted>Enter your account email. If email delivery is set up for your clinic, you will receive a link to reset your password on the SHMS website.</Muted>
-            <Text style={{ height: 12 }} />
+            <Card>
+            <Muted style={{ marginBottom: 12 }}>
+              Enter your account email. If email delivery is set up for your clinic, you will receive a link to reset your
+              password on the SHMS website.
+            </Muted>
             <ErrorBanner message={error} />
             <TextField
               label="Email"
@@ -61,7 +63,8 @@ export default function ForgotPassword() {
               returnKeyType="send"
               onSubmitEditing={() => void submit()}
             />
-            <Button title="Send reset link" onPress={() => void submit()} loading={busy} />
+            <Button title="Send reset link" icon="mail-outline" onPress={() => void submit()} loading={busy} />
+            </Card>
           </>
         )}
       </Screen>

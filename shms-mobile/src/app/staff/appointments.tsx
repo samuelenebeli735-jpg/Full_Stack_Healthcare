@@ -6,18 +6,25 @@ import { appointmentsPage, setAppointmentStatus, type OrgAppointment, type Staff
 import type { Pagination } from '@/api/types';
 import { useAuth } from '@/auth/AuthContext';
 import {
+  Banner,
   Button,
   Card,
+  CardTitle,
   Chip,
+  DateBlock,
   EmptyState,
   ErrorBanner,
   Muted,
   Screen,
+  SectionTitle,
   StatusBadge,
   TextField,
   Title,
   colors,
+  space,
+  statusColor,
   statusLabel,
+  type IconName,
 } from '@/components/ui';
 import { addClinicDays, clinicToday, formatClinicDate, formatClinicDateTime, formatTime, toClinicParts } from '@/lib/clinicTime';
 import { patientName } from '@/lib/patients';
@@ -36,6 +43,12 @@ const ACTION_LABEL: Record<StaffAppointmentAction, string> = {
   confirmed: 'Confirm',
   cancelled: 'Cancel',
   no_show: 'Mark missed',
+};
+
+const ACTION_STYLE: Record<StaffAppointmentAction, { variant: 'primary' | 'secondary' | 'danger'; icon: IconName }> = {
+  confirmed: { variant: 'primary', icon: 'checkmark-circle-outline' },
+  cancelled: { variant: 'secondary', icon: 'close-circle-outline' },
+  no_show: { variant: 'secondary', icon: 'alert-circle-outline' },
 };
 
 export default function StaffAppointments() {
@@ -144,7 +157,8 @@ export default function StaffAppointments() {
         <Chip label="Back to today" onPress={() => setDate(clinicToday())} />
       ) : null}
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 }}>
+      <SectionTitle>Status</SectionTitle>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
         <Chip label="All statuses" selected={!status} onPress={() => setStatus('')} />
         {STATUSES.map((s) => (
           <Chip key={s} label={statusLabel(s)} selected={status === s} onPress={() => setStatus(s)} />
@@ -168,41 +182,52 @@ export default function StaffAppointments() {
       {loading && items.length === 0 ? (
         <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
       ) : items.length === 0 ? (
-        <EmptyState
-          title="No appointments"
-          message={mode === 'day' ? `Nothing matches for ${formatClinicDate(date)}.` : 'Nothing matches these filters.'}
-        />
+        <Card>
+          <EmptyState
+            icon="calendar-outline"
+            title="No appointments"
+            message={mode === 'day' ? `Nothing matches for ${formatClinicDate(date)}.` : 'Nothing matches these filters.'}
+          />
+        </Card>
       ) : (
         <>
-          <Muted>
+          <Muted style={{ marginBottom: space.sm }}>
             {total} appointment{total === 1 ? '' : 's'}
-            {toConfirm ? ` · ${toConfirm} awaiting confirmation (patients can check in only once confirmed)` : ''}
           </Muted>
-          <View style={{ height: 8 }} />
+          {toConfirm ? (
+            <Banner tone="warning">
+              {`${toConfirm} awaiting confirmation. Patients can check in only once their appointment is confirmed.`}
+            </Banner>
+          ) : null}
           {items.map((a) => {
             const { date: d, time } = toClinicParts(a.appointmentDate);
             const actions = ACTIONS[a.status] ?? [];
             return (
-              <Card key={a.id}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <View style={{ flex: 1, paddingRight: 8 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>
-                      {mode === 'all' ? `${formatClinicDate(d)}, ` : ''}
-                      {formatTime(time)} · {patientName(a.medicalRecord?.profile)}
-                    </Text>
-                    <Muted>{a.service?.name || 'Appointment'}</Muted>
+              <Card key={a.id} accent={statusColor(a.status)}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <DateBlock date={d} />
+                  <View style={{ flex: 1 }}>
+                    <CardTitle>{patientName(a.medicalRecord?.profile)}</CardTitle>
+                    <Muted>
+                      {formatTime(time)} · {a.service?.name || 'Appointment'}
+                    </Muted>
                     <Muted>{a.staff ? `Dr ${a.staff.firstName} ${a.staff.lastName}` : 'Any available doctor'}</Muted>
-                    {a.reason ? <Muted>Reason: {a.reason}</Muted> : null}
+                    <View style={{ marginTop: 6 }}>
+                      <StatusBadge status={a.status} />
+                    </View>
                   </View>
-                  <StatusBadge status={a.status} />
                 </View>
+                {a.reason ? <Text style={{ color: colors.textSecondary, marginTop: space.sm }}>Reason: {a.reason}</Text> : null}
                 {actions.length ? (
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: space.sm }}>
                     {actions.map((action) => (
-                      <Chip
+                      <Button
                         key={action}
-                        label={busyId === a.id ? '…' : ACTION_LABEL[action]}
-                        selected={action === 'confirmed'}
+                        size="sm"
+                        title={ACTION_LABEL[action]}
+                        variant={ACTION_STYLE[action].variant}
+                        icon={ACTION_STYLE[action].icon}
+                        loading={busyId === a.id && action === 'confirmed'}
                         disabled={busyId !== null}
                         onPress={() => act(a, action)}
                       />

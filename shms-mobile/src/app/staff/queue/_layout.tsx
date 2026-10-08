@@ -1,10 +1,10 @@
 import { Stack } from 'expo-router';
 
-import { colors } from '@/components/ui';
+import { stackScreenOptions } from '@/components/ui';
 
 export default function StaffQueueLayout() {
   return (
-    <Stack screenOptions={{ headerTintColor: colors.primary, headerStyle: { backgroundColor: colors.card } }}>
+    <Stack screenOptions={stackScreenOptions}>
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="[id]" options={{ title: 'Visit' }} />
     </Stack>
