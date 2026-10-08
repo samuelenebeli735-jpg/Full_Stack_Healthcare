@@ -39,6 +39,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "f5f014b7-e5c9-40fb-ab04-00b3907280de"
+      }
+    },
+    "owner": "alive735s-team"
   }
 }
