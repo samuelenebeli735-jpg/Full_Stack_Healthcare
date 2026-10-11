@@ -46,7 +46,7 @@ Never put the owner credentials into Render.
 | `JWT_EXPIRES_IN` | `24h` |
 | `FRONTEND_URL` | `https://shms-web.onrender.com` (used in password-reset links) |
 | `CORS_ORIGINS` | `https://shms-web.onrender.com` |
-| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` — trust only private-network proxy hops (see §9). Do **not** use `true`. |
+| `TRUST_PROXY` | Private hops **plus Cloudflare's published ranges** (exact value in §9). Do **not** use `true`. |
 | `EMAIL_WEBHOOK_URL` | Not set: password reset by email is unavailable until an HTTP email endpoint is configured (Render blocks SMTP ports) |
 | `PORT`, `HOST` | Do not set: Render supplies `PORT`; the Dockerfile sets `HOST=0.0.0.0` |
 
@@ -174,16 +174,36 @@ rebuild; the URL is compiled into the app.
 showed private Render addresses (`10.195.57.137`, `10.199.71.9`) for requests
 from one public client (2026-10-11), i.e. Render forwards through more than one
 internal hop and `1` stops at an internal proxy: all users then share a few
-rate-limit buckets. Set `TRUST_PROXY=loopback,linklocal,uniquelocal`: Express
-skips only private (RFC 1918 / unique-local) hops and uses the right-most public
-address, which a client cannot forge because only Render's internal network can
-connect from those ranges. Verify after the redeploy: request
+rate-limit buckets. With only `loopback,linklocal,uniquelocal` the log then showed Cloudflare edge
+addresses (`172.68.x`, `172.70.x`): Render sits behind Cloudflare, whose edge is
+public. Trust the private hops **and** Cloudflare's published ranges
+(https://www.cloudflare.com/ips-v4 and /ips-v6, checked 2026-10-11):
+
+```
+loopback,linklocal,uniquelocal,173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32
+```
+
+Express then uses the right-most untrusted address, which is the client address
+Cloudflare appended; a client cannot forge it. Re-check Cloudflare's lists if
+they change. Verify after the redeploy: request
 `/api/v1/health?trust_proxy_check=<marker>` and confirm the matching log line
 starts with your public IP. If it shows a public Cloudflare/Render edge address
 instead, the edge is not in a private range; report the `X-Forwarded-For`
 layout before changing anything further.
 
-## 10. Moving to another provider later
+## 10. Clinic setup before booking works
+
+Students can only book when the organization has, in the admin pages:
+departments/positions as needed, at least one **service**, **staff** with the
+doctor role, and **schedules** for those doctors. With none of these, both web
+and mobile show "no services" and nothing can be booked. A new production
+organization (as created by the bootstrap) starts with none.
+
+Render's health check polls `/api/v1/health` every 5 s while the API is up and
+that endpoint queries the database, so Neon compute stays awake whenever the API
+is awake. Point the health check at `/` (no database) if compute hours run low.
+
+## 11. Moving to another provider later
 
 Everything provider-specific is configuration:
 
