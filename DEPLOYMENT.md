@@ -46,7 +46,7 @@ Never put the owner credentials into Render.
 | `JWT_EXPIRES_IN` | `24h` |
 | `FRONTEND_URL` | `https://shms-web.onrender.com` (used in password-reset links) |
 | `CORS_ORIGINS` | `https://shms-web.onrender.com` |
-| `TRUST_PROXY` | `1` (Render's proxy; see §9) |
+| `TRUST_PROXY` | `loopback,linklocal,uniquelocal` — trust only private-network proxy hops (see §9). Do **not** use `true`. |
 | `EMAIL_WEBHOOK_URL` | Not set: password reset by email is unavailable until an HTTP email endpoint is configured (Render blocks SMTP ports) |
 | `PORT`, `HOST` | Do not set: Render supplies `PORT`; the Dockerfile sets `HOST=0.0.0.0` |
 
@@ -169,9 +169,19 @@ rebuild; the URL is compiled into the app.
 | CORS error in the browser | `CORS_ORIGINS` must contain the exact web origin (scheme + host, no path). |
 | "Password reset by email is not available" | Expected until `EMAIL_WEBHOOK_URL` is configured. |
 
-`TRUST_PROXY=1` is set but not yet confirmed: Render's request log for shms-api
-should show the real client IP (not a Render/Cloudflare address) in each
-access-log line. If it shows a proxy address, adjust the value and redeploy.
+**Client IP / `TRUST_PROXY`.** The API's access log (morgan `combined`) prints
+`req.ip`, the address rate limiting is keyed on. With `TRUST_PROXY=1` the log
+showed private Render addresses (`10.195.57.137`, `10.199.71.9`) for requests
+from one public client (2026-10-11), i.e. Render forwards through more than one
+internal hop and `1` stops at an internal proxy: all users then share a few
+rate-limit buckets. Set `TRUST_PROXY=loopback,linklocal,uniquelocal`: Express
+skips only private (RFC 1918 / unique-local) hops and uses the right-most public
+address, which a client cannot forge because only Render's internal network can
+connect from those ranges. Verify after the redeploy: request
+`/api/v1/health?trust_proxy_check=<marker>` and confirm the matching log line
+starts with your public IP. If it shows a public Cloudflare/Render edge address
+instead, the edge is not in a private range; report the `X-Forwarded-For`
+layout before changing anything further.
 
 ## 10. Moving to another provider later
 
